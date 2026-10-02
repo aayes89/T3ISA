@@ -33,30 +33,61 @@ public class T3ISA {
 
     public static void main(String[] args) {
 
-        String program = """
-                ; =================================
-                ; SETUN-OS TEST PROGRAM
-                ; =================================
+        // BOOT SECTOR
+        String bootSource = "JMP 27";
 
+        TWord[] boot = TAssemblerText.assemble(bootSource);
+
+        /*
+         * TRAP VECTORS
+         *
+         * Por ahora todos apuntan a OS_START.
+         * Los handlers reales los construiremos
+         * después.
+         */
+        TWord[] vectors = {
+            TWord.fromLong(TCPU.OS_START),
+            TWord.fromLong(TCPU.OS_START),
+            TWord.fromLong(TCPU.OS_START),
+            TWord.fromLong(TCPU.OS_START),
+            TWord.fromLong(TCPU.OS_START),
+            TWord.fromLong(TCPU.OS_START)
+        };
+
+        // T3OS
+        String osSource = """
                 MOVI R2, 1234
 
                 MOVI R1, 6
                 SYS
 
+                MOVI R1, 7
+                SYS
+
                 HALT
                 """;
 
-        TWord[] machineCode = TAssemblerText.assemble(program);
+        TWord[] os = TAssemblerText.assemble(osSource);
 
+        // CPU
         TCPU cpu = new TCPU();
-        cpu.loadProgram(machineCode);
+        TConsoleDevice console = new TConsoleDevice();
+        cpu.setDevice(console);
+
+        // Boot
+        cpu.loadBootSector(boot, vectors);
+
+        // OS
+        cpu.loadProgram(os, TCPU.OS_START);
+
+        // START
+        cpu.setPC(TWord.zero());
 
         while (!cpu.isHalted()) {
             cpu.step();
         }
 
-        System.out.println("SYS OUTPUT = " + cpu.getRegister(7).toLong());
-
+        // DEBUG
         for (int i = 0; i < 27; i++) {
             System.out.println("R" + i + " = " + cpu.getRegister(i).toLong());
         }

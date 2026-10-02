@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright 2025 Allan (Slam).
+ * Copyright 2026 Slam.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,56 +21,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.Exceptions;
 
 /**
  *
  * @author Slam
  */
-public enum TOpcode {
+public final class TMemoryException extends RuntimeException {
 
-    NOP(0),
-    HALT(1),
-    MOV(10),
-    MOVI(11),
-    ADD(20),
-    SUB(21),
-    NEG(22),
-    MUL(23),
-    DIV(24),
-    MOD(25),
-    SHL(26),
-    SHR(27),
-    CMP(30),
-    TAND(40),
-    TOR(41),
-    TXOR(42),
-    TNOT(43),
-    JMP(50),
-    JNEG(51),
-    JZERO(52),
-    JPOS(53),
-    LOAD(60),
-    STORE(61),
-    PUSH(70),
-    POP(71),
-    CALL(80),
-    RET(81),
-    IRET(82),
-    SYS(90);
-
-    public final int code;
-
-    TOpcode(int code) {
-        this.code = code;
-    }
-
-    public static TOpcode fromCode(int code) {
-        for (TOpcode opcode : values()) {
-            if (opcode.code == code) {
-                return opcode;
-            }
-        }
-        return null;
+    public TMemoryException(String message) {
+        super(message);
     }
 }

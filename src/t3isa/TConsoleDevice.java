@@ -27,7 +27,18 @@ package t3isa;
  *
  * @author Slam
  */
+import java.io.BufferedReader;
+import java.io.IOException;
+
+import java.io.InputStreamReader;
+
 public final class TConsoleDevice implements TDevice {
+
+    private final BufferedReader input;
+
+    public TConsoleDevice() {
+        input = new BufferedReader(new InputStreamReader(System.in));
+    }
 
     @Override
     public void write(TWord value) {
@@ -36,6 +47,22 @@ public final class TConsoleDevice implements TDevice {
 
     @Override
     public TWord read() {
-        return TWord.zero();
+        System.out.print("DEVICE IN > ");
+
+        try {
+            String line = input.readLine();
+
+            if (line == null || line.trim().isEmpty()) {
+                return TWord.zero();
+            }
+
+            long value = Long.parseLong(line.trim());
+            
+            return TWord.fromLong(value);
+        } catch (IOException e) {
+            throw new IllegalStateException("Error leyendo dispositivo", e);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Entrada no numérica", e);
+        }
     }
 }

@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright 2025 Allan (Slam).
+ * Copyright 2026 Slam.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,50 +27,18 @@ package t3isa;
  *
  * @author Slam
  */
-public enum TOpcode {
+public enum TTrap {
 
-    NOP(0),
-    HALT(1),
-    MOV(10),
-    MOVI(11),
-    ADD(20),
-    SUB(21),
-    NEG(22),
-    MUL(23),
-    DIV(24),
-    MOD(25),
-    SHL(26),
-    SHR(27),
-    CMP(30),
-    TAND(40),
-    TOR(41),
-    TXOR(42),
-    TNOT(43),
-    JMP(50),
-    JNEG(51),
-    JZERO(52),
-    JPOS(53),
-    LOAD(60),
-    STORE(61),
-    PUSH(70),
-    POP(71),
-    CALL(80),
-    RET(81),
-    IRET(82),
-    SYS(90);
+    DIVIDE_BY_ZERO(0),
+    INVALID_MEMORY(1),
+    INVALID_INSTRUCTION(2),
+    INVALID_SYSCALL(3),
+    DEVICE_ERROR(4),
+    STACK_ERROR(5);
 
     public final int code;
 
-    TOpcode(int code) {
+    TTrap(int code) {
         this.code = code;
-    }
-
-    public static TOpcode fromCode(int code) {
-        for (TOpcode opcode : values()) {
-            if (opcode.code == code) {
-                return opcode;
-            }
-        }
-        return null;
     }
 }
