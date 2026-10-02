@@ -32,6 +32,69 @@ package t3isa;
 public class T3ISA {
 
     public static void main(String[] args) {
+        // 1. Instanciar la CPU
+        TCPU cpu = new TCPU();
+
+        // 2. Definir dos programas de prueba sencillos en ensamblador textual T3ISA
+        // Programa A: Incrementa R0 en un bucle infinito
+        String programA
+                = "inicio:\n"
+                + "MOVI R0, 100\n"
+                + "MOVI R1, 11\n"
+                + "SYS\n"
+                + "MOVI R0, 101\n"
+                + "MOVI R1, 12\n"
+                + "SYS\n";
+
+        String programB
+                = "inicio:\n"
+                + "MOVI R2, 200\n"
+                + "MOVI R1, 11\n"
+                + "SYS\n"
+                + "MOVI R2, 201\n"
+                + "MOVI R1, 11\n"
+                + "SYS\n"
+                + "MOVI R2, 202\n"
+                + "JMP inicio\n";
+
+        String timerSource
+                = "MOVI R7, 1234\n"
+                + "IRET\n";
+
+        // 3. Compilar los programas a arrays de TWord usando tu TAssemblerText
+        TWord[] binaryA = TAssemblerText.assemble(programA, 1000);
+        TWord[] binaryB = TAssemblerText.assemble(programB, 5000);
+        TWord[] timer = TAssemblerText.assemble(timerSource);
+
+        // 4. Instanciar el Kernel con un Quántum de 10 instrucciones por proceso
+        TKernel kernel = new TKernel(cpu, 10);
+
+        // 5. Cargar ambos procesos en regiones de memoria de usuario separadas
+        // Proceso 1: memoria 1000 a 4999
+        TPCB process1 = kernel.loadProcess(binaryA, TCPU.USER_MEMORY_START, 4999);
+
+        // Proceso 2: memoria 5000 a 9999
+        TPCB process2 = kernel.loadProcess(binaryB, 5000, 9999);
+        cpu.loadProgram(TCPU.INTERRUPT_HANDLER_TIMER, timer);
+
+        System.out.println("Proceso 1 creado (PID: " + process1.getPid() + ")");
+        System.out.println("Proceso 2 creado (PID: " + process2.getPid() + ")");
+
+        // 6. Ejecutar por 50 ciclos para ver cómo conmuta entre los dos programas
+        for (int i = 0; i < 50; i++) {
+            kernel.step();
+
+            TPCB current = kernel.getScheduler().getCurrentProcess();
+            if (current != null) {
+                System.out.println("Paso " + i + " -> Proceso Ejecutando PID: " + current.getPid() + " | PC: " + cpu.getPC());
+            }
+        }
+    }
+}
+
+/*
+
+    public static void main(String[] args) {
 
         // =================================
         // BOOT SECTOR
@@ -49,12 +112,14 @@ public class T3ISA {
         // T3OS / USER TEST
         // =================================
         String osSource = """
-                MOVI R1, 8
+               MOVI R1, 8
                 SYS
-
-                MOVI R4, 777
-
-                NOP
+                
+                MOVI R1, 0
+                MOVI R2, 123
+                MOVI R1, 0
+                SYS
+                
                 HALT
                 """;
 
@@ -81,14 +146,14 @@ public class T3ISA {
                 """;
 
         String syscallSource = """
-                MOVI R1, 99
-                SYS
+                MOVI R7, 999
                 HALT
                 """;
 
         String deviceSource = """
-                MOVI R2, 4
                 MOVI R1, 6
+                MOVI R2, 0
+                MOVI R3, 123
                 SYS
                 HALT
                 """;
@@ -120,7 +185,7 @@ public class T3ISA {
         TCPU cpu = new TCPU();
 
         TConsoleDevice console = new TConsoleDevice();
-        cpu.attachDevice(console);
+        cpu.attachDevice(0, console);
 
         // =================================
         // TRAP VECTOR TABLE
@@ -180,7 +245,7 @@ public class T3ISA {
         );
         System.out.println("OS MEMORY:");
 
-        for (int i = 27; i < 31; i++) {
+        for (int i = 27; i <= 31; i++) {
             System.out.println(
                     i + " = " + cpu.readMemory(i).toLong()
             );
@@ -309,4 +374,5 @@ public class T3ISA {
             );
         }
     }
-}
+     }
+ */

@@ -43,4 +43,7 @@ public final class TSyscall {
     public static final int DEVICE_IN = 7;
     public static final int ENTER_USER = 8;
     public static final int EXIT_USER = 9;
+    public static final int GETPID = 10;
+    public static final int YIELD = 11;
+    public static final int EXIT = 12;
 }

@@ -97,6 +97,7 @@ public final class TCPU {
 
     private int pc;
     private int sp;
+    private int currentPid;
 
     private boolean kernelMode;
 
@@ -105,14 +106,18 @@ public final class TCPU {
 
     private int programSize;
     private boolean halted;
+    private int pendingProcessAction = -1;
 
-    private TDevice device;
+    //private TDevice device;   // Ya no es necesario
+    private final TDeviceBus deviceBus;
 
     public TCPU() {
         registers = new TWord[REGISTER_COUNT];
         memory = new TWord[MEMORY_SIZE];
-
+        currentPid = 0;
+        pendingProcessAction = -1;
         reset();
+        deviceBus = new TDeviceBus(16);
     }
 
     public void reset() {
@@ -133,7 +138,25 @@ public final class TCPU {
         trap = null;
         compare = 0;
         programSize = 0;
+        currentPid = 0;
+        pendingProcessAction = -1;
         halted = false;
+    }
+
+    public int getCurrentPid() {
+        return currentPid;
+    }
+
+    public void setCurrentPid(int pid) {
+        currentPid = pid;
+    }
+
+    public int getPendingProcessAction() {
+        return pendingProcessAction;
+    }
+
+    public void clearPendingProcessAction() {
+        pendingProcessAction = -1;
     }
 
     public TInterrupt getPendingInterrupt() {
@@ -174,6 +197,15 @@ public final class TCPU {
         registers[index] = value.copy();
     }
 
+    public void setUserSP(int value) {
+        checkAddress(value);
+        userSP = value;
+    }
+
+    public void setCompare(int value) {
+        compare = value;
+    }
+
     public int getPC() {
         return pc;
     }
@@ -203,8 +235,8 @@ public final class TCPU {
         return compare;
     }
 
-    public void attachDevice(TDevice device) {
-        this.device = device;
+    public void attachDevice(int port, TDevice device) {
+        deviceBus.attach(port, device);
     }
 
     public TWord readMemory(int address) {
@@ -272,129 +304,42 @@ public final class TCPU {
         }
 
         try {
-
             if (pc < 0 || pc >= programSize) {
-                System.out.println(
-                        "INVALID PC: " + pc
-                        + " programSize=" + programSize
-                );
-
+                System.out.println("INVALID PC: " + pc + " programSize=" + programSize);
                 raiseTrap(TTrap.INVALID_MEMORY);
                 return;
             }
 
             int instructionAddress = pc;
-
-            System.out.println(
-                    "FETCH PC=" + pc
-                    + " WORD=" + memory[pc].toLong()
-            );
-
-            TInstruction instruction;
-
-            try {
-
-                instruction = TInstruction.decode(memory[pc]);
-
-            } catch (IllegalStateException e) {
-
-                System.out.println(
-                        "DECODE ERROR PC=" + pc
-                        + " WORD=" + memory[pc].toLong()
-                        + " MSG=" + e.getMessage()
-                );
-
-                raiseTrap(TTrap.INVALID_INSTRUCTION);
-                return;
-            }
-
-            if (instruction == null) {
-
-                System.out.println(
-                        "DECODE NULL PC=" + pc
-                );
-
-                raiseTrap(TTrap.INVALID_INSTRUCTION);
-                return;
-            }
-
-            System.out.println(
-                    "DECODE OK PC=" + pc
-                    + " OPCODE=" + instruction.getOpcode()
-            );
-
-            pc = instructionAddress;
-
-            execute(instruction);
-
-        } catch (TMemoryException e) {
-
-            System.out.println(
-                    "MEMORY EXCEPTION PC=" + pc
-            );
-
-            raiseTrap(TTrap.INVALID_MEMORY);
-
-        } catch (ArithmeticException e) {
-
-            System.out.println(
-                    "ARITHMETIC EXCEPTION PC=" + pc
-            );
-
-            raiseTrap(TTrap.DIVIDE_BY_ZERO);
-
-        } catch (IllegalArgumentException e) {
-
-            System.out.println(
-                    "ILLEGAL ARGUMENT PC=" + pc
-                    + " MSG=" + e.getMessage()
-            );
-
-            raiseTrap(TTrap.INVALID_INSTRUCTION);
-        }
-    }
-
-    public void step1() {
-        if (halted) {
-            return;
-        }
-        if (pendingInterrupt != null) {
-            handleInterrupt();
-            return;
-        }
-
-        try {
-            if (pc < 0 || pc >= programSize) {
-                raiseTrap(TTrap.INVALID_MEMORY);
-                return;
-            }
-
-            int instructionAddress = pc;
+            System.out.println("FETCH PC=" + pc + " WORD=" + memory[pc].toLong());
             TInstruction instruction;
 
             try {
                 instruction = TInstruction.decode(memory[pc]);
             } catch (IllegalStateException e) {
+                System.out.println("DECODE ERROR PC=" + pc + " WORD=" + memory[pc].toLong() + " MSG=" + e.getMessage());
                 raiseTrap(TTrap.INVALID_INSTRUCTION);
                 return;
             }
 
             if (instruction == null) {
+                System.out.println("DECODE NULL PC=" + pc);
                 raiseTrap(TTrap.INVALID_INSTRUCTION);
                 return;
             }
 
+            System.out.println("DECODE OK PC=" + pc + " OPCODE=" + instruction.getOpcode());
             pc = instructionAddress;
 
             execute(instruction);
-
         } catch (TMemoryException e) {
+            System.out.println("MEMORY EXCEPTION PC=" + pc);
             raiseTrap(TTrap.INVALID_MEMORY);
-
         } catch (ArithmeticException e) {
+            System.out.println("ARITHMETIC EXCEPTION PC=" + pc);
             raiseTrap(TTrap.DIVIDE_BY_ZERO);
-
         } catch (IllegalArgumentException e) {
+            System.out.println("ILLEGAL ARGUMENT PC=" + pc + " MSG=" + e.getMessage());
             raiseTrap(TTrap.INVALID_INSTRUCTION);
         }
     }
@@ -591,14 +536,11 @@ public final class TCPU {
     }
 
     private void executeIRet() {
-
         System.out.println("=== IRET ===");
         System.out.println("SP antes = " + sp);
         System.out.println("trap = " + trap);
-        System.out.println("memory[sp+1] = "
-                + memory[sp + 1].toLong());
-        System.out.println("memory[sp+2] = "
-                + memory[sp + 2].toLong());
+        System.out.println("memory[sp+1] = " + memory[sp + 1].toLong());
+        System.out.println("memory[sp+2] = " + memory[sp + 2].toLong());
 
         if (!kernelMode) {
             halted = true;
@@ -646,44 +588,13 @@ public final class TCPU {
         System.out.println("SP = " + sp);
     }
 
-    private void executeIRet1() {
-
-        if (!kernelMode) {
-            halted = true;
-            return;
-        }
-
-        int trapAddress = sp + 1;
-        int pcAddress = sp + 2;
-
-        int code = (int) memory[trapAddress].toLong();
-
-        if (trap != null) {
-            if (code < 0 || code >= TRAP_VECTOR_COUNT) {
-                halted = true;
-                return;
-            }
-
-            pc = (int) memory[pcAddress].toLong();
-            sp = userSP;
-            kernelMode = false;
-            trap = null;
-            return;
-        }
-
-        // Si no hay trap, el frame corresponde
-        // a una interrupción.
-        if (code < 0 || code >= INTERRUPT_VECTOR_COUNT) {
-            halted = true;
-            return;
-        }
-
-        pc = (int) memory[pcAddress].toLong();
-        sp = userSP;
-        kernelMode = false;
-    }
-
     private void executeSys() {
+        System.out.println(
+                "SYS -> R1=" + getRegister(1).toLong()
+                + " R2=" + getRegister(2).toLong()
+                + " R3=" + getRegister(3).toLong()
+                + " PC=" + pc
+        );
         int service = (int) getRegister(1).toLong();
         switch (service) {
             case TSyscall.HALT:
@@ -733,22 +644,24 @@ public final class TCPU {
                 break;
 
             case TSyscall.DEVICE_OUT:
-                if (device == null) {
+                try {
+                    int port = (int) getRegister(2).toLong();
+                    deviceBus.write(port, getRegister(3));
+                } catch (IllegalArgumentException | IllegalStateException e) {
                     raiseTrap(TTrap.DEVICE_ERROR);
                     return;
                 }
-
-                device.write(getRegister(2));
                 incrementPC();
                 break;
 
             case TSyscall.DEVICE_IN:
-                if (device == null) {
+                try {
+                    int port = (int) getRegister(2).toLong();
+                    setRegister(7, deviceBus.read(port));
+                } catch (IllegalArgumentException | IllegalStateException e) {
                     raiseTrap(TTrap.DEVICE_ERROR);
                     return;
                 }
-
-                setRegister(7, device.read());
                 incrementPC();
                 break;
 
@@ -773,6 +686,20 @@ public final class TCPU {
                 kernelMode = true;
                 sp = kernelSP;
                 incrementPC();
+                break;
+
+            case TSyscall.GETPID:
+                setRegister(7, TWord.fromLong(currentPid));
+                incrementPC();
+                break;
+
+            case TSyscall.YIELD:
+                incrementPC();
+                pendingProcessAction = TSyscall.YIELD;
+                break;
+
+            case TSyscall.EXIT:
+                pendingProcessAction = TSyscall.EXIT;
                 break;
 
             default:
@@ -969,5 +896,29 @@ public final class TCPU {
         int vectorAddress = INTERRUPT_VECTOR_BASE + interrupt.code;
         int handler = checkedAddress(memory[vectorAddress].toLong());
         pc = handler;
+    }
+
+    public void setKernelMode(boolean value) {
+        kernelMode = value;
+    }
+
+    public void setSP(int value) {
+        checkAddress(value);
+        sp = value;
+    }
+
+    public void restoreProcessContext(int pc, TWord[] registers, int userSP, int compare) {
+        this.pc = pc;
+
+        for (int i = 0; i < REGISTER_COUNT; i++) {
+            this.registers[i] = registers[i].copy();
+        }
+
+        this.userSP = userSP;
+        this.compare = compare;
+
+        this.sp = userSP;
+        this.kernelMode = false;
+        this.trap = null;
     }
 }

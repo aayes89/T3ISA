@@ -36,6 +36,10 @@ public final class TAssemblerText {
     }
 
     public static TWord[] assemble(String source) {
+        return assemble(source, 0);
+    }
+
+    public static TWord[] assemble(String source, int memoryBase) {
 
         String[] lines = source.split("\\R");
         List<String> instructions = new ArrayList<>();
@@ -64,8 +68,7 @@ public final class TAssemblerText {
                 if (labels.containsKey(label)) {
                     throw new IllegalArgumentException("Etiqueta duplicada: " + label);
                 }
-
-                labels.put(label, instructions.size());
+                labels.put(label, memoryBase + instructions.size());
                 line = line.substring(colon + 1).trim();
                 if (line.isEmpty()) {
                     break;
