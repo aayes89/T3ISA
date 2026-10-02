@@ -1,62 +1,61 @@
 /*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Main.java to edit this template
+ * The MIT License
+ *
+ * Copyright 2025 Allan (Slam).
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 package t3isa;
 
 /**
  *
- * @author sistemas T3ISA - Ternary 3-State Instruction Set Architecture
+ * @author Slam
+ *
+ * T3ISA - Ternary 3-State Instruction Set Architecture
  */
 public class T3ISA {
 
     public static void main(String[] args) {
 
+        String program = """
+                ; =================================
+                ; SETUN-OS TEST PROGRAM
+                ; =================================
+
+                MOVI R1, 10
+                MOVI R2, 20
+
+                ADD R3, R1, R2
+
+                HALT
+                """;
+
+        TWord[] machineCode = TAssemblerText.assemble(program);
         TCPU cpu = new TCPU();
-
-        /*
-         * R1 = 10
-         * R2 = 20
-         * R3 = R1 + R2
-         */
-        cpu.load(
-                0,
-                TAssembler.movi(1, 10)
-        );
-
-        cpu.load(
-                1,
-                TAssembler.movi(2, 20)
-        );
-
-        cpu.load(
-                2,
-                TAssembler.add(3, 1, 2)
-        );
-
-        cpu.load(
-                3,
-                TAssembler.halt()
-        );
-
+        cpu.loadProgram(machineCode);
+        
         while (!cpu.isHalted()) {
             cpu.step();
         }
 
-        System.out.println(
-                "R1 = "
-                + cpu.getRegister(1).toLong()
-        );
-
-        System.out.println(
-                "R2 = "
-                + cpu.getRegister(2).toLong()
-        );
-
-        System.out.println(
-                "R3 = "
-                + cpu.getRegister(3).toLong()
-        );
+        System.out.println("R1 = " + cpu.getRegister(1).toLong());
+        System.out.println("R2 = " + cpu.getRegister(2).toLong());
+        System.out.println("R3 = " + cpu.getRegister(3).toLong());
     }
-
 }
