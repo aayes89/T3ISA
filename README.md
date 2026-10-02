@@ -1,1 +1,1 @@
-Computado de tres estados basada en Setun (Rusia)
+Computadora de tres estados basada en Setun (Rusia)
