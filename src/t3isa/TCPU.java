@@ -29,6 +29,7 @@ package t3isa;
  */
 public final class TCPU {
 
+    private TDevice device;
     public static final int REGISTERS = 27;
     public static final int MEMORY_SIZE = 19683;
 
@@ -44,6 +45,7 @@ public final class TCPU {
     private boolean halted;
 
     public TCPU() {
+        device = null;
         registers = new TWord[REGISTERS];
         memory = new TWord[MEMORY_SIZE];
 
@@ -86,6 +88,10 @@ public final class TCPU {
             return;
         }
         registers[index] = value.copy();
+    }
+
+    public void setDevice(TDevice device) {
+        this.device = device;
     }
 
     public TWord getPC() {
@@ -303,11 +309,9 @@ public final class TCPU {
                 break;
 
             case SYS:
-                /*
-                 * Reservado para la ABI del sistema.
-                 */
-                incrementPC();
+                executeSys();
                 break;
+
             default:
                 throw new IllegalStateException("Instrucción aún no implementada: " + opcode);
         }
@@ -315,6 +319,59 @@ public final class TCPU {
 
     private void incrementPC() {
         pc = TALU.increment(pc);
+    }
+
+    private void executeSys() {
+        int service = (int) getRegister(1).toLong();
+
+        switch (service) {
+            case 0: // Sys 0 - Halt
+                halted = true;
+                break;
+
+            case 1: // Sys 1 - getpc R7 = PC
+                setRegister(7, pc);
+                incrementPC();
+                break;
+
+            case 2: // Sys 2 - getsp R7 = SP
+                setRegister(7, sp);
+                incrementPC();
+                break;
+
+            case 3: // Sys 3 - getcmp R7 = -1, 0, +1
+                setRegister(7, TWord.fromLong(compare));
+                incrementPC();
+                break;
+            case 4:
+                // Sys 4 - read
+                // R2 = dirección
+                // R7 = valor
+                int readAddress = checkedAddress(getRegister(2).toLong());
+                setRegister(7, memory[readAddress]);
+                incrementPC();
+                break;
+
+            case 5:
+                // SYS 5 - write
+                // R2 = dirección
+                // R3 = valor
+                int writeAddress = checkedAddress(getRegister(2).toLong());
+                memory[writeAddress] = getRegister(3);
+                incrementPC();
+                break;
+            case 6: // Sys 6 - device
+                if (device == null) {
+                    throw new IllegalStateException("SYS 6 requiere un dispositivo");
+                }
+
+                device.write(getRegister(2));
+                incrementPC();
+                break;
+
+            default:
+                throw new IllegalStateException("SYS desconocido: " + service);
+        }
     }
 
     private void executeLoad(TInstruction instruction) {

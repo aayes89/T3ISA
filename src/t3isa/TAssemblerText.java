@@ -159,7 +159,7 @@ public final class TAssemblerText {
             case "SHR":
                 require(tokens, 4);
                 return TAssembler.shr(register(tokens[1]), register(tokens[2]), register(tokens[3]));
-                
+
             case "NEG":
                 require(tokens, 3);
                 return TAssembler.neg(register(tokens[1]), register(tokens[2]));
@@ -219,6 +219,10 @@ public final class TAssemblerText {
             case "CALL":
                 require(tokens, 2);
                 return TAssembler.call(integer(tokens[1]));
+
+            case "SYS":
+                require(tokens, 1);
+                return TAssembler.encode(TOpcode.SYS, 0, 0, 0, 0);
 
             case "RET":
                 require(tokens, 1);

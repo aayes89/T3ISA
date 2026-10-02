@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright 2025 Allan (Slam).
+ * Copyright 2026 Slam.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,39 +26,16 @@ package t3isa;
 /**
  *
  * @author Slam
- *
- * T3ISA - Ternary 3-State Instruction Set Architecture
  */
-public class T3ISA {
+public final class TConsoleDevice implements TDevice {
 
-    public static void main(String[] args) {
+    @Override
+    public void write(TWord value) {
+        System.out.println("DEVICE OUT = " + value.toLong());
+    }
 
-        String program = """
-                ; =================================
-                ; SETUN-OS TEST PROGRAM
-                ; =================================
-
-                MOVI R2, 1234
-
-                MOVI R1, 6
-                SYS
-
-                HALT
-                """;
-
-        TWord[] machineCode = TAssemblerText.assemble(program);
-
-        TCPU cpu = new TCPU();
-        cpu.loadProgram(machineCode);
-
-        while (!cpu.isHalted()) {
-            cpu.step();
-        }
-
-        System.out.println("SYS OUTPUT = " + cpu.getRegister(7).toLong());
-
-        for (int i = 0; i < 27; i++) {
-            System.out.println("R" + i + " = " + cpu.getRegister(i).toLong());
-        }
+    @Override
+    public TWord read() {
+        return TWord.zero();
     }
 }
