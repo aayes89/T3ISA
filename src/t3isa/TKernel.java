@@ -42,6 +42,7 @@ public class TKernel {
 
         // Configurar los vectores de interrupción/trap en TCPU
         setupInterruptVectors();
+        setupTrapHandlers();
     }
 
     private void setupInterruptVectors() {
@@ -97,6 +98,8 @@ public class TKernel {
 
         int action = cpu.getPendingProcessAction();
 
+        System.out.println("PENDING ACTION = " + action);
+
         if (action == TSyscall.YIELD) {
             cpu.clearPendingProcessAction();
             scheduler.schedule(cpu);
@@ -104,6 +107,11 @@ public class TKernel {
         } else if (action == TSyscall.EXIT) {
             cpu.clearPendingProcessAction();
             scheduler.terminateCurrentProcess(cpu);
+
+            if (scheduler.getCurrentProcess() == null) {
+                cpu.halt();
+                return;
+            }
         }
 
         if (cpu.isKernelMode() && cpu.getPC() == TCPU.INTERRUPT_HANDLER_TIMER) {
@@ -116,6 +124,15 @@ public class TKernel {
         while (!cpu.isHalted() && scheduler.hasReadyProcesses()) {
             step();
         }
+    }
+
+    private void setupTrapHandlers() {
+        TWord[] memoryHandler = TAssemblerText.assemble(
+                "MOVI R1, 1\n"
+                + "IRET\n"
+        );
+
+        cpu.loadProgram(TCPU.TRAP_HANDLER_MEMORY, memoryHandler);
     }
 
     public TScheduler getScheduler() {

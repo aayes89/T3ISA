@@ -90,13 +90,13 @@ public class TPCB {
     public void restoreContext(TCPU cpu) {
         cpu.setPC(this.pc);
 
-        // Restaurar registros generales R0..R26
         for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
             cpu.setRegister(i, this.registers[i]);
         }
 
         cpu.setUserSP(userSP);
         cpu.setCompare(compare);
+        cpu.setProcessMemoryRange(memoryBase, memoryLimit);
     }
 
     public TWord[] getRegisters() {

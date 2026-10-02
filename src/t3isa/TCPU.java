@@ -103,8 +103,9 @@ public final class TCPU {
 
     private TTrap trap;
     private int compare;
+    private int currentMemoryBase;
+    private int currentMemoryLimit;
 
-    private int programSize;
     private boolean halted;
     private int pendingProcessAction = -1;
 
@@ -136,8 +137,9 @@ public final class TCPU {
         kernelMode = true;
         pendingInterrupt = null;
         trap = null;
+        currentMemoryBase = USER_MEMORY_START;
+        currentMemoryLimit = USER_MEMORY_START;
         compare = 0;
-        programSize = 0;
         currentPid = 0;
         pendingProcessAction = -1;
         halted = false;
@@ -179,7 +181,6 @@ public final class TCPU {
 
         int vectorAddress = INTERRUPT_VECTOR_BASE + interrupt.code;
         memory[vectorAddress] = TWord.fromLong(handlerAddress);
-        programSize = Math.max(programSize, vectorAddress + 1);
     }
 
     public TWord getRegister(int index) {
@@ -235,6 +236,18 @@ public final class TCPU {
         return compare;
     }
 
+    public void setProcessMemoryRange(int base, int limit) {
+        checkAddress(base);
+        checkAddress(limit);
+
+        if (base > limit) {
+            throw new IllegalArgumentException("Rango de memoria inválido");
+        }
+
+        currentMemoryBase = base;
+        currentMemoryLimit = limit;
+    }
+
     public void attachDevice(int port, TDevice device) {
         deviceBus.attach(port, device);
     }
@@ -277,7 +290,6 @@ public final class TCPU {
             memory[startAddress + i] = program[i].copy();
         }
 
-        programSize = Math.max(programSize, startAddress + program.length);
     }
 
     public void loadTrapVector(TTrap trap, int handlerAddress) {
@@ -289,7 +301,6 @@ public final class TCPU {
 
         int vectorAddress = TRAP_VECTOR_BASE + trap.code;
         memory[vectorAddress] = TWord.fromLong(handlerAddress);
-        programSize = Math.max(programSize, vectorAddress + 1);
     }
 
     public void step() {
@@ -304,9 +315,18 @@ public final class TCPU {
         }
 
         try {
-            if (pc < 0 || pc >= programSize) {
-                System.out.println("INVALID PC: " + pc + " programSize=" + programSize);
+            if (pc < 0 || pc >= MEMORY_SIZE) {
+                System.out.println("INVALID PC: " + pc);
                 raiseTrap(TTrap.INVALID_MEMORY);
+                return;
+            }
+
+            if (!kernelMode && (pc < currentMemoryBase || pc > currentMemoryLimit)) {
+                System.out.println("PROCESS MEMORY VIOLATION PC=" + pc + " RANGE=" + currentMemoryBase + ".." + currentMemoryLimit);
+                raiseTrap(TTrap.INVALID_MEMORY);
+
+                // Violación de ejecución: el proceso no puede continuar.
+                pendingProcessAction = TSyscall.EXIT;
                 return;
             }
 
@@ -775,9 +795,9 @@ public final class TCPU {
         }
 
         // Frame:
-        // [sp]     = PC de retorno
-        // [sp - 1] = código del trap
-        memory[sp] = TWord.fromLong(pc + 1);
+        // [sp]  = PC de retorno
+        // [sp]  = código del trap
+        memory[sp] = TWord.fromLong(pc);
         sp--;
 
         memory[sp] = TWord.fromLong(cause.code);
@@ -845,10 +865,14 @@ public final class TCPU {
 
     private int checkedUserAddress(long address) {
         int value = checkedAddress(address);
-        if (!kernelMode && value < USER_MEMORY_START) {
-            raiseTrap(TTrap.INVALID_MEMORY);
-            return -1;
+
+        if (!kernelMode) {
+            if (value < currentMemoryBase || value > currentMemoryLimit) {
+                raiseTrap(TTrap.INVALID_MEMORY);
+                return -1;
+            }
         }
+
         return value;
     }
 
@@ -905,6 +929,10 @@ public final class TCPU {
     public void setSP(int value) {
         checkAddress(value);
         sp = value;
+    }
+
+    public void halt() {
+        halted = true;
     }
 
     public void restoreProcessContext(int pc, TWord[] registers, int userSP, int compare) {

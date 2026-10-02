@@ -79,7 +79,7 @@ public class TScheduler {
 
         // Extraer el siguiente proceso de la cola de listos
         currentProcess = readyQueue.poll();
-        
+
         if (currentProcess != null) {
             currentProcess.setState(TPCB.ProcessState.RUNNING);
             cpu.setCurrentPid(currentProcess.getPid());
@@ -138,6 +138,7 @@ public class TScheduler {
         if (currentProcess != null) {
             currentProcess.setState(TPCB.ProcessState.RUNNING);
             cpu.setCurrentPid(currentProcess.getPid());
+            cpu.setProcessMemoryRange(currentProcess.getMemoryBase(), currentProcess.getMemoryLimit());
             cpu.restoreProcessContext(currentProcess.getPc(), currentProcess.getRegisters(), currentProcess.getUserSP(), currentProcess.getCompare());
         }
 

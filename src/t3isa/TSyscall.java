@@ -46,4 +46,5 @@ public final class TSyscall {
     public static final int GETPID = 10;
     public static final int YIELD = 11;
     public static final int EXIT = 12;
+    public static final int BLOCK = 13;
 }
