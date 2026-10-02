@@ -29,20 +29,7 @@ import t3isa.Exceptions.TMemoryException;
  *
  * @author Slam
  */
-public final class TCPU {
-
-    public static final int REGISTER_COUNT = 27;
-    public static final int REGISTERS = REGISTER_COUNT;
-    public static final int MEMORY_SIZE = 19683;
-    public static final int KERNEL_MEMORY_END = 999;
-    public static final int USER_MEMORY_START = 1000;
-    public static final int KERNEL_STACK_TOP = 15999;
-    public static final int KERNEL_STACK_BOTTOM = 15000;
-
-    public static final int USER_STACK_TOP = 19682;
-    public static final int USER_STACK_BOTTOM = 16000;
-
-    /*
+/*
      * Memory map
      *
      * 0      - Boot sector
@@ -61,10 +48,24 @@ public final class TCPU {
      * 16000..19682 STACK
      *
      * Stack grows downward.
-     */
-    public static final int BOOT_START = 0;
+ */
+public final class TCPU {
+
+    public static final int REGISTER_COUNT = 27;
+    public static final int REGISTERS = REGISTER_COUNT;
+    public static final int MEMORY_SIZE = 19683;
+    public static final int KERNEL_MEMORY_END = 999;
+    public static final int USER_MEMORY_START = 1000;
+    public static final int KERNEL_STACK_TOP = 15999;
+    public static final int KERNEL_STACK_BOTTOM = 15000;
+
+    public static final int USER_STACK_TOP = 19682;
+    public static final int USER_STACK_BOTTOM = 16000;
+    private int userSP;
+    private int kernelSP;
     public static final int TRAP_VECTOR_BASE = 1;
     public static final int TRAP_VECTOR_COUNT = 6;
+    public static final int BOOT_START = 7;
     public static final int BOOT_SIZE = 27;
     public static final int OS_START = 27;
 
@@ -111,7 +112,9 @@ public final class TCPU {
         }
 
         pc = BOOT_START;
-        sp = STACK_TOP;
+        kernelSP = KERNEL_STACK_TOP;
+        userSP = USER_STACK_TOP;
+        sp = kernelSP;
         kernelMode = true;
 
         trap = null;
@@ -391,18 +394,10 @@ public final class TCPU {
                 break;
 
             case LOAD:
-                if (!kernelMode) {
-                    raiseTrap(TTrap.INVALID_MEMORY);
-                    return;
-                }
                 executeLoad(instruction);
                 break;
 
             case STORE:
-                if (!kernelMode) {
-                    raiseTrap(TTrap.INVALID_MEMORY);
-                    return;
-                }
                 executeStore(instruction);
                 break;
 
@@ -462,14 +457,26 @@ public final class TCPU {
     }
 
     private void executeIRet() {
-        TWord trapCode = pop();
-        int code = (int) trapCode.toLong();
+
+        if (!kernelMode || trap == null) {
+            halted = true;
+            return;
+        }
+
+        int trapAddress = sp + 1;
+        int pcAddress = sp + 2;
+
+        int code = (int) memory[trapAddress].toLong();
+
         if (code < 0 || code >= TRAP_VECTOR_COUNT) {
             halted = true;
             return;
         }
 
-        pc = (int) pop().toLong();
+        pc = (int) memory[pcAddress].toLong();
+
+        sp = userSP;
+        kernelMode = false;
         trap = null;
     }
 
@@ -543,13 +550,13 @@ public final class TCPU {
                 break;
 
             case TSyscall.ENTER_USER:
-                // Sys 8 - ENTER_USER
                 if (!kernelMode) {
                     raiseTrap(TTrap.INVALID_SYSCALL);
                     return;
                 }
 
                 kernelMode = false;
+                sp = userSP;
                 incrementPC();
                 break;
 
@@ -559,7 +566,9 @@ public final class TCPU {
                     return;
                 }
 
+                userSP = sp;
                 kernelMode = true;
+                sp = kernelSP;
                 incrementPC();
                 break;
 
@@ -571,30 +580,37 @@ public final class TCPU {
 
     private void push(TWord value) {
 
-        if (sp < STACK_BOTTOM) {
+        int bottom = kernelMode
+                ? KERNEL_STACK_BOTTOM
+                : USER_STACK_BOTTOM;
+
+        if (sp < bottom) {
             raiseTrap(TTrap.STACK_ERROR);
             return;
         }
 
         memory[sp] = value.copy();
-
         sp--;
-
-        if (sp < STACK_BOTTOM) {
-            sp = STACK_BOTTOM;
-        }
     }
 
     private TWord pop() {
 
-        if (sp >= STACK_TOP) {
+        int bottom = kernelMode
+                ? KERNEL_STACK_BOTTOM
+                : USER_STACK_BOTTOM;
+
+        int top = kernelMode
+                ? KERNEL_STACK_TOP
+                : USER_STACK_TOP;
+
+        if (sp >= top) {
             raiseTrap(TTrap.STACK_ERROR);
             return TWord.zero();
         }
 
         sp++;
 
-        if (sp > STACK_TOP) {
+        if (sp > top || sp < bottom) {
             raiseTrap(TTrap.STACK_ERROR);
             return TWord.zero();
         }
@@ -603,43 +619,59 @@ public final class TCPU {
     }
 
     private void raiseTrap(TTrap cause) {
+
         if (cause == null) {
             halted = true;
             return;
         }
 
-        if (trap != null && cause == TTrap.STACK_ERROR) {
+        if (trap != null) {
             halted = true;
             return;
         }
 
         trap = cause;
-        kernelMode = true;
 
-        try {
-            if (sp < STACK_BOTTOM + 2) {
-                halted = true;
-                return;
-            }
-
-            memory[sp] = TWord.fromLong(pc + 1);
-            sp--;
-
-            memory[sp] = TWord.fromLong(cause.code);
-            sp--;
-
-            int vectorAddress = TRAP_VECTOR_BASE + cause.code;
-            if (vectorAddress < TRAP_VECTOR_BASE || vectorAddress >= TRAP_VECTOR_BASE + TRAP_VECTOR_COUNT) {
-                halted = true;
-                return;
-            }
-
-            int handler = checkedAddress(memory[vectorAddress].toLong());
-            pc = handler;
-        } catch (Exception e) {
-            trap = TTrap.STACK_ERROR;
-            halted = true;
+        if (!kernelMode) {
+            userSP = sp;
+            kernelMode = true;
+            sp = KERNEL_STACK_TOP;
         }
+
+        if (sp < KERNEL_STACK_BOTTOM + 2) {
+            halted = true;
+            return;
+        }
+
+        // Frame:
+        // [sp]     = PC de retorno
+        // [sp - 1] = código del trap
+        memory[sp] = TWord.fromLong(pc + 1);
+        sp--;
+
+        memory[sp] = TWord.fromLong(cause.code);
+        sp--;
+
+        int vectorAddress = TRAP_VECTOR_BASE + cause.code;
+
+        int handler = checkedAddress(
+                memory[vectorAddress].toLong()
+        );
+
+        pc = handler;
+    }
+
+    private void switchToKernelStack() {
+        if (!kernelMode) {
+            userSP = sp;
+            kernelSP = KERNEL_STACK_TOP;
+            sp = kernelSP;
+        }
+    }
+
+    private void switchToUserStack() {
+        kernelSP = sp;
+        sp = userSP;
     }
 
     private TWord pcWord() {
@@ -686,5 +718,17 @@ public final class TCPU {
             return -1;
         }
         return value;
+    }
+
+    public boolean isKernelMode() {
+        return kernelMode;
+    }
+
+    public int getUserSP() {
+        return userSP;
+    }
+
+    public int getKernelSP() {
+        return kernelSP;
     }
 }

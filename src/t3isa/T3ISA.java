@@ -33,20 +33,16 @@ public class T3ISA {
 
     public static void main(String[] args) {
 
-        TWord[] iretTest = TAssemblerText.assemble("""
-                                                   MOVI R2, 111
-                                                   IRET 
-                                                   HALT
-                                                   """
-        );
+        String userKernelWriteTest = """
+        MOVI R1, 8
+        SYS
 
-        TWord[] divZeroTest = TAssemblerText.assemble("""
-        MOVI R2, 10
-        MOVI R3, 0
-        DIV R4, R2, R3
-        MOVI R5, 123
+        MOVI R2, 27
+        MOVI R3, 999
+        STORE R2, R3, 0
+
         HALT
-        """);
+        """;
 
         // =================================
         // BOOT SECTOR
@@ -64,19 +60,17 @@ public class T3ISA {
         // T3OS
         // =================================
         String osSource = """
-               MOVI R1, 8
-               SYS
-               
-               MOVI R2, 123
-               MOVI R1, 6
-               SYS
-               
-               MOVI R1, 9
-               SYS
-               
-               MOVI R1, 0
-               SYS
-                """;
+       MOVI R1, 8
+       SYS
+       
+       MOVI R2, 500
+       LOAD R3, R2, 0
+       HALT
+       """;
+        String memorySource = """
+        MOVI R7, 999
+        IRET
+        """;
 
         TWord[] os = TAssemblerText.assemble(osSource);
 
@@ -86,11 +80,6 @@ public class T3ISA {
         String divZeroSource = """
                 MOVI R7, 999 
                 IRET
-                """;
-        String memorySource = """
-                MOVI R2, -1
-                LOAD R3, R2, 0
-                HALT
                 """;
 
         String instructionSource = """
@@ -146,11 +135,14 @@ public class T3ISA {
 // LOAD BOOT
 // =================================
         cpu.loadProgram(TCPU.BOOT_START, boot);
+        TWord[] userKernelWrite = TAssemblerText.assemble(userKernelWriteTest);
+
+        cpu.loadProgram(TCPU.OS_START, userKernelWrite);
 
 // =================================
 // LOAD T3OS
 // =================================
-        cpu.loadProgram(TCPU.OS_START, os);
+        //cpu.loadProgram(TCPU.OS_START, os);
 
 // =================================
 // LOAD TRAP HANDLERS
@@ -171,6 +163,12 @@ public class T3ISA {
 // RUN
 // =================================
         cpu.run();
+        System.out.println("PC = " + cpu.getPC());
+        System.out.println("SP = " + cpu.getSP());
+        System.out.println("USER SP = " + cpu.getUserSP());
+        System.out.println("KERNEL SP = " + cpu.getKernelSP());
+        System.out.println("KERNEL MODE = " + cpu.isKernelMode());
+        System.out.println("VECTOR MEMORY = " + cpu.readMemory(2).toLong());
 
         // =================================
         // DEBUG
@@ -183,4 +181,5 @@ public class T3ISA {
             System.out.println("R" + i + " = " + cpu.getRegister(i).toLong());
         }
     }
+
 }
