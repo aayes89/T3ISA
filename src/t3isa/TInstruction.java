@@ -87,6 +87,7 @@ public final class TInstruction {
         return new TInstruction(opcode, dst, src1, src2, immediate);
     }
 
+
     private static boolean isJump(TOpcode opcode) {
         return opcode == TOpcode.JMP || opcode == TOpcode.JNEG || opcode == TOpcode.JZERO || opcode == TOpcode.JPOS || opcode == TOpcode.CALL;
     }
@@ -116,7 +117,43 @@ public final class TInstruction {
         return result;
     }
 
+    private static void writeUnsigned(TWord word, int start, int length, int value) {
+        for (int i = 0; i < length; i++) {
+            int digit = value % 3;
+            value /= 3;
+            word.set(start + i, Trit.fromInt(digit - 1));
+        }
+
+        if (value != 0) {
+            throw new IllegalArgumentException("Valor fuera de rango: " + value);
+        }
+    }
+
+    private static void writeSigned(TWord word, int start, int length, int value) {
+        int remaining = value;
+
+        for (int i = 0; i < length; i++) {
+            int remainder = remaining % 3;
+            remaining /= 3;
+
+            if (remainder == 2) {
+                remainder = -1;
+                remaining++;
+            } else if (remainder == -2) {
+                remainder = 1;
+                remaining--;
+            }
+
+            word.set(start + i, Trit.fromInt(remainder));
+        }
+
+        if (remaining != 0) {
+            throw new IllegalArgumentException("Inmediato fuera de rango: " + value);
+        }
+    }
+
     @Override
+
     public String toString() {
         return opcode + " dst=" + dst + " src1=" + src1 + " src2=" + src2 + " imm=" + immediate;
     }

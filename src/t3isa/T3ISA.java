@@ -33,61 +33,152 @@ public class T3ISA {
 
     public static void main(String[] args) {
 
+        TWord[] iretTest = TAssemblerText.assemble("""
+                                                   MOVI R2, 111
+                                                   IRET 
+                                                   HALT
+                                                   """
+        );
+
+        TWord[] divZeroTest = TAssemblerText.assemble("""
+        MOVI R2, 10
+        MOVI R3, 0
+        DIV R4, R2, R3
+        MOVI R5, 123
+        HALT
+        """);
+
+        // =================================
         // BOOT SECTOR
-        String bootSource = "JMP 27";
+        // =================================
+        String bootSource = """
+                 MOVI R1, 2
+                        SYS
+                        MOVI R0, 777
+                        JMP 27
+                """;
 
         TWord[] boot = TAssemblerText.assemble(bootSource);
 
-        /*
-         * TRAP VECTORS
-         *
-         * Por ahora todos apuntan a OS_START.
-         * Los handlers reales los construiremos
-         * después.
-         */
-        TWord[] vectors = {
-            TWord.fromLong(TCPU.OS_START),
-            TWord.fromLong(TCPU.OS_START),
-            TWord.fromLong(TCPU.OS_START),
-            TWord.fromLong(TCPU.OS_START),
-            TWord.fromLong(TCPU.OS_START),
-            TWord.fromLong(TCPU.OS_START)
-        };
-
+        // =================================
         // T3OS
+        // =================================
         String osSource = """
-                MOVI R2, 1234
-
-                MOVI R1, 6
-                SYS
-
-                MOVI R1, 7
-                SYS
-
-                HALT
+               MOVI R1, 8
+               SYS
+               
+               MOVI R2, 123
+               MOVI R1, 6
+               SYS
+               
+               MOVI R1, 9
+               SYS
+               
+               MOVI R1, 0
+               SYS
                 """;
 
         TWord[] os = TAssemblerText.assemble(osSource);
 
+        // =================================
+        // TRAP HANDLERS
+        // =================================
+        String divZeroSource = """
+                MOVI R7, 999 
+                IRET
+                """;
+        String memorySource = """
+                MOVI R2, -1
+                LOAD R3, R2, 0
+                HALT
+                """;
+
+        String instructionSource = """
+                MOVI R2, 2
+                MOVI R1, 6
+                SYS
+                HALT
+                """;
+
+        String syscallSource = """
+                MOVI R1, 99
+                SYS
+                HALT
+                """;
+
+        String deviceSource = """
+                MOVI R2, 4
+                MOVI R1, 6
+                SYS
+                HALT
+                """;
+
+        String stackSource = """ 
+                             POP R1 
+                             HALT 
+                             """;
+
+        TWord[] divZero = TAssemblerText.assemble(divZeroSource);
+        TWord[] memory = TAssemblerText.assemble(memorySource);
+        TWord[] instruction = TAssemblerText.assemble(instructionSource);
+        TWord[] syscall = TAssemblerText.assemble(syscallSource);
+        TWord[] device = TAssemblerText.assemble(deviceSource);
+        TWord[] stack = TAssemblerText.assemble(stackSource);
+
+        // =================================
         // CPU
+        // =================================
         TCPU cpu = new TCPU();
         TConsoleDevice console = new TConsoleDevice();
-        cpu.setDevice(console);
+        cpu.attachDevice(console);
 
-        // Boot
-        cpu.loadBootSector(boot, vectors);
+        // =================================
+        // TRAP VECTOR TABLE
+        // =================================
+        cpu.loadTrapVector(TTrap.DIVIDE_BY_ZERO, TCPU.TRAP_HANDLER_DIV_ZERO);
+        cpu.loadTrapVector(TTrap.INVALID_MEMORY, TCPU.TRAP_HANDLER_MEMORY);
+        cpu.loadTrapVector(TTrap.INVALID_INSTRUCTION, TCPU.TRAP_HANDLER_INSTRUCTION);
+        cpu.loadTrapVector(TTrap.INVALID_SYSCALL, TCPU.TRAP_HANDLER_SYSCALL);
+        cpu.loadTrapVector(TTrap.DEVICE_ERROR, TCPU.TRAP_HANDLER_DEVICE);
+        cpu.loadTrapVector(TTrap.STACK_ERROR, TCPU.TRAP_HANDLER_STACK);
 
-        // OS
-        cpu.loadProgram(os, TCPU.OS_START);
+// =================================
+// LOAD BOOT
+// =================================
+        cpu.loadProgram(TCPU.BOOT_START, boot);
 
-        // START
-        cpu.setPC(TWord.zero());
+// =================================
+// LOAD T3OS
+// =================================
+        cpu.loadProgram(TCPU.OS_START, os);
 
-        while (!cpu.isHalted()) {
-            cpu.step();
-        }
+// =================================
+// LOAD TRAP HANDLERS
+// =================================
+        cpu.loadProgram(TCPU.TRAP_HANDLER_DIV_ZERO, divZero);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_MEMORY, memory);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_INSTRUCTION, instruction);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_SYSCALL, syscall);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_DEVICE, device);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_STACK, stack);
 
+// =================================
+// RESET / BOOT
+// =================================
+        cpu.setPC(TCPU.BOOT_START);
+
+// =================================
+// RUN
+// =================================
+        cpu.run();
+
+        // =================================
         // DEBUG
+        // =================================
+        System.out.println();
+        System.out.println("TRAP = " + cpu.getTrap());
+        System.out.println();
+
         for (int i = 0; i < 27; i++) {
             System.out.println("R" + i + " = " + cpu.getRegister(i).toLong());
         }

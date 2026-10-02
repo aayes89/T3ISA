@@ -41,4 +41,6 @@ public final class TSyscall {
     public static final int MEM_WRITE = 5;
     public static final int DEVICE_OUT = 6;
     public static final int DEVICE_IN = 7;
+    public static final int ENTER_USER = 8;
+    public static final int EXIT_USER = 9;
 }

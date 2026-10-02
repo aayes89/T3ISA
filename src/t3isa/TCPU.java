@@ -31,204 +31,194 @@ import t3isa.Exceptions.TMemoryException;
  */
 public final class TCPU {
 
-    private TDevice device;
-    public static final int REGISTERS = 27;
+    public static final int REGISTER_COUNT = 27;
+    public static final int REGISTERS = REGISTER_COUNT;
     public static final int MEMORY_SIZE = 19683;
+    public static final int KERNEL_MEMORY_END = 999;
+    public static final int USER_MEMORY_START = 1000;
+    public static final int KERNEL_STACK_TOP = 15999;
+    public static final int KERNEL_STACK_BOTTOM = 15000;
 
-    private final TWord[] registers;
-    private final TWord[] memory;
+    public static final int USER_STACK_TOP = 19682;
+    public static final int USER_STACK_BOTTOM = 16000;
 
-    private TWord pc;
-    private TWord sp;
-
-    private TTrap trap;
-
+    /*
+     * Memory map
+     *
+     * 0      - Boot sector
+     * 1..6   - Trap vectors
+     * 7..26  - Reserved
+     * 27..   - T3OS / programs
+     *
+     * 100    - DIVIDE_BY_ZERO
+     * 110    - INVALID_MEMORY
+     * 120    - INVALID_INSTRUCTION
+     * 130    - INVALID_SYSCALL
+     * 140    - DEVICE_ERROR
+     * 150    - STACK_ERROR
+     * 0..999       KERNEL
+     * 1000..15999  USER
+     * 16000..19682 STACK
+     *
+     * Stack grows downward.
+     */
     public static final int BOOT_START = 0;
     public static final int TRAP_VECTOR_BASE = 1;
     public static final int TRAP_VECTOR_COUNT = 6;
     public static final int BOOT_SIZE = 27;
-    public static final int OS_START = BOOT_SIZE;
+    public static final int OS_START = 27;
 
+    public static final int TRAP_HANDLER_DIV_ZERO = 100;
+    public static final int TRAP_HANDLER_MEMORY = 110;
+    public static final int TRAP_HANDLER_INSTRUCTION = 120;
+    public static final int TRAP_HANDLER_SYSCALL = 130;
+    public static final int TRAP_HANDLER_DEVICE = 140;
+    public static final int TRAP_HANDLER_STACK = 150;
+
+    public static final int STACK_TOP = MEMORY_SIZE - 1;
+    public static final int STACK_BOTTOM = 16000;
+
+    private final TWord[] registers;
+    private final TWord[] memory;
+
+    private int pc;
+    private int sp;
+
+    private boolean kernelMode;
+
+    private TTrap trap;
     private int compare;
-    private int programSize;
 
+    private int programSize;
     private boolean halted;
 
+    private TDevice device;
+
     public TCPU() {
-        device = null;
-        registers = new TWord[REGISTERS];
+        registers = new TWord[REGISTER_COUNT];
         memory = new TWord[MEMORY_SIZE];
 
-        for (int i = 0; i < REGISTERS; i++) {
+        reset();
+    }
+
+    public void reset() {
+        for (int i = 0; i < REGISTER_COUNT; i++) {
             registers[i] = TWord.zero();
         }
 
         for (int i = 0; i < MEMORY_SIZE; i++) {
             memory[i] = TWord.zero();
         }
-        pc = TWord.zero();
-        sp = TWord.fromLong(MEMORY_SIZE - 1);
+
+        pc = BOOT_START;
+        sp = STACK_TOP;
+        kernelMode = true;
 
         trap = null;
         compare = 0;
         programSize = 0;
         halted = false;
-    }
-
-    public void reset() {
-        for (int i = 0; i < REGISTERS; i++) {
-            registers[i] = TWord.zero();
-        }
-        pc = TWord.zero();
-        sp = TWord.fromLong(MEMORY_SIZE - 1);
-        trap = null;
-        compare = 0;
-        programSize = 0;
-        halted = false;
-    }
-
-    public void clearTrap() {
-        trap = null;
     }
 
     public TWord getRegister(int index) {
         checkRegister(index);
-        if (index == 0) {
-            return TWord.zero();
-        }
         return registers[index].copy();
     }
 
     public void setRegister(int index, TWord value) {
         checkRegister(index);
-        if (index == 0) {
-            return;
+
+        if (value == null) {
+            throw new IllegalArgumentException("Registro no puede ser null");
         }
+
         registers[index] = value.copy();
     }
 
-    public void setDevice(TDevice device) {
-        this.device = device;
+    public int getPC() {
+        return pc;
     }
 
-    private int getTrapVector(TTrap cause) {
-        int vectorAddress = TRAP_VECTOR_BASE + cause.code;
-        return checkedAddress(vectorAddress);
+    public void setPC(int value) {
+        checkAddress(value);
+        pc = value;
     }
 
-    private void raiseTrap(TTrap cause) {
-        trap = cause;
-        push(pc);
-        push(TWord.fromLong(cause.code));
-        int vectorAddress = getTrapVector(cause);
-        pc = memory[vectorAddress].copy();
+    public int getSP() {
+        return sp;
     }
 
-    public void setPC(TWord value) {
-        pc = value.copy();
+    public String getTrap() {
+        return trap == null ? null : trap.toString();
     }
 
-    public TWord getPC() {
-        return pc.copy();
-    }
-
-    public TWord getSP() {
-        return sp.copy();
-    }
-
-    public int getCompare() {
-        return compare;
+    public TTrap getTrapCode() {
+        return trap;
     }
 
     public boolean isHalted() {
         return halted;
     }
 
-    public void loadProgram(TWord[] program, int startAddress) {
+    public int getCompare() {
+        return compare;
+    }
 
+    public void attachDevice(TDevice device) {
+        this.device = device;
+    }
+
+    public TWord readMemory(int address) {
+        return memory[checkedAddress(address)].copy();
+    }
+
+    public void writeMemory(int address, TWord value) {
+        if (value == null) {
+            throw new IllegalArgumentException("Valor de memoria no puede ser null");
+        }
+
+        memory[checkedAddress(address)] = value.copy();
+    }
+
+    public void loadBootSector(TWord[] boot) {
+        if (boot == null) {
+            throw new IllegalArgumentException("Boot sector null");
+        }
+        loadProgram(BOOT_START, boot);
+    }
+
+    public void loadProgram(int startAddress, TWord[] program) {
         if (program == null) {
             throw new IllegalArgumentException("Programa null");
         }
 
-        if (startAddress < 0 || startAddress >= MEMORY_SIZE) {
-            throw new IllegalArgumentException("Dirección inicial inválida: " + startAddress);
-        }
+        checkAddress(startAddress);
 
         if (program.length > MEMORY_SIZE - startAddress) {
-            throw new IllegalArgumentException("Programa demasiado grande");
+            throw new TMemoryException("Programa fuera de memoria");
         }
 
         for (int i = 0; i < program.length; i++) {
+            if (program[i] == null) {
+                throw new IllegalArgumentException("Palabra de instrucción null en posición " + i);
+            }
+
             memory[startAddress + i] = program[i].copy();
         }
+
         programSize = Math.max(programSize, startAddress + program.length);
     }
 
-    public void loadProgram(TWord[] program) {
-        if (program == null) {
-            throw new IllegalArgumentException("Programa null");
+    public void loadTrapVector(TTrap trap, int handlerAddress) {
+        if (trap == null) {
+            throw new IllegalArgumentException("Trap null");
         }
 
-        if (program.length > MEMORY_SIZE) {
-            throw new IllegalArgumentException("Programa demasiado grande: " + program.length);
-        }
+        checkAddress(handlerAddress);
 
-        // Limpiar memoria del programa anterior.
-        for (int i = 0; i < programSize; i++) {
-            memory[i] = TWord.zero();
-        }
-
-        // Cargar nuevo programa.
-        for (int i = 0; i < program.length; i++) {
-            memory[i] = program[i].copy();
-        }
-
-        programSize = program.length;
-        pc = TWord.zero();
-        halted = false;
-    }
-
-    public void loadBootSector(TWord[] bootSector, TWord[] trapVectors) {
-        if (bootSector == null) {
-            throw new IllegalArgumentException("Boot sector null");
-        }
-
-        if (trapVectors == null) {
-            throw new IllegalArgumentException("Trap vectors null");
-        }
-
-        if (trapVectors.length != TRAP_VECTOR_COUNT) {
-            throw new IllegalArgumentException("Se requieren " + TRAP_VECTOR_COUNT + " trap vectors");
-        }
-
-        if (bootSector.length > BOOT_SIZE) {
-            throw new IllegalArgumentException("Boot sector demasiado grande");
-        }
-
-        for (int i = 0; i < bootSector.length; i++) {
-            memory[BOOT_START + i] = bootSector[i].copy();
-        }
-
-        for (int i = 0; i < trapVectors.length; i++) {
-            memory[TRAP_VECTOR_BASE + i] = trapVectors[i].copy();
-        }
-        programSize = Math.max(programSize, BOOT_START + bootSector.length);
-    }
-
-    public void load(int address, TWord value) {
-        checkAddress(address);
-        memory[address] = value.copy();
-    }
-
-    public TWord read(int address) {
-        checkAddress(address);
-        return memory[address].copy();
-    }
-
-    public void run() {
-        while (!halted) {
-            step();
-        }
+        int vectorAddress = TRAP_VECTOR_BASE + trap.code;
+        memory[vectorAddress] = TWord.fromLong(handlerAddress);
+        programSize = Math.max(programSize, vectorAddress + 1);
     }
 
     public void step() {
@@ -237,26 +227,58 @@ public final class TCPU {
         }
 
         try {
-            int address = addressOf(pc);
-
-            if (address >= programSize) {
+            if (pc < 0 || pc >= programSize) {
                 raiseTrap(TTrap.INVALID_MEMORY);
                 return;
             }
 
-            TInstruction instruction = TInstruction.decode(memory[address]);
+            int instructionAddress = pc;
+            TInstruction instruction;
+
+            try {
+                instruction = TInstruction.decode(memory[pc]);
+            } catch (IllegalStateException e) {
+                raiseTrap(TTrap.INVALID_INSTRUCTION);
+                return;
+            }
+
+            if (instruction == null) {
+                raiseTrap(TTrap.INVALID_INSTRUCTION);
+                return;
+            }
+
+            pc = instructionAddress;
+
             execute(instruction);
+
         } catch (TMemoryException e) {
             raiseTrap(TTrap.INVALID_MEMORY);
+
         } catch (ArithmeticException e) {
             raiseTrap(TTrap.DIVIDE_BY_ZERO);
+
+        } catch (IllegalArgumentException e) {
+            raiseTrap(TTrap.INVALID_INSTRUCTION);
+        }
+    }
+
+    public void run() {
+        while (!halted) {
+            step();
         }
     }
 
     private void execute(TInstruction instruction) {
+
         TOpcode opcode = instruction.getOpcode();
 
+        if (opcode == null) {
+            raiseTrap(TTrap.INVALID_INSTRUCTION);
+            return;
+        }
+
         switch (opcode) {
+
             case NOP:
                 incrementPC();
                 break;
@@ -285,10 +307,16 @@ public final class TCPU {
                 incrementPC();
                 break;
 
+            case NEG:
+                setRegister(instruction.getDst(), TALU.negate(getRegister(instruction.getSrc1())));
+                incrementPC();
+                break;
+
             case MUL:
                 setRegister(instruction.getDst(), TALU.multiply(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
                 incrementPC();
                 break;
+
             case DIV:
                 setRegister(instruction.getDst(), TALU.divide(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
                 incrementPC();
@@ -300,17 +328,12 @@ public final class TCPU {
                 break;
 
             case SHL:
-                setRegister(instruction.getDst(), TALU.shiftLeft(getRegister(instruction.getSrc1()), (int) getRegister(instruction.getSrc2()).toLong()));
+                setRegister(instruction.getDst(), TALU.shiftLeft(getRegister(instruction.getSrc1()), instruction.getImmediate()));
                 incrementPC();
                 break;
 
             case SHR:
-                setRegister(instruction.getDst(), TALU.shiftRight(getRegister(instruction.getSrc1()), (int) getRegister(instruction.getSrc2()).toLong()));
-                incrementPC();
-                break;
-
-            case NEG:
-                setRegister(instruction.getDst(), TALU.negate(getRegister(instruction.getSrc1())));
+                setRegister(instruction.getDst(), TALU.shiftRight(getRegister(instruction.getSrc1()), instruction.getImmediate()));
                 incrementPC();
                 break;
 
@@ -329,26 +352,62 @@ public final class TCPU {
                 incrementPC();
                 break;
 
-            case TNOT:
-                setRegister(instruction.getDst(), TALU.not(getRegister(instruction.getSrc1())));
-                incrementPC();
-                break;
-
             case TXOR:
                 setRegister(instruction.getDst(), TALU.xor(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
                 incrementPC();
                 break;
 
+            case TNOT:
+                setRegister(instruction.getDst(), TALU.not(getRegister(instruction.getSrc1())));
+                incrementPC();
+                break;
+
+            case JMP:
+                pc = instruction.getImmediate();
+                break;
+
+            case JNEG:
+                if (compare < 0) {
+                    pc = instruction.getImmediate();
+                } else {
+                    incrementPC();
+                }
+                break;
+
+            case JZERO:
+                if (compare == 0) {
+                    pc = instruction.getImmediate();
+                } else {
+                    incrementPC();
+                }
+                break;
+
+            case JPOS:
+                if (compare > 0) {
+                    pc = instruction.getImmediate();
+                } else {
+                    incrementPC();
+                }
+                break;
+
             case LOAD:
+                if (!kernelMode) {
+                    raiseTrap(TTrap.INVALID_MEMORY);
+                    return;
+                }
                 executeLoad(instruction);
                 break;
 
             case STORE:
+                if (!kernelMode) {
+                    raiseTrap(TTrap.INVALID_MEMORY);
+                    return;
+                }
                 executeStore(instruction);
                 break;
 
             case PUSH:
-                push(getRegister(instruction.getDst()));
+                push(getRegister(instruction.getSrc1()));
                 incrementPC();
                 break;
 
@@ -357,40 +416,12 @@ public final class TCPU {
                 incrementPC();
                 break;
 
-            case JMP:
-                jump(instruction.getImmediate());
-                break;
-
-            case JNEG:
-                if (compare < 0) {
-                    jump(instruction.getImmediate());
-                } else {
-                    incrementPC();
-                }
-                break;
-
-            case JZERO:
-                if (compare == 0) {
-                    jump(instruction.getImmediate());
-                } else {
-                    incrementPC();
-                }
-                break;
-
-            case JPOS:
-                if (compare > 0) {
-                    jump(instruction.getImmediate());
-                } else {
-                    incrementPC();
-                }
-                break;
-
             case CALL:
-                executeCall(instruction.getImmediate());
+                executeCall(instruction);
                 break;
 
             case RET:
-                pc = pop();
+                pc = (int) pop().toLong();
                 break;
 
             case IRET:
@@ -402,64 +433,99 @@ public final class TCPU {
                 break;
 
             default:
-                throw new IllegalStateException("Instrucción aún no implementada: " + opcode);
+                raiseTrap(TTrap.INVALID_INSTRUCTION);
+                break;
         }
     }
 
-    private void incrementPC() {
-        pc = TALU.increment(pc);
+    private void executeLoad(TInstruction instruction) {
+        int address = checkedUserAddress(getRegister(instruction.getSrc1()).toLong());
+        if (address < 0) {
+            return;
+        }
+        setRegister(instruction.getDst(), memory[address]);
+        incrementPC();
+    }
+
+    private void executeStore(TInstruction instruction) {
+        int address = checkedUserAddress(getRegister(instruction.getDst()).toLong());
+        if (address < 0) {
+            return;
+        }
+        memory[address] = getRegister(instruction.getSrc1()).copy();
+        incrementPC();
+    }
+
+    private void executeCall(TInstruction instruction) {
+        push(TWord.fromLong(pc + 1));
+        pc = instruction.getImmediate();
     }
 
     private void executeIRet() {
-        pop();       // código del trap
-        pc = pop();  // PC original
+        TWord trapCode = pop();
+        int code = (int) trapCode.toLong();
+        if (code < 0 || code >= TRAP_VECTOR_COUNT) {
+            halted = true;
+            return;
+        }
+
+        pc = (int) pop().toLong();
         trap = null;
     }
 
     private void executeSys() {
         int service = (int) getRegister(1).toLong();
-
         switch (service) {
-            case TSyscall.HALT: // Sys 0 - Halt
+            case TSyscall.HALT:
+                if (!kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
                 halted = true;
                 break;
 
-            case TSyscall.GET_PC: // Sys 1 - getpc R7 = PC
-                setRegister(7, pc);
+            case TSyscall.GET_PC:
+                setRegister(7, TWord.fromLong(pc));
                 incrementPC();
                 break;
 
-            case TSyscall.GET_SP: // Sys 2 - getsp R7 = SP
-                setRegister(7, sp);
+            case TSyscall.GET_SP:
+                setRegister(7, TWord.fromLong(sp));
                 incrementPC();
                 break;
 
-            case TSyscall.GET_CMP: // Sys 3 - getcmp R7 = -1, 0, +1
+            case TSyscall.GET_CMP:
                 setRegister(7, TWord.fromLong(compare));
                 incrementPC();
                 break;
+
             case TSyscall.MEM_READ:
-                // Sys 4 - read memoria
-                // R2 = dirección
-                // R7 = valor
+                if (!kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
                 int readAddress = checkedAddress(getRegister(2).toLong());
                 setRegister(7, memory[readAddress]);
                 incrementPC();
                 break;
 
             case TSyscall.MEM_WRITE:
-                // SYS 5 - write memoria
-                // R2 = dirección
-                // R3 = valor
+                if (!kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
                 int writeAddress = checkedAddress(getRegister(2).toLong());
                 memory[writeAddress] = getRegister(3);
                 incrementPC();
                 break;
+
             case TSyscall.DEVICE_OUT:
-                // Sys 6 - device write
-                // R2 = valor
                 if (device == null) {
-                    throw new IllegalStateException("SYS 6 requiere un dispositivo");
+                    raiseTrap(TTrap.DEVICE_ERROR);
+                    return;
                 }
 
                 device.write(getRegister(2));
@@ -467,70 +533,131 @@ public final class TCPU {
                 break;
 
             case TSyscall.DEVICE_IN:
-                // sys 7 - device read
-                // R7 = valor
                 if (device == null) {
-                    throw new IllegalStateException("SYS 7 requiere un dispositivo");
+                    raiseTrap(TTrap.DEVICE_ERROR);
+                    return;
                 }
+
                 setRegister(7, device.read());
+                incrementPC();
+                break;
+
+            case TSyscall.ENTER_USER:
+                // Sys 8 - ENTER_USER
+                if (!kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
+                kernelMode = false;
+                incrementPC();
+                break;
+
+            case TSyscall.EXIT_USER:
+                if (kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
+                kernelMode = true;
                 incrementPC();
                 break;
 
             default:
                 raiseTrap(TTrap.INVALID_SYSCALL);
-                return;
+                break;
         }
     }
 
-    private void executeLoad(TInstruction instruction) {
-        long base = getRegister(instruction.getSrc1()).toLong();
-        long address = base + instruction.getImmediate();
-
-        checkAddress(checkedAddress(address));
-        setRegister(instruction.getDst(), memory[(int) address]);
-        incrementPC();
-    }
-
-    private void executeStore(TInstruction instruction) {
-        long base = getRegister(instruction.getSrc1()).toLong();
-        long address = base + instruction.getImmediate();
-        int index = checkedAddress(address);
-        memory[index] = getRegister(instruction.getDst());
-        incrementPC();
-    }
-
-    private void executeCall(int address) {
-        /*
-         * Guardar la dirección de retorno.
-         *
-         * CALL está en PC.
-         * La siguiente instrucción es PC + 1.
-         */
-        TWord returnAddress = TALU.increment(pc);
-        push(returnAddress);
-        jump(address);
-    }
-
     private void push(TWord value) {
-        int address = addressOf(sp);
-        memory[address] = value.copy();
-        sp = TALU.decrement(sp);
+
+        if (sp < STACK_BOTTOM) {
+            raiseTrap(TTrap.STACK_ERROR);
+            return;
+        }
+
+        memory[sp] = value.copy();
+
+        sp--;
+
+        if (sp < STACK_BOTTOM) {
+            sp = STACK_BOTTOM;
+        }
     }
 
     private TWord pop() {
-        sp = TALU.increment(sp);
-        int address = addressOf(sp);
-        return memory[address].copy();
+
+        if (sp >= STACK_TOP) {
+            raiseTrap(TTrap.STACK_ERROR);
+            return TWord.zero();
+        }
+
+        sp++;
+
+        if (sp > STACK_TOP) {
+            raiseTrap(TTrap.STACK_ERROR);
+            return TWord.zero();
+        }
+
+        return memory[sp].copy();
     }
 
-    private void jump(int address) {
-        checkAddress(address);
-        pc = TWord.fromLong(address);
+    private void raiseTrap(TTrap cause) {
+        if (cause == null) {
+            halted = true;
+            return;
+        }
+
+        if (trap != null && cause == TTrap.STACK_ERROR) {
+            halted = true;
+            return;
+        }
+
+        trap = cause;
+        kernelMode = true;
+
+        try {
+            if (sp < STACK_BOTTOM + 2) {
+                halted = true;
+                return;
+            }
+
+            memory[sp] = TWord.fromLong(pc + 1);
+            sp--;
+
+            memory[sp] = TWord.fromLong(cause.code);
+            sp--;
+
+            int vectorAddress = TRAP_VECTOR_BASE + cause.code;
+            if (vectorAddress < TRAP_VECTOR_BASE || vectorAddress >= TRAP_VECTOR_BASE + TRAP_VECTOR_COUNT) {
+                halted = true;
+                return;
+            }
+
+            int handler = checkedAddress(memory[vectorAddress].toLong());
+            pc = handler;
+        } catch (Exception e) {
+            trap = TTrap.STACK_ERROR;
+            halted = true;
+        }
     }
 
-    private int addressOf(TWord value) {
-        long address = value.toLong();
-        return checkedAddress(address);
+    private TWord pcWord() {
+        return TWord.fromLong(pc);
+    }
+
+    private void incrementPC() {
+        pc++;
+        if (pc >= MEMORY_SIZE) {
+            raiseTrap(TTrap.INVALID_MEMORY);
+        }
+    }
+
+    private int getTrapVector(TTrap cause) {
+        if (cause == null) {
+            throw new IllegalArgumentException("Trap null");
+        }
+        return TRAP_VECTOR_BASE + cause.code;
     }
 
     private int checkedAddress(long address) {
@@ -540,15 +667,24 @@ public final class TCPU {
         return (int) address;
     }
 
+    private void checkAddress(int address) {
+        if (address < 0 || address >= MEMORY_SIZE) {
+            throw new TMemoryException("Dirección de memoria inválida: " + address);
+        }
+    }
+
     private void checkRegister(int index) {
-        if (index < 0 || index >= REGISTERS) {
+        if (index < 0 || index >= REGISTER_COUNT) {
             throw new IllegalArgumentException("Registro inválido: R" + index);
         }
     }
 
-    private void checkAddress(int address) {
-        if (address < 0 || address >= MEMORY_SIZE) {
-            throw new IllegalArgumentException("Dirección inválida: " + address);
+    private int checkedUserAddress(long address) {
+        int value = checkedAddress(address);
+        if (!kernelMode && value < USER_MEMORY_START) {
+            raiseTrap(TTrap.INVALID_MEMORY);
+            return -1;
         }
+        return value;
     }
 }

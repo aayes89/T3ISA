@@ -228,6 +228,10 @@ public final class TAssemblerText {
                 require(tokens, 1);
                 return TAssembler.ret();
 
+            case "IRET":
+                //require(tokens, 1);
+                return TAssembler.encode(TOpcode.IRET, 0, 0, 0, 0);
+
             default:
                 throw new IllegalArgumentException("Mnemonic desconocido: " + mnemonic);
         }
