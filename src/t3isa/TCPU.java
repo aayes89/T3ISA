@@ -30,24 +30,30 @@ import t3isa.Exceptions.TMemoryException;
  * @author Slam
  */
 /*
-     * Memory map
-     *
-     * 0      - Boot sector
-     * 1..6   - Trap vectors
-     * 7..26  - Reserved
-     * 27..   - T3OS / programs
-     *
-     * 100    - DIVIDE_BY_ZERO
-     * 110    - INVALID_MEMORY
-     * 120    - INVALID_INSTRUCTION
-     * 130    - INVALID_SYSCALL
-     * 140    - DEVICE_ERROR
-     * 150    - STACK_ERROR
-     * 0..999       KERNEL
-     * 1000..15999  USER
-     * 16000..19682 STACK
-     *
-     * Stack grows downward.
+    * Memory map
+    *
+    * 0      - Boot sector
+    * 1..6   - Trap vectors
+    * 7..26  - Reserved
+    * 27..   - T3OS / programs
+    * 7..9   - interrupt vectors
+    * 10..26 - reservado
+    * 27...  - T3OS
+    * 100    - DIVIDE_BY_ZERO
+    * 110    - INVALID_MEMORY
+    * 120    - INVALID_INSTRUCTION
+    * 130    - INVALID_SYSCALL
+    * 140    - DEVICE_ERROR
+    * 150    - STACK_ERROR
+    * 160    - timer interrupt
+    * 170    - device interrupt
+    * 180    - keyboard interrupt
+    *
+    * 0..999       KERNEL
+    * 1000..15999  USER
+    * 16000..19682 STACK
+    *
+    * Stack grows downward.
  */
 public final class TCPU {
 
@@ -66,8 +72,14 @@ public final class TCPU {
     public static final int TRAP_VECTOR_BASE = 1;
     public static final int TRAP_VECTOR_COUNT = 6;
     public static final int BOOT_START = 7;
-    public static final int BOOT_SIZE = 27;
+    public static final int BOOT_SIZE = 17;
     public static final int OS_START = 27;
+    public static final int INTERRUPT_VECTOR_BASE = 24;
+    public static final int INTERRUPT_VECTOR_COUNT = 3;
+
+    public static final int INTERRUPT_HANDLER_TIMER = 160;
+    public static final int INTERRUPT_HANDLER_DEVICE = 170;
+    public static final int INTERRUPT_HANDLER_KEYBOARD = 180;
 
     public static final int TRAP_HANDLER_DIV_ZERO = 100;
     public static final int TRAP_HANDLER_MEMORY = 110;
@@ -79,6 +91,7 @@ public final class TCPU {
     public static final int STACK_TOP = MEMORY_SIZE - 1;
     public static final int STACK_BOTTOM = 16000;
 
+    private TInterrupt pendingInterrupt;
     private final TWord[] registers;
     private final TWord[] memory;
 
@@ -116,11 +129,34 @@ public final class TCPU {
         userSP = USER_STACK_TOP;
         sp = kernelSP;
         kernelMode = true;
-
+        pendingInterrupt = null;
         trap = null;
         compare = 0;
         programSize = 0;
         halted = false;
+    }
+
+    public TInterrupt getPendingInterrupt() {
+        return pendingInterrupt;
+    }
+
+    public void requestInterrupt(TInterrupt interrupt) {
+        if (interrupt == null) {
+            throw new IllegalArgumentException("Interrupt null");
+        }
+        pendingInterrupt = interrupt;
+    }
+
+    public void loadInterruptVector(TInterrupt interrupt, int handlerAddress) {
+        if (interrupt == null) {
+            throw new IllegalArgumentException("Interrupt null");
+        }
+
+        checkAddress(handlerAddress);
+
+        int vectorAddress = INTERRUPT_VECTOR_BASE + interrupt.code;
+        memory[vectorAddress] = TWord.fromLong(handlerAddress);
+        programSize = Math.max(programSize, vectorAddress + 1);
     }
 
     public TWord getRegister(int index) {
@@ -225,7 +261,105 @@ public final class TCPU {
     }
 
     public void step() {
+
         if (halted) {
+            return;
+        }
+
+        if (pendingInterrupt != null) {
+            handleInterrupt();
+            return;
+        }
+
+        try {
+
+            if (pc < 0 || pc >= programSize) {
+                System.out.println(
+                        "INVALID PC: " + pc
+                        + " programSize=" + programSize
+                );
+
+                raiseTrap(TTrap.INVALID_MEMORY);
+                return;
+            }
+
+            int instructionAddress = pc;
+
+            System.out.println(
+                    "FETCH PC=" + pc
+                    + " WORD=" + memory[pc].toLong()
+            );
+
+            TInstruction instruction;
+
+            try {
+
+                instruction = TInstruction.decode(memory[pc]);
+
+            } catch (IllegalStateException e) {
+
+                System.out.println(
+                        "DECODE ERROR PC=" + pc
+                        + " WORD=" + memory[pc].toLong()
+                        + " MSG=" + e.getMessage()
+                );
+
+                raiseTrap(TTrap.INVALID_INSTRUCTION);
+                return;
+            }
+
+            if (instruction == null) {
+
+                System.out.println(
+                        "DECODE NULL PC=" + pc
+                );
+
+                raiseTrap(TTrap.INVALID_INSTRUCTION);
+                return;
+            }
+
+            System.out.println(
+                    "DECODE OK PC=" + pc
+                    + " OPCODE=" + instruction.getOpcode()
+            );
+
+            pc = instructionAddress;
+
+            execute(instruction);
+
+        } catch (TMemoryException e) {
+
+            System.out.println(
+                    "MEMORY EXCEPTION PC=" + pc
+            );
+
+            raiseTrap(TTrap.INVALID_MEMORY);
+
+        } catch (ArithmeticException e) {
+
+            System.out.println(
+                    "ARITHMETIC EXCEPTION PC=" + pc
+            );
+
+            raiseTrap(TTrap.DIVIDE_BY_ZERO);
+
+        } catch (IllegalArgumentException e) {
+
+            System.out.println(
+                    "ILLEGAL ARGUMENT PC=" + pc
+                    + " MSG=" + e.getMessage()
+            );
+
+            raiseTrap(TTrap.INVALID_INSTRUCTION);
+        }
+    }
+
+    public void step1() {
+        if (halted) {
+            return;
+        }
+        if (pendingInterrupt != null) {
+            handleInterrupt();
             return;
         }
 
@@ -458,7 +592,15 @@ public final class TCPU {
 
     private void executeIRet() {
 
-        if (!kernelMode || trap == null) {
+        System.out.println("=== IRET ===");
+        System.out.println("SP antes = " + sp);
+        System.out.println("trap = " + trap);
+        System.out.println("memory[sp+1] = "
+                + memory[sp + 1].toLong());
+        System.out.println("memory[sp+2] = "
+                + memory[sp + 2].toLong());
+
+        if (!kernelMode) {
             halted = true;
             return;
         }
@@ -468,16 +610,77 @@ public final class TCPU {
 
         int code = (int) memory[trapAddress].toLong();
 
-        if (code < 0 || code >= TRAP_VECTOR_COUNT) {
+        System.out.println("IRET code = " + code);
+        System.out.println("IRET PC = " + memory[pcAddress].toLong());
+
+        if (trap != null) {
+
+            if (code < 0 || code >= TRAP_VECTOR_COUNT) {
+                halted = true;
+                return;
+            }
+
+            pc = (int) memory[pcAddress].toLong();
+            sp = userSP;
+            kernelMode = false;
+            trap = null;
+
+            System.out.println("IRET -> USER");
+            System.out.println("PC = " + pc);
+            System.out.println("SP = " + sp);
+
+            return;
+        }
+
+        if (code < 0 || code >= INTERRUPT_VECTOR_COUNT) {
             halted = true;
             return;
         }
 
         pc = (int) memory[pcAddress].toLong();
-
         sp = userSP;
         kernelMode = false;
-        trap = null;
+
+        System.out.println("IRET INTERRUPT -> USER");
+        System.out.println("PC = " + pc);
+        System.out.println("SP = " + sp);
+    }
+
+    private void executeIRet1() {
+
+        if (!kernelMode) {
+            halted = true;
+            return;
+        }
+
+        int trapAddress = sp + 1;
+        int pcAddress = sp + 2;
+
+        int code = (int) memory[trapAddress].toLong();
+
+        if (trap != null) {
+            if (code < 0 || code >= TRAP_VECTOR_COUNT) {
+                halted = true;
+                return;
+            }
+
+            pc = (int) memory[pcAddress].toLong();
+            sp = userSP;
+            kernelMode = false;
+            trap = null;
+            return;
+        }
+
+        // Si no hay trap, el frame corresponde
+        // a una interrupción.
+        if (code < 0 || code >= INTERRUPT_VECTOR_COUNT) {
+            halted = true;
+            return;
+        }
+
+        pc = (int) memory[pcAddress].toLong();
+        sp = userSP;
+        kernelMode = false;
     }
 
     private void executeSys() {
@@ -635,7 +838,8 @@ public final class TCPU {
         if (!kernelMode) {
             userSP = sp;
             kernelMode = true;
-            sp = KERNEL_STACK_TOP;
+            kernelSP = KERNEL_STACK_TOP;
+            sp = kernelSP;
         }
 
         if (sp < KERNEL_STACK_BOTTOM + 2) {
@@ -664,6 +868,7 @@ public final class TCPU {
     private void switchToKernelStack() {
         if (!kernelMode) {
             userSP = sp;
+            kernelMode = true;
             kernelSP = KERNEL_STACK_TOP;
             sp = kernelSP;
         }
@@ -730,5 +935,39 @@ public final class TCPU {
 
     public int getKernelSP() {
         return kernelSP;
+    }
+
+    private void handleInterrupt() {
+        if (pendingInterrupt == null) {
+            return;
+        }
+
+        TInterrupt interrupt = pendingInterrupt;
+        pendingInterrupt = null;
+
+        if (!kernelMode) {
+            userSP = sp;
+            kernelMode = true;
+            kernelSP = KERNEL_STACK_TOP;
+            sp = kernelSP;
+        }
+
+        if (sp < KERNEL_STACK_BOTTOM + 2) {
+            halted = true;
+            return;
+        }
+
+        // Frame de interrupción:
+        // [sp]     = PC de retorno
+        // [sp - 1] = código de interrupción
+        memory[sp] = TWord.fromLong(pc);
+        sp--;
+
+        memory[sp] = TWord.fromLong(interrupt.code);
+        sp--;
+
+        int vectorAddress = INTERRUPT_VECTOR_BASE + interrupt.code;
+        int handler = checkedAddress(memory[vectorAddress].toLong());
+        pc = handler;
     }
 }

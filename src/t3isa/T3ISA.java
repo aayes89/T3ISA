@@ -33,44 +33,30 @@ public class T3ISA {
 
     public static void main(String[] args) {
 
-        String userKernelWriteTest = """
-        MOVI R1, 8
-        SYS
-
-        MOVI R2, 27
-        MOVI R3, 999
-        STORE R2, R3, 0
-
-        HALT
-        """;
-
         // =================================
         // BOOT SECTOR
         // =================================
         String bootSource = """
-                 MOVI R1, 2
-                        SYS
-                        MOVI R0, 777
-                        JMP 27
+                MOVI R1, 2
+                SYS
+                MOVI R0, 777
+                JMP 27
                 """;
 
         TWord[] boot = TAssemblerText.assemble(bootSource);
 
         // =================================
-        // T3OS
+        // T3OS / USER TEST
         // =================================
         String osSource = """
-       MOVI R1, 8
-       SYS
-       
-       MOVI R2, 500
-       LOAD R3, R2, 0
-       HALT
-       """;
-        String memorySource = """
-        MOVI R7, 999
-        IRET
-        """;
+                MOVI R1, 8
+                SYS
+
+                MOVI R4, 777
+
+                NOP
+                HALT
+                """;
 
         TWord[] os = TAssemblerText.assemble(osSource);
 
@@ -78,7 +64,12 @@ public class T3ISA {
         // TRAP HANDLERS
         // =================================
         String divZeroSource = """
-                MOVI R7, 999 
+                MOVI R7, 999
+                IRET
+                """;
+
+        String memorySource = """
+                MOVI R7, 999
                 IRET
                 """;
 
@@ -102,10 +93,18 @@ public class T3ISA {
                 HALT
                 """;
 
-        String stackSource = """ 
-                             POP R1 
-                             HALT 
-                             """;
+        String stackSource = """
+                POP R1
+                HALT
+                """;
+
+        // =================================
+        // TIMER INTERRUPT HANDLER
+        // =================================
+        String timerSource = """
+                MOVI R7, 1234
+                IRET
+                """;
 
         TWord[] divZero = TAssemblerText.assemble(divZeroSource);
         TWord[] memory = TAssemblerText.assemble(memorySource);
@@ -113,73 +112,201 @@ public class T3ISA {
         TWord[] syscall = TAssemblerText.assemble(syscallSource);
         TWord[] device = TAssemblerText.assemble(deviceSource);
         TWord[] stack = TAssemblerText.assemble(stackSource);
+        TWord[] timer = TAssemblerText.assemble(timerSource);
 
         // =================================
         // CPU
         // =================================
         TCPU cpu = new TCPU();
+
         TConsoleDevice console = new TConsoleDevice();
         cpu.attachDevice(console);
 
         // =================================
         // TRAP VECTOR TABLE
         // =================================
-        cpu.loadTrapVector(TTrap.DIVIDE_BY_ZERO, TCPU.TRAP_HANDLER_DIV_ZERO);
-        cpu.loadTrapVector(TTrap.INVALID_MEMORY, TCPU.TRAP_HANDLER_MEMORY);
-        cpu.loadTrapVector(TTrap.INVALID_INSTRUCTION, TCPU.TRAP_HANDLER_INSTRUCTION);
-        cpu.loadTrapVector(TTrap.INVALID_SYSCALL, TCPU.TRAP_HANDLER_SYSCALL);
-        cpu.loadTrapVector(TTrap.DEVICE_ERROR, TCPU.TRAP_HANDLER_DEVICE);
-        cpu.loadTrapVector(TTrap.STACK_ERROR, TCPU.TRAP_HANDLER_STACK);
+        cpu.loadTrapVector(
+                TTrap.DIVIDE_BY_ZERO,
+                TCPU.TRAP_HANDLER_DIV_ZERO
+        );
 
-// =================================
-// LOAD BOOT
-// =================================
-        cpu.loadProgram(TCPU.BOOT_START, boot);
-        TWord[] userKernelWrite = TAssemblerText.assemble(userKernelWriteTest);
+        cpu.loadTrapVector(
+                TTrap.INVALID_MEMORY,
+                TCPU.TRAP_HANDLER_MEMORY
+        );
 
-        cpu.loadProgram(TCPU.OS_START, userKernelWrite);
+        cpu.loadTrapVector(
+                TTrap.INVALID_INSTRUCTION,
+                TCPU.TRAP_HANDLER_INSTRUCTION
+        );
 
-// =================================
-// LOAD T3OS
-// =================================
-        //cpu.loadProgram(TCPU.OS_START, os);
+        cpu.loadTrapVector(
+                TTrap.INVALID_SYSCALL,
+                TCPU.TRAP_HANDLER_SYSCALL
+        );
 
-// =================================
-// LOAD TRAP HANDLERS
-// =================================
-        cpu.loadProgram(TCPU.TRAP_HANDLER_DIV_ZERO, divZero);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_MEMORY, memory);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_INSTRUCTION, instruction);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_SYSCALL, syscall);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_DEVICE, device);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_STACK, stack);
+        cpu.loadTrapVector(
+                TTrap.DEVICE_ERROR,
+                TCPU.TRAP_HANDLER_DEVICE
+        );
 
-// =================================
-// RESET / BOOT
-// =================================
+        cpu.loadTrapVector(
+                TTrap.STACK_ERROR,
+                TCPU.TRAP_HANDLER_STACK
+        );
+
+        // =================================
+        // INTERRUPT VECTOR TABLE
+        // =================================
+        cpu.loadInterruptVector(
+                TInterrupt.TIMER,
+                TCPU.INTERRUPT_HANDLER_TIMER
+        );
+
+        // =================================
+        // LOAD BOOT
+        // =================================
+        cpu.loadProgram(
+                TCPU.BOOT_START,
+                boot
+        );
+
+        // =================================
+        // LOAD T3OS
+        // =================================
+        cpu.loadProgram(
+                TCPU.OS_START,
+                os
+        );
+        System.out.println("OS MEMORY:");
+
+        for (int i = 27; i < 31; i++) {
+            System.out.println(
+                    i + " = " + cpu.readMemory(i).toLong()
+            );
+        }
+
+        // =================================
+        // LOAD TRAP HANDLERS
+        // =================================
+        cpu.loadProgram(
+                TCPU.TRAP_HANDLER_DIV_ZERO,
+                divZero
+        );
+
+        cpu.loadProgram(
+                TCPU.TRAP_HANDLER_MEMORY,
+                memory
+        );
+
+        cpu.loadProgram(
+                TCPU.TRAP_HANDLER_INSTRUCTION,
+                instruction
+        );
+
+        cpu.loadProgram(
+                TCPU.TRAP_HANDLER_SYSCALL,
+                syscall
+        );
+
+        cpu.loadProgram(
+                TCPU.TRAP_HANDLER_DEVICE,
+                device
+        );
+
+        cpu.loadProgram(
+                TCPU.TRAP_HANDLER_STACK,
+                stack
+        );
+
+        // =================================
+        // LOAD TIMER HANDLER
+        // =================================
+        cpu.loadProgram(
+                TCPU.INTERRUPT_HANDLER_TIMER,
+                timer
+        );
+
+        // =================================
+        // RESET / BOOT
+        // =================================
         cpu.setPC(TCPU.BOOT_START);
 
-// =================================
-// RUN
-// =================================
+        // =================================
+        // EJECUTAR BOOT
+        // =================================
+        //
+        // 7  MOVI R1, 2
+        // 8  SYS
+        // 9  MOVI R0, 777
+        // 10 JMP 27
+        //
+        // Después de estas cuatro instrucciones:
+        // PC = 27
+        // KERNEL MODE = true
+        //
+        cpu.step();
+        cpu.step();
+        cpu.step();
+        cpu.step();
+
+        // =================================
+        // ENTRAR EN USER
+        // =================================
+        //
+        // 27 MOVI R1, 8
+        // 28 SYS
+        //
+        cpu.step();
+        cpu.step();
+
+        // Ahora:
+        //
+        // PC = 29
+        // KERNEL MODE = false
+        //
+        // =================================
+        // SOLICITAR INTERRUPCIÓN TIMER
+        // =================================
+        cpu.requestInterrupt(TInterrupt.TIMER);
+
+        // =================================
+        // RUN
+        // =================================
         cpu.run();
+
+        // =================================
+        // DEBUG
+        // =================================
         System.out.println("PC = " + cpu.getPC());
         System.out.println("SP = " + cpu.getSP());
         System.out.println("USER SP = " + cpu.getUserSP());
         System.out.println("KERNEL SP = " + cpu.getKernelSP());
         System.out.println("KERNEL MODE = " + cpu.isKernelMode());
-        System.out.println("VECTOR MEMORY = " + cpu.readMemory(2).toLong());
 
-        // =================================
-        // DEBUG
-        // =================================
+        System.out.println(
+                "TIMER VECTOR = "
+                + cpu.readMemory(
+                        TCPU.INTERRUPT_VECTOR_BASE
+                        + TInterrupt.TIMER.code
+                ).toLong()
+        );
+
         System.out.println();
+
         System.out.println("TRAP = " + cpu.getTrap());
+        System.out.println(
+                "PENDING INTERRUPT = "
+                + cpu.getPendingInterrupt()
+        );
+
         System.out.println();
 
         for (int i = 0; i < 27; i++) {
-            System.out.println("R" + i + " = " + cpu.getRegister(i).toLong());
+            System.out.println(
+                    "R" + i + " = "
+                    + cpu.getRegister(i).toLong()
+            );
         }
     }
-
 }

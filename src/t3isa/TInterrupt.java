@@ -27,6 +27,7 @@ package t3isa;
  *
  * @author Slam
  */
+
 public enum TInterrupt {
 
     TIMER(0),
