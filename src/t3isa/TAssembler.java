@@ -33,15 +33,12 @@ public final class TAssembler {
     }
 
     public static TWord encode(TOpcode opcode, int dst, int src1, int src2, int immediate) {
-
         validateRegister(dst);
         validateRegister(src1);
         validateRegister(src2);
 
-        if (immediate < -9842 || immediate > 9842) {
-            throw new IllegalArgumentException(
-                    "Immediate fuera de rango: " + immediate
-            );
+        if (immediate < -9841 || immediate > 9841) {
+            throw new IllegalArgumentException("Immediate fuera de rango: " + immediate);
         }
 
         TWord word = new TWord();
@@ -50,9 +47,30 @@ public final class TAssembler {
         writeUnsigned(word, dst, 9, 3);
         writeUnsigned(word, src1, 12, 3);
         writeUnsigned(word, src2, 15, 3);
-        writeSigned(word, immediate, 18, 9);
+        /*
+         * Los saltos utilizan el campo inmediato como
+         * dirección absoluta unsigned.
+         */
+        if (isJump(opcode)) {
+            if (immediate < 0 || immediate >= TCPU.MEMORY_SIZE) {
+                throw new IllegalArgumentException("Dirección fuera de rango: " + immediate);
+            }
+            writeUnsigned(word, immediate, 18, 9);
+        } else {
+            /*
+             * Inmediato signed de 9 trits:
+             *
+             * -(3^9-1)/2 .. +(3^9-1)/2
+             * -9841 .. +9841
+             */
+            writeSigned(word, immediate, 18, 9);
+        }
 
         return word;
+    }
+
+    private static boolean isJump(TOpcode opcode) {
+        return opcode == TOpcode.JMP || opcode == TOpcode.JNEG || opcode == TOpcode.JZERO || opcode == TOpcode.JPOS || opcode == TOpcode.CALL;
     }
 
     public static TWord nop() {
@@ -87,6 +105,42 @@ public final class TAssembler {
         return encode(TOpcode.CMP, 0, src1, src2, 0);
     }
 
+    public static TWord mul(int dst, int src1, int src2) {
+        return encode(TOpcode.MUL, dst, src1, src2, 0);
+    }
+
+    public static TWord div(int dst, int src1, int src2) {
+        return encode(TOpcode.DIV, dst, src1, src2, 0);
+    }
+
+    public static TWord mod(int dst, int src1, int src2) {
+        return encode(TOpcode.MOD, dst, src1, src2, 0);
+    }
+
+    public static TWord shl(int dst, int src1, int src2) {
+        return encode(TOpcode.SHL, dst, src1, src2, 0);
+    }
+
+    public static TWord shr(int dst, int src1, int src2) {
+        return encode(TOpcode.SHR, dst, src1, src2, 0);
+    }
+
+    public static TWord tand(int dst, int src1, int src2) {
+        return encode(TOpcode.TAND, dst, src1, src2, 0);
+    }
+
+    public static TWord tor(int dst, int src1, int src2) {
+        return encode(TOpcode.TOR, dst, src1, src2, 0);
+    }
+
+    public static TWord txor(int dst, int src1, int src2) {
+        return encode(TOpcode.TXOR, dst, src1, src2, 0);
+    }
+
+    public static TWord tnot(int dst, int src) {
+        return encode(TOpcode.TNOT, dst, src, 0, 0);
+    }
+
     public static TWord jmp(int address) {
         return encode(TOpcode.JMP, 0, 0, 0, address);
     }
@@ -103,22 +157,41 @@ public final class TAssembler {
         return encode(TOpcode.JPOS, 0, 0, 0, address);
     }
 
+    public static TWord load(int dst, int base, int offset) {
+        return encode(TOpcode.LOAD, dst, base, 0, offset);
+    }
+
+    public static TWord store(int src, int base, int offset) {
+        return encode(TOpcode.STORE, src, base, 0, offset);
+    }
+
+    public static TWord push(int src) {
+        return encode(TOpcode.PUSH, src, 0, 0, 0);
+    }
+
+    public static TWord pop(int dst) {
+        return encode(TOpcode.POP, dst, 0, 0, 0);
+    }
+
+    public static TWord call(int address) {
+        return encode(TOpcode.CALL, 0, 0, 0, address);
+    }
+
+    public static TWord ret() {
+        return encode(TOpcode.RET, 0, 0, 0, 0);
+    }
+
     private static void validateRegister(int register) {
-        if (register < 0 || register >= 27) {
-            throw new IllegalArgumentException(
-                    "Registro inválido: R" + register
-            );
+        if (register < 0 || register >= TCPU.REGISTERS) {
+            throw new IllegalArgumentException("Registro inválido: R" + register);
         }
     }
 
     private static void writeUnsigned(TWord word, int value, int start, int length) {
-
         int max = pow3(length);
 
         if (value < 0 || value >= max) {
-            throw new IllegalArgumentException(
-                    "Valor fuera de rango: " + value
-            );
+            throw new IllegalArgumentException("Valor fuera de rango: " + value);
         }
 
         for (int i = 0; i < length; i++) {
@@ -132,9 +205,7 @@ public final class TAssembler {
         int max = (pow3(length) - 1) / 2;
 
         if (value < -max || value > max) {
-            throw new IllegalArgumentException(
-                    "Valor signed fuera de rango: " + value
-            );
+            throw new IllegalArgumentException("Valor signed fuera de rango: " + value);
         }
 
         for (int i = 0; i < length; i++) {

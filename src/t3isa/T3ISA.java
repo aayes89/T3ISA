@@ -37,25 +37,39 @@ public class T3ISA {
                 ; =================================
                 ; SETUN-OS TEST PROGRAM
                 ; =================================
-
-                MOVI R1, 10
-                MOVI R2, 20
-
-                ADD R3, R1, R2
-
+                MOVI R1, 5
+                MOVI R2, 1
+                SHL R3, R1, R2
+                
+                MOVI R4, 45
+                CMP R3, R4
+                JZERO shl_ok
+                HALT
+                
+                shl_ok:
+                MOVI R1, 45
+                MOVI R2, 1
+                SHR R3, R1, R2
+                
+                MOVI R4, 15
+                CMP R3, R4
+                JZERO shr_ok
+                HALT
+                
+                shr_ok:
                 HALT
                 """;
 
-        TWord[] machineCode = TAssemblerText.assemble(program);
+        TWord[] machineCode = TAssemblerText.assemble(program);//test.Tests.test);
         TCPU cpu = new TCPU();
         cpu.loadProgram(machineCode);
-        
+
         while (!cpu.isHalted()) {
             cpu.step();
         }
 
-        System.out.println("R1 = " + cpu.getRegister(1).toLong());
-        System.out.println("R2 = " + cpu.getRegister(2).toLong());
-        System.out.println("R3 = " + cpu.getRegister(3).toLong());
+        for (int i = 0; i < 27; i++) {
+            System.out.println("R" + i + " = " + cpu.getRegister(i).toLong());
+        }
     }
 }

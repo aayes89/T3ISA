@@ -27,7 +27,6 @@ package t3isa;
  *
  * @author Slam
  */
-
 public final class TWord {
 
     public static final int TRITS = 27;
@@ -55,19 +54,19 @@ public final class TWord {
     }
 
     public static TWord fromLong(long value) {
-
         TWord word = new TWord();
 
         for (int i = 0; i < TRITS; i++) {
-
             long remainder = value % 3;
             value /= 3;
 
             if (remainder == 2) {
                 remainder = -1;
                 value++;
+            } else if (remainder == -2) {
+                remainder = 1;
+                value--;
             }
-
             word.data[i] = Trit.fromInt((int) remainder);
         }
 
@@ -75,12 +74,10 @@ public final class TWord {
     }
 
     public long toLong() {
-
         long result = 0;
         long power = 1;
 
         for (int i = 0; i < TRITS; i++) {
-
             result += data[i].value * power;
             power *= 3;
         }
@@ -102,13 +99,9 @@ public final class TWord {
 
     @Override
     public String toString() {
-
         StringBuilder sb = new StringBuilder(TRITS);
-
         for (int i = TRITS - 1; i >= 0; i--) {
-
             switch (data[i]) {
-
                 case NEG:
                     sb.append('-');
                     break;
@@ -122,7 +115,6 @@ public final class TWord {
                     break;
             }
         }
-
         return sb.toString();
     }
 }

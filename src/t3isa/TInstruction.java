@@ -39,13 +39,7 @@ public final class TInstruction {
     private final int src2;
     private final int immediate;
 
-    private TInstruction(
-            TOpcode opcode,
-            int dst,
-            int src1,
-            int src2,
-            int immediate) {
-
+    private TInstruction(TOpcode opcode, int dst, int src1, int src2, int immediate) {
         this.opcode = opcode;
         this.dst = dst;
         this.src1 = src1;
@@ -74,70 +68,48 @@ public final class TInstruction {
     }
 
     public static TInstruction decode(TWord word) {
+        int opcodeValue = readUnsigned(word, 0, 9);
+        TOpcode opcode = TOpcode.fromCode(opcodeValue);
 
-        int opcode = readUnsigned(word, 0, 9);
+        if (opcode == null) {
+            throw new IllegalStateException("Opcode inválido: " + opcodeValue);
+        }
         int dst = readUnsigned(word, 9, 3);
         int src1 = readUnsigned(word, 12, 3);
         int src2 = readUnsigned(word, 15, 3);
-        int immediate = readSigned(word, 18, 9);
-
-        TOpcode operation = TOpcode.fromCode(opcode);
-
-        if (operation == null) {
-            throw new IllegalStateException(
-                    "Opcode inválido: " + opcode
-            );
+        int immediate;
+        if (isJump(opcode)) {
+            immediate = readUnsigned(word, 18, 9);
+        } else {
+            immediate = readSigned(word, 18, 9);
         }
 
-        return new TInstruction(
-                operation,
-                dst,
-                src1,
-                src2,
-                immediate
-        );
+        return new TInstruction(opcode, dst, src1, src2, immediate);
     }
 
-    private static int readUnsigned(
-            TWord word,
-            int start,
-            int length) {
+    private static boolean isJump(TOpcode opcode) {
+        return opcode == TOpcode.JMP || opcode == TOpcode.JNEG || opcode == TOpcode.JZERO || opcode == TOpcode.JPOS || opcode == TOpcode.CALL;
+    }
 
+    private static int readUnsigned(TWord word, int start, int length) {
         int result = 0;
         int power = 1;
 
         for (int i = 0; i < length; i++) {
-
-            int value = word.get(start + i).value;
-
-            /*
-             * Los campos de codificación usan
-             * 0, 1, 2 internamente.
-             */
-            int encoded = value + 1;
-
+            int encoded = word.get(start + i).value + 1;
             result += encoded * power;
-
             power *= 3;
         }
 
         return result;
     }
 
-    private static int readSigned(
-            TWord word,
-            int start,
-            int length) {
-
+    private static int readSigned(TWord word, int start, int length) {
         int result = 0;
         int power = 1;
 
         for (int i = 0; i < length; i++) {
-
-            result
-                    += word.get(start + i).value
-                    * power;
-
+            result += word.get(start + i).value * power;
             power *= 3;
         }
 
@@ -146,11 +118,6 @@ public final class TInstruction {
 
     @Override
     public String toString() {
-
-        return opcode
-                + " dst=" + dst
-                + " src1=" + src1
-                + " src2=" + src2
-                + " imm=" + immediate;
+        return opcode + " dst=" + dst + " src1=" + src1 + " src2=" + src2 + " imm=" + immediate;
     }
 }

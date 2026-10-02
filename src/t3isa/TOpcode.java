@@ -37,6 +37,10 @@ public enum TOpcode {
     SUB(21),
     NEG(22),
     MUL(23),
+    DIV(24),
+    MOD(25),
+    SHL(26),
+    SHR(27),
     CMP(30),
     TAND(40),
     TOR(41),
@@ -61,13 +65,11 @@ public enum TOpcode {
     }
 
     public static TOpcode fromCode(int code) {
-
         for (TOpcode opcode : values()) {
             if (opcode.code == code) {
                 return opcode;
             }
         }
-
         return null;
     }
 }

@@ -36,16 +36,67 @@ public final class TAssemblerText {
     }
 
     public static TWord[] assemble(String source) {
+
         String[] lines = source.split("\\R");
-        List<TWord> program = new ArrayList<>();
-        for (String line : lines) {
-            line = removeComment(line).trim();
+        List<String> instructions = new ArrayList<>();
+        java.util.Map<String, Integer> labels = new java.util.HashMap<>();
+
+        /*
+         * PASS 1
+         *
+         * Encontrar etiquetas.
+         */
+        for (String original : lines) {
+            String line = removeComment(original).trim();
+
             if (line.isEmpty()) {
                 continue;
             }
-            TWord instruction = parseInstruction(line);
-            program.add(instruction);
+
+            while (line.contains(":")) {
+                int colon = line.indexOf(':');
+                String label = line.substring(0, colon).trim().toUpperCase();
+
+                if (label.isEmpty()) {
+                    throw new IllegalArgumentException("Etiqueta vacía");
+                }
+
+                if (labels.containsKey(label)) {
+                    throw new IllegalArgumentException("Etiqueta duplicada: " + label);
+                }
+
+                labels.put(label, instructions.size());
+                line = line.substring(colon + 1).trim();
+                if (line.isEmpty()) {
+                    break;
+                }
+            }
+
+            if (!line.isEmpty()) {
+                instructions.add(line);
+            }
         }
+
+        /*
+         * PASS 2
+         */
+        List<TWord> program = new ArrayList<>();
+        for (String line : instructions) {
+            String[] tokens = tokenize(line);
+            String mnemonic = tokens[0].toUpperCase();
+
+            if (isJump(mnemonic) && tokens.length == 2) {
+                String operand = tokens[1].toUpperCase();
+
+                if (labels.containsKey(operand)) {
+                    tokens[1] = Integer.toString(labels.get(operand));
+                    line = rebuild(tokens);
+                }
+            }
+
+            program.add(parseInstruction(line));
+        }
+
         return program.toArray(new TWord[0]);
     }
 
@@ -89,6 +140,26 @@ public final class TAssemblerText {
                 require(tokens, 4);
                 return TAssembler.sub(register(tokens[1]), register(tokens[2]), register(tokens[3]));
 
+            case "MUL":
+                require(tokens, 4);
+                return TAssembler.mul(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+
+            case "DIV":
+                require(tokens, 4);
+                return TAssembler.div(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+
+            case "MOD":
+                require(tokens, 4);
+                return TAssembler.mod(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+
+            case "SHL":
+                require(tokens, 4);
+                return TAssembler.shl(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+
+            case "SHR":
+                require(tokens, 4);
+                return TAssembler.shr(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+                
             case "NEG":
                 require(tokens, 3);
                 return TAssembler.neg(register(tokens[1]), register(tokens[2]));
@@ -124,6 +195,34 @@ public final class TAssemblerText {
             case "JPOS":
                 require(tokens, 2);
                 return TAssembler.jpos(integer(tokens[1]));
+
+            case "TXOR":
+                require(tokens, 4);
+                return TAssembler.txor(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+
+            case "LOAD":
+                require(tokens, 4);
+                return TAssembler.load(register(tokens[1]), register(tokens[2]), integer(tokens[3]));
+
+            case "STORE":
+                require(tokens, 4);
+                return TAssembler.store(register(tokens[1]), register(tokens[2]), integer(tokens[3]));
+
+            case "PUSH":
+                require(tokens, 2);
+                return TAssembler.push(register(tokens[1]));
+
+            case "POP":
+                require(tokens, 2);
+                return TAssembler.pop(register(tokens[1]));
+
+            case "CALL":
+                require(tokens, 2);
+                return TAssembler.call(integer(tokens[1]));
+
+            case "RET":
+                require(tokens, 1);
+                return TAssembler.ret();
 
             default:
                 throw new IllegalArgumentException("Mnemonic desconocido: " + mnemonic);
@@ -166,5 +265,20 @@ public final class TAssemblerText {
         if (tokens.length != expected) {
             throw new IllegalArgumentException("Número incorrecto de operandos. " + "Esperados: " + (expected - 1) + ", recibidos: " + (tokens.length - 1));
         }
+    }
+
+    private static boolean isJump(String mnemonic) {
+        return mnemonic.equals("JMP") || mnemonic.equals("JNEG") || mnemonic.equals("JZERO") || mnemonic.equals("JPOS") || mnemonic.equals("CALL");
+    }
+
+    private static String rebuild(String[] tokens) {
+        StringBuilder sb = new StringBuilder();
+        for (String token : tokens) {
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(token);
+        }
+        return sb.toString();
     }
 }

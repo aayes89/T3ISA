@@ -39,6 +39,7 @@ public final class TCPU {
     private TWord sp;
 
     private int compare;
+    private int programSize;
 
     private boolean halted;
 
@@ -56,6 +57,7 @@ public final class TCPU {
         pc = TWord.zero();
         sp = TWord.fromLong(MEMORY_SIZE - 1);
         compare = 0;
+        programSize = 0;
         halted = false;
     }
 
@@ -66,6 +68,7 @@ public final class TCPU {
         pc = TWord.zero();
         sp = TWord.fromLong(MEMORY_SIZE - 1);
         compare = 0;
+        programSize = 0;
         halted = false;
     }
 
@@ -102,14 +105,29 @@ public final class TCPU {
     }
 
     public void loadProgram(TWord[] program) {
-        if (program.length > MEMORY_SIZE) {
-            throw new IllegalArgumentException("Programa demasiado grande");
+        if (program == null) {
+            throw new IllegalArgumentException("Programa null");
         }
 
+        if (program.length > MEMORY_SIZE) {
+            throw new IllegalArgumentException("Programa demasiado grande: " + program.length);
+        }
+
+        /*
+         * Limpiar memoria del programa anterior.
+         */
+        for (int i = 0; i < programSize; i++) {
+            memory[i] = TWord.zero();
+        }
+
+        /*
+         * Cargar nuevo programa.
+         */
         for (int i = 0; i < program.length; i++) {
             memory[i] = program[i].copy();
         }
 
+        programSize = program.length;
         pc = TWord.zero();
         halted = false;
     }
@@ -124,65 +142,134 @@ public final class TCPU {
         return memory[address].copy();
     }
 
+    public void run() {
+        while (!halted) {
+            step();
+        }
+    }
+
     public void step() {
         if (halted) {
             return;
         }
 
-        int address = (int) pc.toLong();
-        TWord rawInstruction = read(address);
-        TInstruction instruction = TInstruction.decode(rawInstruction);
+        int address = addressOf(pc);
+        if (address >= programSize) {
+            throw new IllegalStateException("PC fuera del programa: " + address + " / tamaño=" + programSize);
+        }
+
+        TInstruction instruction = TInstruction.decode(memory[address]);
         execute(instruction);
     }
 
     private void execute(TInstruction instruction) {
         TOpcode opcode = instruction.getOpcode();
+
         switch (opcode) {
             case NOP:
                 incrementPC();
                 break;
+
             case HALT:
                 halted = true;
                 break;
+
             case MOV:
                 setRegister(instruction.getDst(), getRegister(instruction.getSrc1()));
                 incrementPC();
                 break;
+
             case MOVI:
                 setRegister(instruction.getDst(), TWord.fromLong(instruction.getImmediate()));
                 incrementPC();
                 break;
+
             case ADD:
                 setRegister(instruction.getDst(), TALU.add(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
                 incrementPC();
                 break;
+
             case SUB:
                 setRegister(instruction.getDst(), TALU.subtract(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
                 incrementPC();
                 break;
+
+            case MUL:
+                setRegister(instruction.getDst(), TALU.multiply(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
+                incrementPC();
+                break;
+            case DIV:
+                setRegister(instruction.getDst(), TALU.divide(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
+                incrementPC();
+                break;
+
+            case MOD:
+                setRegister(instruction.getDst(), TALU.modulo(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
+                incrementPC();
+                break;
+
+            case SHL:
+                setRegister(instruction.getDst(), TALU.shiftLeft(getRegister(instruction.getSrc1()), (int) getRegister(instruction.getSrc2()).toLong()));
+                incrementPC();
+                break;
+
+            case SHR:
+                setRegister(instruction.getDst(), TALU.shiftRight(getRegister(instruction.getSrc1()), (int) getRegister(instruction.getSrc2()).toLong()));
+                incrementPC();
+                break;
+
             case NEG:
                 setRegister(instruction.getDst(), TALU.negate(getRegister(instruction.getSrc1())));
                 incrementPC();
                 break;
+
             case CMP:
                 compare = TALU.compare(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2()));
                 incrementPC();
                 break;
+
             case TAND:
                 setRegister(instruction.getDst(), TALU.and(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
                 incrementPC();
                 break;
+
             case TOR:
                 setRegister(instruction.getDst(), TALU.or(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
                 incrementPC();
                 break;
+
             case TNOT:
                 setRegister(instruction.getDst(), TALU.not(getRegister(instruction.getSrc1())));
                 incrementPC();
                 break;
+
+            case TXOR:
+                setRegister(instruction.getDst(), TALU.xor(getRegister(instruction.getSrc1()), getRegister(instruction.getSrc2())));
+                incrementPC();
+                break;
+
+            case LOAD:
+                executeLoad(instruction);
+                break;
+
+            case STORE:
+                executeStore(instruction);
+                break;
+
+            case PUSH:
+                push(getRegister(instruction.getDst()));
+                incrementPC();
+                break;
+
+            case POP:
+                setRegister(instruction.getDst(), pop());
+                incrementPC();
+                break;
+
             case JMP:
                 jump(instruction.getImmediate());
                 break;
+
             case JNEG:
                 if (compare < 0) {
                     jump(instruction.getImmediate());
@@ -190,6 +277,7 @@ public final class TCPU {
                     incrementPC();
                 }
                 break;
+
             case JZERO:
                 if (compare == 0) {
                     jump(instruction.getImmediate());
@@ -197,12 +285,28 @@ public final class TCPU {
                     incrementPC();
                 }
                 break;
+
             case JPOS:
                 if (compare > 0) {
                     jump(instruction.getImmediate());
                 } else {
                     incrementPC();
                 }
+                break;
+
+            case CALL:
+                executeCall(instruction.getImmediate());
+                break;
+
+            case RET:
+                pc = pop();
+                break;
+
+            case SYS:
+                /*
+                 * Reservado para la ABI del sistema.
+                 */
+                incrementPC();
                 break;
             default:
                 throw new IllegalStateException("Instrucción aún no implementada: " + opcode);
@@ -213,9 +317,62 @@ public final class TCPU {
         pc = TALU.increment(pc);
     }
 
+    private void executeLoad(TInstruction instruction) {
+        long base = getRegister(instruction.getSrc1()).toLong();
+        long address = base + instruction.getImmediate();
+
+        checkAddress(checkedAddress(address));
+        setRegister(instruction.getDst(), memory[(int) address]);
+        incrementPC();
+    }
+
+    private void executeStore(TInstruction instruction) {
+        long base = getRegister(instruction.getSrc1()).toLong();
+        long address = base + instruction.getImmediate();
+        int index = checkedAddress(address);
+        memory[index] = getRegister(instruction.getDst());
+        incrementPC();
+    }
+
+    private void executeCall(int address) {
+        /*
+         * Guardar la dirección de retorno.
+         *
+         * CALL está en PC.
+         * La siguiente instrucción es PC + 1.
+         */
+        TWord returnAddress = TALU.increment(pc);
+        push(returnAddress);
+        jump(address);
+    }
+
+    private void push(TWord value) {
+        int address = addressOf(sp);
+        memory[address] = value.copy();
+        sp = TALU.decrement(sp);
+    }
+
+    private TWord pop() {
+        sp = TALU.increment(sp);
+        int address = addressOf(sp);
+        return memory[address].copy();
+    }
+
     private void jump(int address) {
         checkAddress(address);
         pc = TWord.fromLong(address);
+    }
+
+    private int addressOf(TWord value) {
+        long address = value.toLong();
+        return checkedAddress(address);
+    }
+
+    private int checkedAddress(long address) {
+        if (address < 0 || address >= MEMORY_SIZE) {
+            throw new IllegalStateException("Dirección de memoria inválida: " + address);
+        }
+        return (int) address;
     }
 
     private void checkRegister(int index) {
