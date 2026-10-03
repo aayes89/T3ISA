@@ -18,7 +18,7 @@ Implementa una arquitectura completa de 27 trits con CPU, ALU, memoria, kernel, 
 - Bus de dispositivos y consola
 
 ## Estructura del proyecto
-
+```
 src/t3isa/
 ├── Trit.java              # Trit (-1, 0, +1)
 ├── TWord.java             # Palabra de 27 trits
@@ -33,6 +33,8 @@ src/t3isa/
 ├── TShell.java            # Shell interactivo
 ├── T3OS.java              # Sistema operativo
 └── T3ISA.java             # Punto de entrada
+```
+
 
 ## Mapa de memoria
 
