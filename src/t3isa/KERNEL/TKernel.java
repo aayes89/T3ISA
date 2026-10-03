@@ -23,7 +23,7 @@
  */
 package t3isa.KERNEL;
 
-import t3isa.Memory.TMemoryManager;
+import t3isa.MEMORY.TMemoryManager;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TTrap;
 import t3isa.ISA.TOpcode;

@@ -18,7 +18,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa.Memory;
+package t3isa.MEMORY;
 
 import t3isa.Core.TCPU;
 import java.util.ArrayList;

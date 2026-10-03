@@ -27,32 +27,58 @@ package t3isa.FS;
  *
  * @author Slam
  */
+import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
 public final class TVFS {
 
-    private static final int DIRECTORY_BLOCK = 0;
+    /*
+     * TFileSystem:
+     *
+     * 0  superbloque
+     * 1  bitmap
+     * 2  metadata VFS
+     * 3    MAGIC
+     * 4..7    VERSION
+     * 8..11   NEXT BLOCK
+     * 12..15  PAYLOAD SIZE
+     * 3..255 = datos
+     */
+    private static final int DIRECTORY_BLOCK = 2;
+    private static final int HEADER_SIZE = 16;
+    private static final int MAGIC = 0x54334452; // T3DR 
+    private static final int VERSION = 1;
 
     private final TFileSystem fs;
     private final List<TNode> nodes;
+    private final List<Integer> directoryBlocks;
 
     public TVFS(TFileSystem fs) {
         if (fs == null) {
             throw new IllegalArgumentException("Filesystem null");
         }
-
         this.fs = fs;
         this.nodes = new ArrayList<>();
-
+        this.directoryBlocks = new ArrayList<>();
         loadDirectory();
     }
 
     public void format() {
         fs.format();
         nodes.clear();
+        directoryBlocks.clear();
         nodes.add(new TNode("/", "", true));
+        directoryBlocks.add(DIRECTORY_BLOCK);
+        if (!fs.isBlockUsed(DIRECTORY_BLOCK)) {
+            int block = fs.allocateBlock();
+            if (block != DIRECTORY_BLOCK) {
+                fs.freeBlock(block);
+                throw new IllegalStateException("No se pudo reservar el bloque VFS: " + DIRECTORY_BLOCK);
+            }
+        }
         saveDirectory();
     }
 
@@ -125,29 +151,37 @@ public final class TVFS {
             content = "";
         }
 
-        freeFileBlocks(node);
-
         byte[] data = content.getBytes(StandardCharsets.UTF_8);
 
+        freeFileBlocks(node);
+
         int required = (data.length + TFileSystem.BLOCK_SIZE - 1) / TFileSystem.BLOCK_SIZE;
+
         if (required > fs.getFreeBlocks()) {
             throw new IllegalStateException("Espacio insuficiente");
         }
 
-        int position = 0;
         for (int i = 0; i < required; i++) {
-            int block = fs.allocateBlock();
+            node.blocks.add(fs.allocateBlock());
+        }
+
+        int position = 0;
+
+        for (int block : node.blocks) {
             int length = Math.min(TFileSystem.BLOCK_SIZE, data.length - position);
 
             byte[] blockData = new byte[length];
-            System.arraycopy(data, position, blockData, 0, length);
+
+            if (length > 0) {
+                System.arraycopy(data, position, blockData, 0, length);
+                position += length;
+            }
 
             fs.writeBlock(block, blockData);
-            node.blocks.add(block);
-            position += length;
         }
 
         node.size = data.length;
+
         saveDirectory();
     }
 
@@ -171,8 +205,8 @@ public final class TVFS {
             int length = Math.min(data.length, result.length - position);
 
             System.arraycopy(data, 0, result, position, length);
-            position += length;
 
+            position += length;
             if (position >= result.length) {
                 break;
             }
@@ -189,6 +223,7 @@ public final class TVFS {
         }
 
         TNode node = find(normalized);
+
         if (node == null) {
             throw new IllegalStateException("No encontrado: " + normalized);
         }
@@ -205,6 +240,7 @@ public final class TVFS {
 
         freeFileBlocks(node);
         nodes.remove(node);
+
         saveDirectory();
     }
 
@@ -217,8 +253,8 @@ public final class TVFS {
         }
 
         List<TFileInfo> result = new ArrayList<>();
-        String prefix = "/".equals(normalized) ? "/" : normalized + "/";
 
+        String prefix = "/".equals(normalized) ? "/" : normalized + "/";
         for (TNode node : nodes) {
             if (node == directory) {
                 continue;
@@ -244,17 +280,14 @@ public final class TVFS {
     }
 
     public int getUsedBlocks() {
-
         return fs.getUsedBlocks();
     }
 
     public int getFreeBlocks() {
-
         return fs.getFreeBlocks();
     }
 
     private void freeFileBlocks(TNode node) {
-
         for (int block : node.blocks) {
             fs.freeBlock(block);
         }
@@ -264,13 +297,49 @@ public final class TVFS {
     }
 
     private void saveDirectory() {
+        if (directoryBlocks.isEmpty()) {
+            directoryBlocks.add(DIRECTORY_BLOCK);
+        }
 
-        /*
-         * El directorio se serializa dentro
-         * del bloque reservado 0.
-         */
+        byte[] data = serializeDirectory();
+        int payloadSize = TFileSystem.BLOCK_SIZE - HEADER_SIZE;
+        int requiredBlocks = Math.max(1, (data.length + payloadSize - 1) / payloadSize);
+
+        while (directoryBlocks.size() < requiredBlocks) {
+            int block = fs.allocateBlock();
+            directoryBlocks.add(block);
+        }
+
+        while (directoryBlocks.size() > requiredBlocks) {
+            int last = directoryBlocks.remove(directoryBlocks.size() - 1);
+            fs.freeBlock(last);
+        }
+
+        int position = 0;
+        for (int i = 0; i < directoryBlocks.size(); i++) {
+            int block = directoryBlocks.get(i);
+            int next = (i + 1 < directoryBlocks.size()) ? directoryBlocks.get(i + 1) : -1;
+
+            int length = Math.min(payloadSize, data.length - position);
+            byte[] blockData = new byte[TFileSystem.BLOCK_SIZE];
+
+            ByteBuffer buffer = ByteBuffer.wrap(blockData);
+            buffer.putInt(MAGIC);
+            buffer.putInt(VERSION);
+            buffer.putInt(next);
+            buffer.putInt(length);
+
+            if (length > 0) {
+                buffer.put(data, position, length);
+                position += length;
+            }
+
+            fs.writeBlock(block, blockData);
+        }
+    }
+
+    private byte[] serializeDirectory() {
         StringBuilder data = new StringBuilder();
-
         for (TNode node : nodes) {
             data.append(node.directory ? "D" : "F")
                     .append('|')
@@ -285,66 +354,121 @@ public final class TVFS {
                 if (i > 0) {
                     data.append(',');
                 }
-
                 data.append(node.blocks.get(i));
             }
-
             data.append('\n');
         }
-
-        byte[] bytes = data.toString().getBytes(StandardCharsets.UTF_8);
-        if (bytes.length > TFileSystem.BLOCK_SIZE) {
-            throw new IllegalStateException("Directorio raíz lleno");
-        }
-
-        if (!fs.isBlockUsed(DIRECTORY_BLOCK)) {
-            fs.allocateBlock();
-        }
-
-        fs.writeBlock(DIRECTORY_BLOCK, bytes);
+        return data.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     private void loadDirectory() {
+        nodes.clear();
+        directoryBlocks.clear();
+
         if (!fs.isBlockUsed(DIRECTORY_BLOCK)) {
             nodes.add(new TNode("/", "", true));
+            directoryBlocks.add(DIRECTORY_BLOCK);
+
+            int block = fs.allocateBlock();
+            if (block != DIRECTORY_BLOCK) {
+                fs.freeBlock(block);
+                throw new IllegalStateException("No se pudo reservar el bloque VFS: " + DIRECTORY_BLOCK);
+            }
+
             saveDirectory();
             return;
         }
 
-        byte[] bytes = fs.readBlock(DIRECTORY_BLOCK);
-        String content = new String(bytes, StandardCharsets.UTF_8).trim();
+        int block = DIRECTORY_BLOCK;
 
-        if (content.isEmpty()) {
+        ByteArrayOutputStream directoryData = new ByteArrayOutputStream();
+
+        while (block >= 0) {
+            if (!fs.isBlockUsed(block)) {
+                throw new IllegalStateException("Bloque VFS inválido: " + block);
+            }
+
+            byte[] blockData = fs.readBlock(block);
+
+            if (blockData.length < HEADER_SIZE) {
+                throw new IllegalStateException("Metadatos VFS corruptos");
+            }
+
+            ByteBuffer buffer = ByteBuffer.wrap(blockData);
+
+            int magic = buffer.getInt();
+            int version = buffer.getInt();
+            int next = buffer.getInt();
+            int length = buffer.getInt();
+
+            if (magic != MAGIC) {
+                throw new IllegalStateException("Magic VFS inválido");
+            }
+
+            if (version != VERSION) {
+                throw new IllegalStateException("Versión VFS no soportada: " + version);
+            }
+
+            if (length < 0 || length > blockData.length - HEADER_SIZE) {
+                throw new IllegalStateException("Tamaño de metadatos VFS inválido");
+            }
+            directoryBlocks.add(block);
+
+            byte[] payload = new byte[length];
+            buffer.get(payload);
+            directoryData.writeBytes(payload);
+            block = next;
+        }
+
+        appendDirectoryPayload(directoryData.toByteArray());
+
+        if (find("/") == null) {
+            nodes.clear();
+            directoryBlocks.clear();
+
             nodes.add(new TNode("/", "", true));
+            directoryBlocks.add(DIRECTORY_BLOCK);
+
             saveDirectory();
+        }
+    }
+
+    private void appendDirectoryPayload(byte[] payload) {
+        String content = new String(payload, StandardCharsets.UTF_8);
+        if (content.isEmpty()) {
             return;
         }
 
         String[] lines = content.split("\\R");
         for (String line : lines) {
-            String[] parts = line.split("\\|", -1);
-            if (parts.length < 5) {
+            if (line.isEmpty()) {
                 continue;
             }
 
+            String[] parts = line.split("\\|", -1);
+            if (parts.length < 5) {
+                throw new IllegalStateException("Entrada VFS corrupta");
+            }
+
             boolean directory = "D".equals(parts[0]);
+            if (!directory && !"F".equals(parts[0])) {
+                throw new IllegalStateException("Tipo de nodo VFS inválido");
+            }
+
             TNode node = new TNode(parts[1], parts[2], directory);
             node.size = Integer.parseInt(parts[3]);
 
             if (!parts[4].isEmpty()) {
                 String[] blockList = parts[4].split(",");
-                for (String block : blockList) {
-                    node.blocks.add(Integer.parseInt(block));
+                for (String blockString : blockList) {
+                    int dataBlock = Integer.parseInt(blockString);
+                    if (dataBlock < 3 || dataBlock >= TFileSystem.BLOCK_COUNT) {
+                        throw new IllegalStateException("Bloque de archivo inválido: " + dataBlock);
+                    }
+                    node.blocks.add(dataBlock);
                 }
             }
-
             nodes.add(node);
-        }
-
-        if (find("/") == null) {
-            nodes.clear();
-            nodes.add(new TNode("/", "", true));
-            saveDirectory();
         }
     }
 
