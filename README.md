@@ -18,22 +18,46 @@ Implementa una arquitectura completa de 27 trits con CPU, ALU, memoria, kernel, 
 - Bus de dispositivos y consola
 
 ## Estructura del proyecto
-```
-src/t3isa/
-├── Trit.java              # Trit (-1, 0, +1)
-├── TWord.java             # Palabra de 27 trits
-├── TALU.java              # Unidad aritmético-lógica
-├── TCPU.java              # Procesador + memoria
-├── TInstruction.java      # Decodificación de instrucciones
-├── TOpcode.java           # Conjunto de instrucciones
-├── TAssembler.java        # Ensamblador
-├── TKernel.java           # Kernel
-├── TScheduler.java        # Planificador
-├── TMemoryManager.java    # Gestión de memoria
-├── TShell.java            # Shell interactivo
-├── T3OS.java              # Sistema operativo
-└── T3ISA.java             # Punto de entrada
-```
+
+```text
+   ├── t3isa/                         # Paquete principal de la máquina virtual
+   │   ├── BOOT/
+   │   │   └── TBoot.java              # Inicialización del sistema y sector de arranque
+   │   ├── Core/
+   │   │   ├── TALU.java               # Unidad aritmética y lógica ternaria
+   │   │   ├── TCPU.java               # Unidad central de proceso
+   │   │   ├── TWord.java              # Palabra ternaria de 27 trits
+   │   │   └── Trit.java               # Representación de un trit (-1, 0, +1)
+   │   ├── DEVICE/
+   │   │   ├── TConsoleDevice.java     # Dispositivo de consola
+   │   │   ├── TDevice.java            # Interfaz base para dispositivos
+   │   │   ├── TDeviceBus.java         # Bus de comunicación entre dispositivos
+   │   │   └── TGraphicsDevice.java    # Dispositivo gráfico
+   │   ├── Exceptions/
+   │   │   └── TMemoryException.java   # Excepción de errores de memoria
+   │   ├── FS/
+   │   │   ├── TFileSystem.java        # Sistema de archivos abstracto
+   │   │   └── TVFS.java               # Sistema de archivos virtual
+   │   ├── ISA/
+   │   │   ├── TAssembler.java         # Ensamblador del conjunto de instrucciones
+   │   │   ├── TAssemblerText.java     # Ensamblador basado en texto
+   │   │   ├── TInstruction.java       # Definición de instrucciones
+   │   │   ├── TInterrupt.java         # Manejo de interrupciones
+   │   │   ├── TOpcode.java            # Códigos de operación
+   │   │   ├── TSyscall.java           # Llamadas al sistema
+   │   │   └── TTrap.java              # Trampas del sistema
+   │   ├── KERNEL/
+   │   │   ├── TKernel.java            # Núcleo del sistema operativo
+   │   │   ├── TPCB.java               # Bloque de control de proceso
+   │   │   └── TScheduler.java         # Planificador de procesos
+   │   ├── Memory/
+   │   │   └── TMemoryManager.java     # Gestión de memoria del sistema
+   │   ├── SHELL/
+   │   │   └── TShell.java             # Shell interactivo del sistema
+   │   ├── T3ISA.java                 # Punto de entrada principal
+   │   └── T3OS.java                  # Sistema operativo mínimo
+   └── test/
+       └── Tests.java                 # Pruebas automáticas del proyecto
 
 
 ## Mapa de memoria
