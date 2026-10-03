@@ -32,4 +32,5 @@ public interface TDevice {
     void write(TWord value);
 
     TWord read();
+    boolean hasInput();
 }

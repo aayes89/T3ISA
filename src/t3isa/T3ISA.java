@@ -34,86 +34,86 @@ public class T3ISA {
     public static void main(String[] args) {
 
         TCPU cpu = new TCPU();
+        TConsoleDevice console = new TConsoleDevice();
+        cpu.getDeviceBus().attach(0, console);
 
         String programA
-                = "MOVI R1, 13\n"
+                = "MOVI R1, 7\n"
+                + "MOVI R2, 0\n"
                 + "SYS\n"
                 + "MOVI R1, 12\n"
                 + "SYS\n";
 
         String programB
-                = "MOVI R1, 11\n"
-                + "SYS\n"
+                = "MOVI R7, 222\n"
+                + "MOVI R7, 333\n"
+                + "MOVI R7, 444\n"
+                + "MOVI R7, 555\n"
+                + "MOVI R7, 666\n"
+                + "MOVI R7, 777\n"
                 + "MOVI R1, 12\n"
                 + "SYS\n";
 
         String timerSource
                 = "MOVI R7, 1234\n"
                 + "IRET\n";
+        String programBad
+                = "MOVI R1, 100\n"
+                + "MOVI R2, 0\n"
+                + "DIV R3, R1, R2\n"
+                + "MOVI R1, 12\n"
+                + "SYS\n";
+        String programBadMemory
+                = "MOVI R1, 1000\n"
+                + "LOAD R3, R1, 0\n"
+                + "MOVI R1, 12\n"
+                + "SYS\n";
+        String programBadStack
+                = "POP R3\n"
+                + "POP R3\n"
+                + "MOVI R1, 12\n"
+                + "SYS\n";
 
-        TWord[] binaryA = TAssemblerText.assemble(programA, 1000);
-        TWord[] binaryB = TAssemblerText.assemble(programB, 5000);
+        TKernel kernel = new TKernel(cpu, 3);
+
+        TWord[] binaryA = TAssemblerText.assemble(programA);
+        TWord[] binaryB = TAssemblerText.assemble(programB);
+        TWord[] binaryBad = TAssemblerText.assemble(programBad);
         TWord[] timer = TAssemblerText.assemble(timerSource);
-
-        TWord[] syscallHandler = TAssemblerText.assemble(
-                "IRET\n"
-        );
-
-        TKernel kernel = new TKernel(cpu, 10);
-
-        TPCB process1 = kernel.loadProcess(
-                binaryA,
-                TCPU.USER_MEMORY_START,
-                4999
-        );
-
-        TPCB process2 = kernel.loadProcess(
-                binaryB,
-                5000,
-                9999
-        );
+        TWord[] binaryBadMemory = TAssemblerText.assemble(programBadMemory);
+        TWord[] binaryBadInstruction = {TWord.fromLong(2)};
+        TWord[] binaryBadStack = TAssemblerText.assemble(programBadStack);
 
         cpu.loadProgram(TCPU.INTERRUPT_HANDLER_TIMER, timer);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_SYSCALL, syscallHandler);
+        cpu.loadProgram(TCPU.INTERRUPT_HANDLER_DEVICE, TAssemblerText.assemble("IRET\n"));
+        TPCB process1 = kernel.loadProcess(binaryA);
+        TPCB process2 = kernel.loadProcess(binaryB);
+        TPCB process3 = kernel.loadProcess(binaryBad);
+        TPCB process4 = kernel.loadProcess(binaryBadMemory);
+        TPCB process5 = kernel.loadProcess(binaryBadInstruction);
+        TPCB process6 = kernel.loadProcess(binaryBadStack);
 
-        System.out.println(
-                "Proceso 1 creado (PID: "
-                + process1.getPid() + ")"
-        );
-
-        System.out.println(
-                "Proceso 2 creado (PID: "
-                + process2.getPid() + ")"
-        );
+        kernel.step(); // 0
+        kernel.step(); // 1
+        kernel.step(); // 2
 
         for (int i = 0; i < 20; i++) {
 
+            if (i == 17) {
+                System.out.println("=== INYECTANDO ENTRADA ===");
+                console.enqueueInput(1234);
+            }
+
             kernel.step();
 
-            TPCB current
-                    = kernel.getScheduler().getCurrentProcess();
-
-            if (process1.getState() == TPCB.ProcessState.BLOCKED) {
-                System.out.println(
-                        "PID " + process1.getPid()
-                        + " -> BLOCKED"
-                );
-
-                kernel.unblockProcess(process1);
-
-                System.out.println(
-                        "PID " + process1.getPid()
-                        + " -> READY"
-                );
-            }
+            TPCB current = kernel.getScheduler().getCurrentProcess();
 
             if (current != null) {
                 System.out.println(
                         "Paso " + i
-                        + " -> Proceso Ejecutando PID: "
-                        + current.getPid()
-                        + " | PC: "
-                        + cpu.getPC()
+                        + " -> PID: " + current.getPid()
+                        + " | PCB PC: " + current.getPc()
+                        + " | CPU PC: " + cpu.getPC()
                 );
             }
         }

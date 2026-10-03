@@ -142,4 +142,16 @@ public final class TDeviceBus {
             throw new IllegalArgumentException("Puerto de dispositivo inválido: " + port);
         }
     }
+
+    public boolean hasInput(int port) {
+        TDevice device = get(port);
+
+        if (device == null) {
+            throw new IllegalStateException(
+                    "No hay dispositivo conectado en el puerto: " + port
+            );
+        }
+
+        return device.hasInput();
+    }
 }

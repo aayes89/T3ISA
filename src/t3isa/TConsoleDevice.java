@@ -31,13 +31,17 @@ import java.io.BufferedReader;
 import java.io.IOException;
 
 import java.io.InputStreamReader;
+import java.util.ArrayDeque;
+import java.util.Queue;
 
 public final class TConsoleDevice implements TDevice {
 
     private final BufferedReader input;
+    private final Queue<TWord> inputQueue;
 
     public TConsoleDevice() {
         input = new BufferedReader(new InputStreamReader(System.in));
+        inputQueue = new ArrayDeque<>();
     }
 
     @Override
@@ -47,22 +51,39 @@ public final class TConsoleDevice implements TDevice {
 
     @Override
     public TWord read() {
+        if (!inputQueue.isEmpty()) {
+            return inputQueue.poll();
+        }
+
         System.out.print("DEVICE IN > ");
 
         try {
             String line = input.readLine();
-
             if (line == null || line.trim().isEmpty()) {
                 return TWord.zero();
             }
-
-            long value = Long.parseLong(line.trim());
-            
-            return TWord.fromLong(value);
+            return TWord.fromLong(Long.parseLong(line.trim()));
         } catch (IOException e) {
             throw new IllegalStateException("Error leyendo dispositivo", e);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Entrada no numérica", e);
         }
+    }
+
+    @Override
+    public boolean hasInput() {
+        if (!inputQueue.isEmpty()) {
+            return true;
+        }
+
+        try {
+            return System.in.available() > 0;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    public void enqueueInput(long value) {
+        inputQueue.add(TWord.fromLong(value));
     }
 }

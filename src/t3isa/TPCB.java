@@ -40,64 +40,69 @@ public class TPCB {
     private final int pid;
     private ProcessState state;
 
-    // Estado del contexto guardado según los tipos primitivos/clases reales de TCPU
     private int pc;
     private int userSP;
     private int compare;
-    private final TWord[] registers; // R0 a R26
+    private final TWord[] registers;
 
-    // Límites del espacio de direcciones asignado al proceso
     private final int memoryBase;
     private final int memoryLimit;
 
-    public TPCB(int pid, int entryPoint, int memoryBase, int memoryLimit) {
+    private final int stackBase;
+    private final int stackLimit;
+
+    public TPCB(
+            int pid,
+            int entryPoint,
+            int memoryBase,
+            int memoryLimit,
+            int stackBase,
+            int stackLimit) {
+
         this.pid = pid;
         this.state = ProcessState.NEW;
+
         this.pc = entryPoint;
+
         this.memoryBase = memoryBase;
         this.memoryLimit = memoryLimit;
 
-        // La pila inicial de usuario por defecto se ubica al final de su segmento asignado
-        this.userSP = memoryLimit;
+        this.stackBase = stackBase;
+        this.stackLimit = stackLimit;
+
+        this.userSP = stackLimit;
         this.compare = 0;
 
         this.registers = new TWord[TCPU.REGISTER_COUNT];
+
         for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
             this.registers[i] = TWord.zero();
         }
     }
 
-    /**
-     * Guarda el contexto actual del proceso desde TCPU.
-     *
-     * @param cpu
-     */
+    public void restoreContext(TCPU cpu) {
+        cpu.restoreProcessContext(this.pc, this.registers, this.userSP, this.compare, this.stackBase, this.stackLimit);
+        cpu.setProcessMemoryRange(this.memoryBase, this.memoryLimit);
+    }
+
+    public void setUserSP(int userSP) {
+        if (userSP < stackBase || userSP > stackLimit) {
+            throw new IllegalArgumentException(
+                    "User SP fuera del stack del proceso: " + userSP
+            );
+        }
+
+        this.userSP = userSP;
+    }
+
     public void saveContext(TCPU cpu) {
-        this.pc = cpu.getPC();
+        this.pc = cpu.isKernelMode() ? cpu.getInterruptedPC() : cpu.getPC();
         this.userSP = cpu.getUserSP();
         this.compare = cpu.getCompare();
 
         for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
             this.registers[i] = cpu.getRegister(i);
         }
-    }
-
-    /**
-     * Restaura el contexto del proceso en TCPU.
-     *
-     * @param cpu
-     */
-    public void restoreContext(TCPU cpu) {
-        cpu.setPC(this.pc);
-
-        for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
-            cpu.setRegister(i, this.registers[i]);
-        }
-
-        cpu.setUserSP(userSP);
-        cpu.setCompare(compare);
-        cpu.setProcessMemoryRange(memoryBase, memoryLimit);
-        cpu.setKernelMode(false);
     }
 
     public TWord[] getRegisters() {
@@ -134,5 +139,13 @@ public class TPCB {
 
     public int getMemoryLimit() {
         return memoryLimit;
+    }
+
+    public int getStackBase() {
+        return stackBase;
+    }
+
+    public int getStackLimit() {
+        return stackLimit;
     }
 }

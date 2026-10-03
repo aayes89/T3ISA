@@ -26,6 +26,8 @@ package t3isa;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Queue;
 
 /**
@@ -36,12 +38,14 @@ public class TScheduler {
 
     private final Queue<TPCB> readyQueue;
     private final List<TPCB> processTable;
+    private final Map<Integer, Queue<TPCB>> blockedByDevice;
     private TPCB currentProcess;
     private int nextPid;
 
     public TScheduler() {
         this.readyQueue = new ArrayDeque<>();
         this.processTable = new ArrayList<>();
+        blockedByDevice = new HashMap<>();
         this.currentProcess = null;
         this.nextPid = 1;
     }
@@ -52,10 +56,12 @@ public class TScheduler {
      * @param entryPoint
      * @param memoryBase
      * @param memoryLimit
+     * @param stackBase
+     * @param stackLimit
      * @return
      */
-    public TPCB createProcess(int entryPoint, int memoryBase, int memoryLimit) {
-        TPCB pcb = new TPCB(nextPid++, entryPoint, memoryBase, memoryLimit);
+    public TPCB createProcess(int entryPoint, int memoryBase, int memoryLimit, int stackBase, int stackLimit) {
+        TPCB pcb = new TPCB(nextPid++, entryPoint, memoryBase, memoryLimit, stackBase, stackLimit);
         pcb.setState(TPCB.ProcessState.READY);
         processTable.add(pcb);
         readyQueue.add(pcb);
@@ -106,13 +112,41 @@ public class TScheduler {
      *
      * @param cpu
      */
-    public void blockCurrentProcess(TCPU cpu) {
+    public void blockCurrentProcess(TCPU cpu, int devicePort) {
         if (currentProcess != null) {
             currentProcess.saveContext(cpu);
             currentProcess.setState(TPCB.ProcessState.BLOCKED);
+
+            blockedByDevice
+                    .computeIfAbsent(devicePort, k -> new ArrayDeque<>())
+                    .add(currentProcess);
+
             currentProcess = null;
         }
+
         schedule(cpu);
+    }
+
+    public void unblockDevice(int devicePort) {
+        Queue<TPCB> queue = blockedByDevice.get(devicePort);
+
+        if (queue == null || queue.isEmpty()) {
+            return;
+        }
+
+        TPCB pcb = queue.poll();
+
+        pcb.setState(TPCB.ProcessState.READY);
+        readyQueue.add(pcb);
+
+        if (queue.isEmpty()) {
+            blockedByDevice.remove(devicePort);
+        }
+    }
+
+    public boolean hasBlockedProcesses(int devicePort) {
+        Queue<TPCB> queue = blockedByDevice.get(devicePort);
+        return queue != null && !queue.isEmpty();
     }
 
     /**
@@ -138,8 +172,7 @@ public class TScheduler {
         if (currentProcess != null) {
             currentProcess.setState(TPCB.ProcessState.RUNNING);
             cpu.setCurrentPid(currentProcess.getPid());
-            cpu.setProcessMemoryRange(currentProcess.getMemoryBase(), currentProcess.getMemoryLimit());
-            cpu.restoreProcessContext(currentProcess.getPc(), currentProcess.getRegisters(), currentProcess.getUserSP(), currentProcess.getCompare());
+            currentProcess.restoreContext(cpu);
         }
 
         return currentProcess;

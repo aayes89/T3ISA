@@ -105,9 +105,14 @@ public final class TCPU {
     private int compare;
     private int currentMemoryBase;
     private int currentMemoryLimit;
+    private int currentStackBase;
+    private int currentStackLimit;
 
     private boolean halted;
     private int pendingProcessAction = -1;
+    private int pendingDevicePort = -1;
+    private int interruptedPC;
+    private boolean interruptReturned;
 
     //private TDevice device;   // Ya no es necesario
     private final TDeviceBus deviceBus;
@@ -139,10 +144,22 @@ public final class TCPU {
         trap = null;
         currentMemoryBase = USER_MEMORY_START;
         currentMemoryLimit = USER_MEMORY_START;
+        currentStackBase = USER_STACK_BOTTOM;
+        currentStackLimit = USER_STACK_TOP;
         compare = 0;
         currentPid = 0;
         pendingProcessAction = -1;
+        pendingDevicePort = -1;
+        interruptReturned = false;
         halted = false;
+    }
+
+    public boolean wasInterruptReturned() {
+        return interruptReturned;
+    }
+
+    public void clearInterruptReturned() {
+        interruptReturned = false;
     }
 
     public int getCurrentPid() {
@@ -159,6 +176,14 @@ public final class TCPU {
 
     public void clearPendingProcessAction() {
         pendingProcessAction = -1;
+    }
+
+    public int getPendingDevicePort() {
+        return pendingDevicePort;
+    }
+
+    public void clearPendingDevicePort() {
+        pendingDevicePort = -1;
     }
 
     public TInterrupt getPendingInterrupt() {
@@ -246,6 +271,18 @@ public final class TCPU {
 
         currentMemoryBase = base;
         currentMemoryLimit = limit;
+    }
+
+    public void setProcessStackRange(int base, int limit) {
+        checkAddress(base);
+        checkAddress(limit);
+
+        if (base > limit) {
+            throw new IllegalArgumentException("Rango de stack inválido");
+        }
+
+        currentStackBase = base;
+        currentStackLimit = limit;
     }
 
     public void attachDevice(int port, TDevice device) {
@@ -465,12 +502,20 @@ public final class TCPU {
                 break;
 
             case JMP:
-                pc = instruction.getImmediate();
+                int jumpAddress = checkedUserCodeAddress(instruction.getImmediate());
+                if (jumpAddress < 0) {
+                    return;
+                }
+                pc = jumpAddress;
                 break;
 
             case JNEG:
                 if (compare < 0) {
-                    pc = instruction.getImmediate();
+                    int target = checkedUserCodeAddress(instruction.getImmediate());
+                    if (target < 0) {
+                        return;
+                    }
+                    pc = target;
                 } else {
                     incrementPC();
                 }
@@ -478,7 +523,11 @@ public final class TCPU {
 
             case JZERO:
                 if (compare == 0) {
-                    pc = instruction.getImmediate();
+                    int target = checkedUserCodeAddress(instruction.getImmediate());
+                    if (target < 0) {
+                        return;
+                    }
+                    pc = target;
                 } else {
                     incrementPC();
                 }
@@ -486,7 +535,11 @@ public final class TCPU {
 
             case JPOS:
                 if (compare > 0) {
-                    pc = instruction.getImmediate();
+                    int target = checkedUserCodeAddress(instruction.getImmediate());
+                    if (target < 0) {
+                        return;
+                    }
+                    pc = target;
                 } else {
                     incrementPC();
                 }
@@ -502,11 +555,17 @@ public final class TCPU {
 
             case PUSH:
                 push(getRegister(instruction.getSrc1()));
+                if (trap != null) {
+                    return;
+                }
                 incrementPC();
                 break;
 
             case POP:
                 setRegister(instruction.getDst(), pop());
+                if (trap != null) {
+                    return;
+                }
                 incrementPC();
                 break;
 
@@ -515,7 +574,19 @@ public final class TCPU {
                 break;
 
             case RET:
-                pc = (int) pop().toLong();
+                TWord returnAddress = pop();
+
+                if (trap != null) {
+                    return;
+                }
+
+                int returnPC = checkedUserCodeAddress(returnAddress.toLong());
+
+                if (returnPC < 0) {
+                    return;
+                }
+
+                pc = returnPC;
                 break;
 
             case IRET:
@@ -551,17 +622,22 @@ public final class TCPU {
     }
 
     private void executeCall(TInstruction instruction) {
+        int target = checkedUserCodeAddress(instruction.getImmediate());
+
+        if (target < 0) {
+            return;
+        }
+
         push(TWord.fromLong(pc + 1));
-        pc = instruction.getImmediate();
+
+        if (trap != null) {
+            return;
+        }
+
+        pc = target;
     }
 
     private void executeIRet() {
-        System.out.println("=== IRET ===");
-        System.out.println("SP antes = " + sp);
-        System.out.println("trap = " + trap);
-        System.out.println("memory[sp+1] = " + memory[sp + 1].toLong());
-        System.out.println("memory[sp+2] = " + memory[sp + 2].toLong());
-
         if (!kernelMode) {
             halted = true;
             return;
@@ -570,42 +646,40 @@ public final class TCPU {
         int trapAddress = sp + 1;
         int pcAddress = sp + 2;
 
-        int code = (int) memory[trapAddress].toLong();
+        if (trapAddress < KERNEL_STACK_BOTTOM || trapAddress > KERNEL_STACK_TOP || pcAddress < KERNEL_STACK_BOTTOM || pcAddress > KERNEL_STACK_TOP) {
+            raiseTrap(TTrap.STACK_ERROR);
+            return;
+        }
 
-        System.out.println("IRET code = " + code);
-        System.out.println("IRET PC = " + memory[pcAddress].toLong());
+        int code = (int) memory[trapAddress].toLong();
+        int returnPC = (int) memory[pcAddress].toLong();
 
         if (trap != null) {
-
             if (code < 0 || code >= TRAP_VECTOR_COUNT) {
                 halted = true;
                 return;
             }
+        } else {
+            if (code < 0 || code >= INTERRUPT_VECTOR_COUNT) {
+                halted = true;
+                return;
+            }
+        }
 
-            pc = (int) memory[pcAddress].toLong();
-            sp = userSP;
-            kernelMode = false;
-            trap = null;
-
-            System.out.println("IRET -> USER");
-            System.out.println("PC = " + pc);
-            System.out.println("SP = " + sp);
-
+        if (returnPC < currentMemoryBase || returnPC > currentMemoryLimit) {
+            raiseTrap(TTrap.INVALID_MEMORY);
             return;
         }
 
-        if (code < 0 || code >= INTERRUPT_VECTOR_COUNT) {
-            halted = true;
-            return;
-        }
-
-        pc = (int) memory[pcAddress].toLong();
+        pc = returnPC;
         sp = userSP;
         kernelMode = false;
 
-        System.out.println("IRET INTERRUPT -> USER");
-        System.out.println("PC = " + pc);
-        System.out.println("SP = " + sp);
+        if (trap != null) {
+            trap = null;
+        } else {
+            interruptReturned = true;
+        }
     }
 
     private void executeSys() {
@@ -677,12 +751,19 @@ public final class TCPU {
             case TSyscall.DEVICE_IN:
                 try {
                     int port = (int) getRegister(2).toLong();
+
+                    if (!deviceBus.hasInput(port)) {
+                        pendingDevicePort = port;
+                        pendingProcessAction = TSyscall.BLOCK;
+                        return;
+                    }
+
                     setRegister(7, deviceBus.read(port));
+                    incrementPC();
+
                 } catch (IllegalArgumentException | IllegalStateException e) {
                     raiseTrap(TTrap.DEVICE_ERROR);
-                    return;
                 }
-                incrementPC();
                 break;
 
             case TSyscall.ENTER_USER:
@@ -731,7 +812,7 @@ public final class TCPU {
                 incrementPC();
                 pendingProcessAction = TSyscall.BLOCK;
                 break;
-                
+
             default:
                 raiseTrap(TTrap.INVALID_SYSCALL);
                 break;
@@ -739,11 +820,7 @@ public final class TCPU {
     }
 
     private void push(TWord value) {
-
-        int bottom = kernelMode
-                ? KERNEL_STACK_BOTTOM
-                : USER_STACK_BOTTOM;
-
+        int bottom = kernelMode ? KERNEL_STACK_BOTTOM : currentStackBase;
         if (sp < bottom) {
             raiseTrap(TTrap.STACK_ERROR);
             return;
@@ -754,14 +831,8 @@ public final class TCPU {
     }
 
     private TWord pop() {
-
-        int bottom = kernelMode
-                ? KERNEL_STACK_BOTTOM
-                : USER_STACK_BOTTOM;
-
-        int top = kernelMode
-                ? KERNEL_STACK_TOP
-                : USER_STACK_TOP;
+        int bottom = kernelMode ? KERNEL_STACK_BOTTOM : currentStackBase;
+        int top = kernelMode ? KERNEL_STACK_TOP : currentStackLimit;
 
         if (sp >= top) {
             raiseTrap(TTrap.STACK_ERROR);
@@ -804,9 +875,6 @@ public final class TCPU {
             return;
         }
 
-        // Frame:
-        // [sp]  = PC de retorno
-        // [sp]  = código del trap
         memory[sp] = TWord.fromLong(pc);
         sp--;
 
@@ -820,6 +888,13 @@ public final class TCPU {
         );
 
         pc = handler;
+
+        // El trap ya está atendido por el CPU.
+        // El handler decidirá si el proceso termina.
+    }
+
+    public void requestDeviceInterrupt() {
+        pendingInterrupt = TInterrupt.DEVICE;
     }
 
     private void switchToKernelStack() {
@@ -873,17 +948,47 @@ public final class TCPU {
         }
     }
 
-    private int checkedUserAddress(long address) {
-        int value = checkedAddress(address);
-
-        if (!kernelMode) {
-            if (value < currentMemoryBase || value > currentMemoryLimit) {
-                raiseTrap(TTrap.INVALID_MEMORY);
-                return -1;
-            }
+    private int checkedUserAddress(long rawAddress) {
+        if (rawAddress < 0 || rawAddress >= MEMORY_SIZE) {
+            raiseTrap(TTrap.INVALID_MEMORY);
+            return -1;
         }
 
-        return value;
+        int address = (int) rawAddress;
+
+        if (kernelMode) {
+            return address;
+        }
+
+        boolean inProcessMemory = address >= currentMemoryBase && address <= currentMemoryLimit;
+        boolean inProcessStack = address >= currentStackBase && address <= currentStackLimit;
+
+        if (!inProcessMemory && !inProcessStack) {
+            raiseTrap(TTrap.INVALID_MEMORY);
+            return -1;
+        }
+
+        return address;
+    }
+
+    private int checkedUserCodeAddress(long rawAddress) {
+        if (rawAddress < 0 || rawAddress >= MEMORY_SIZE) {
+            raiseTrap(TTrap.INVALID_MEMORY);
+            return -1;
+        }
+
+        int address = (int) rawAddress;
+
+        if (kernelMode) {
+            return address;
+        }
+
+        if (address < currentMemoryBase || address > currentMemoryLimit) {
+            raiseTrap(TTrap.INVALID_MEMORY);
+            return -1;
+        }
+
+        return address;
     }
 
     public boolean isKernelMode() {
@@ -907,6 +1012,8 @@ public final class TCPU {
         pendingInterrupt = null;
 
         if (!kernelMode) {
+            interruptedPC = pc;
+
             userSP = sp;
             kernelMode = true;
             kernelSP = KERNEL_STACK_TOP;
@@ -918,9 +1025,6 @@ public final class TCPU {
             return;
         }
 
-        // Frame de interrupción:
-        // [sp]     = PC de retorno
-        // [sp - 1] = código de interrupción
         memory[sp] = TWord.fromLong(pc);
         sp--;
 
@@ -929,7 +1033,12 @@ public final class TCPU {
 
         int vectorAddress = INTERRUPT_VECTOR_BASE + interrupt.code;
         int handler = checkedAddress(memory[vectorAddress].toLong());
+
         pc = handler;
+    }
+
+    public int getInterruptedPC() {
+        return interruptedPC;
     }
 
     public void setKernelMode(boolean value) {
@@ -945,7 +1054,7 @@ public final class TCPU {
         halted = true;
     }
 
-    public void restoreProcessContext(int pc, TWord[] registers, int userSP, int compare) {
+    public void restoreProcessContext(int pc, TWord[] registers, int userSP, int compare, int stackBase, int stackLimit) {
         this.pc = pc;
 
         for (int i = 0; i < REGISTER_COUNT; i++) {
@@ -955,6 +1064,9 @@ public final class TCPU {
         this.userSP = userSP;
         this.compare = compare;
 
+        this.currentStackBase = stackBase;
+        this.currentStackLimit = stackLimit;
+
         this.sp = userSP;
         this.kernelMode = false;
         this.trap = null;
@@ -962,5 +1074,9 @@ public final class TCPU {
 
     public void resume() {
         halted = false;
+    }
+
+    public TDeviceBus getDeviceBus() {
+        return deviceBus;
     }
 }

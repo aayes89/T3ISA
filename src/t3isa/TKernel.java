@@ -31,6 +31,7 @@ public class TKernel {
 
     private final TCPU cpu;
     private final TScheduler scheduler;
+    private final TMemoryManager memoryManager;
     private int timerTicks;
     private final int quantumTicks; // Cuántos pasos de CPU equivalen a 1 quántum/tic de temporizador
 
@@ -38,6 +39,7 @@ public class TKernel {
         this.cpu = cpu;
         this.scheduler = new TScheduler();
         this.quantumTicks = quantumTicks;
+        this.memoryManager = new TMemoryManager();
         this.timerTicks = 0;
 
         // Configurar los vectores de interrupción/trap en TCPU
@@ -46,29 +48,37 @@ public class TKernel {
     }
 
     private void setupInterruptVectors() {
-        // Cargar las direcciones de los handlers en la CPU
         cpu.loadInterruptVector(TInterrupt.TIMER, TCPU.INTERRUPT_HANDLER_TIMER);
+        cpu.loadInterruptVector(TInterrupt.DEVICE, TCPU.INTERRUPT_HANDLER_DEVICE);
 
-        // Cargar traps básicos (ej. división por cero, error de memoria)
         cpu.loadTrapVector(TTrap.DIVIDE_BY_ZERO, TCPU.TRAP_HANDLER_DIV_ZERO);
         cpu.loadTrapVector(TTrap.INVALID_MEMORY, TCPU.TRAP_HANDLER_MEMORY);
         cpu.loadTrapVector(TTrap.INVALID_SYSCALL, TCPU.TRAP_HANDLER_SYSCALL);
+        cpu.loadTrapVector(TTrap.DEVICE_ERROR, TCPU.TRAP_HANDLER_DEVICE);
+        cpu.loadTrapVector(TTrap.INVALID_INSTRUCTION, TCPU.TRAP_HANDLER_INSTRUCTION);
+        cpu.loadTrapVector(TTrap.STACK_ERROR, TCPU.TRAP_HANDLER_STACK);
     }
 
     /**
      * Carga un programa binario en el espacio de usuario y crea su proceso.
      *
      * @param binary
-     * @param memoryBase
-     * @param memoryLimit
      * @return
      */
-    public TPCB loadProcess(TWord[] binary, int memoryBase, int memoryLimit) {
-        // Cargar las instrucciones del programa en la memoria física a partir de memoryBase
-        cpu.loadProgram(memoryBase, binary);
+    public TPCB loadProcess(TWord[] binary) {
+        return createProcess(binary);
+    }
 
-        // Crear el PCB con punto de entrada en memoryBase
-        return scheduler.createProcess(memoryBase, memoryBase, memoryLimit);
+    public TPCB createProcess(TWord[] binary) {
+        if (binary == null || binary.length == 0) {
+            throw new IllegalArgumentException("El programa está vacío");
+        }
+
+        TMemoryManager.MemoryBlock block = memoryManager.allocate(binary.length);
+        TMemoryManager.MemoryBlock stack = memoryManager.allocateStack(256);
+        cpu.loadProgram(block.getBase(), binary);
+
+        return scheduler.createProcess(block.getBase(), block.getBase(), block.getLimit(), stack.getBase(), stack.getLimit());
     }
 
     // Avanza la CPU un ciclo de instrucción y simula el temporizador.
@@ -77,61 +87,107 @@ public class TKernel {
             return;
         }
 
+        boolean deviceInterrupt = checkDeviceInterrupts();
+
         if (scheduler.getCurrentProcess() == null && scheduler.hasReadyProcesses()) {
             scheduler.schedule(cpu);
         }
 
         timerTicks++;
+        boolean timerInterrupt = false;
 
         if (timerTicks >= quantumTicks) {
             timerTicks = 0;
 
             TPCB current = scheduler.getCurrentProcess();
 
-            if (current != null && !cpu.isKernelMode()) {
-                current.saveContext(cpu);
+            if (!deviceInterrupt && current != null && !cpu.isKernelMode()) {
+                timerInterrupt = true;
+                cpu.requestInterrupt(TInterrupt.TIMER);
             }
-
-            cpu.requestInterrupt(TInterrupt.TIMER);
         }
 
         cpu.step();
+
+        System.out.println("DEBUG CPU: PC=" + cpu.getPC() + " SP=" + cpu.getSP() + " KERNEL=" + cpu.isKernelMode() + " TRAP=" + cpu.getTrap());
+
+        if (deviceInterrupt) {
+            cpu.clearInterruptReturned();
+            while (cpu.isKernelMode() && !cpu.isHalted()) {
+                cpu.step();
+            }
+
+            if (cpu.wasInterruptReturned()) {
+                TPCB current = scheduler.getCurrentProcess();
+
+                if (current != null) {
+                    current.saveContext(cpu);
+                }
+                cpu.clearInterruptReturned();
+                scheduler.scheduleAfterInterrupt(cpu);
+            }
+            return;
+        }
+
+        if (timerInterrupt) {
+            cpu.clearInterruptReturned();
+            while (cpu.isKernelMode() && !cpu.isHalted()) {
+                cpu.step();
+            }
+
+            if (cpu.wasInterruptReturned()) {
+                TPCB current = scheduler.getCurrentProcess();
+                if (current != null) {
+                    current.saveContext(cpu);
+                }
+
+                cpu.clearInterruptReturned();
+                scheduler.scheduleAfterInterrupt(cpu);
+            }
+
+            return;
+        }
 
         int action = cpu.getPendingProcessAction();
 
         System.out.println("PENDING ACTION = " + action);
 
         switch (action) {
+
             case TSyscall.YIELD:
                 cpu.clearPendingProcessAction();
                 scheduler.schedule(cpu);
                 break;
+
             case TSyscall.BLOCK:
+                int devicePort = cpu.getPendingDevicePort();
+
                 cpu.clearPendingProcessAction();
-                scheduler.blockCurrentProcess(cpu);
+                cpu.clearPendingDevicePort();
+
+                scheduler.blockCurrentProcess(cpu, devicePort);
                 break;
+
             case TSyscall.EXIT:
                 cpu.clearPendingProcessAction();
+
+                TPCB process = scheduler.getCurrentProcess();
+
+                if (process != null) {
+                    memoryManager.free(process.getMemoryBase());
+                    memoryManager.freeStack(process.getStackBase());
+                }
+
                 scheduler.terminateCurrentProcess(cpu);
+
                 if (scheduler.getCurrentProcess() == null) {
                     cpu.halt();
                     return;
                 }
                 break;
+
             default:
                 break;
-        }
-
-        if (cpu.isKernelMode() && cpu.getPC() == TCPU.INTERRUPT_HANDLER_TIMER) {
-            scheduler.scheduleAfterInterrupt(cpu);
-        }
-    }
-
-    public void unblockProcess(TPCB pcb) {
-        scheduler.unblockProcess(pcb);
-
-        if (cpu.isHalted() && scheduler.hasReadyProcesses()) {
-            cpu.resume();
         }
     }
 
@@ -142,13 +198,38 @@ public class TKernel {
         }
     }
 
+    private boolean checkDeviceInterrupts() {
+        for (int port = 0; port < cpu.getDeviceBus().size(); port++) {
+            if (!cpu.getDeviceBus().hasDevice(port)) {
+                continue;
+            }
+
+            if (!cpu.getDeviceBus().hasInput(port)) {
+                continue;
+            }
+
+            if (scheduler.hasBlockedProcesses(port)) {
+                scheduler.unblockDevice(port);
+                cpu.requestInterrupt(TInterrupt.DEVICE);
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void setupTrapHandlers() {
-        TWord[] memoryHandler = TAssemblerText.assemble(
-                "MOVI R1, 1\n"
-                + "IRET\n"
+
+        TWord[] fatalHandler = TAssemblerText.assemble(
+                "MOVI R1, 12\n"
+                + "SYS\n"
         );
 
-        cpu.loadProgram(TCPU.TRAP_HANDLER_MEMORY, memoryHandler);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_DIV_ZERO, fatalHandler);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_MEMORY, fatalHandler);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_INSTRUCTION, fatalHandler);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_SYSCALL, fatalHandler);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_DEVICE, fatalHandler);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_STACK, fatalHandler);
     }
 
     public TScheduler getScheduler() {

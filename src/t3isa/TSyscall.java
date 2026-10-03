@@ -27,7 +27,6 @@ package t3isa;
  *
  * @author Slam
  */
-
 public final class TSyscall {
 
     private TSyscall() {
@@ -47,4 +46,5 @@ public final class TSyscall {
     public static final int YIELD = 11;
     public static final int EXIT = 12;
     public static final int BLOCK = 13;
+    public static final int FORK = 14;
 }
