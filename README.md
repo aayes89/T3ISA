@@ -92,6 +92,8 @@ java -jar dist/T3ISA.jar
 
 O desde el IDE NetBeans: Run Project.
 
+
 # Licencia
+
 MIT License
 Copyright (c) 2025 Allan (Slam)
