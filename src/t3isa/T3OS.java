@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright 2025 Allan (Slam).
+ * Copyright 2026 Slam.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,45 +27,49 @@ package t3isa;
  *
  * @author Slam
  *
- * T3ISA - Ternary 3-State Instruction Set Architecture
+ * Punto de entrada de T3OS.
  */
-public class T3ISA {
+public final class T3OS {
 
-    public static void main(String[] args) {
+    private final TCPU cpu;
+    private final TKernel kernel;
+    private final TBoot boot;
 
-        System.out.println("========================================");
-        System.out.println(" T3OS BOOT TEST");
-        System.out.println("========================================");
+    public T3OS() {
+        cpu = new TCPU();
+        boot = new TBoot(cpu);
+        kernel = new TKernel(cpu, 10);
+    }
 
-        T3OS os = new T3OS();
+    public void boot() {
+        // Primero reset del hardware.
+        boot.reset();
 
-        os.boot();
+        // Después instalar el contenido del boot.
+        boot.install();
 
-        TCPU cpu = os.getCPU();
+        // El hardware arranca desde el reset vector.
+        boot.resetVector();
+        System.out.println("T3OS BOOT PC=" + cpu.getPC());
 
-        System.out.println();
-        System.out.println("RESET VECTOR = "
-                + cpu.readMemory(0).toLong());
-
-        System.out.println("BOOT START = "
-                + TCPU.BOOT_START);
-
-        System.out.println("OS START = "
-                + TCPU.OS_START);
-
-        System.out.println("PC = "
-                + cpu.getPC());
-
-        System.out.println("KERNEL MODE = "
-                + cpu.isKernelMode());
+        // Ejecutar BOOT.
+        cpu.step();
+        System.out.println("T3OS KERNEL ENTRY PC=" + cpu.getPC());
 
         if (cpu.getPC() != TCPU.OS_START) {
-            throw new IllegalStateException(
-                    "T3OS no inició correctamente"
-            );
+            throw new IllegalStateException("BOOT no transfirió control a T3OS");
         }
+    }
 
-        System.out.println();
-        System.out.println("BOOT -> T3OS OK");
+    public TCPU getCPU() {
+        return cpu;
+    }
+
+    public TKernel getKernel() {
+        return kernel;
+    }
+
+    public TBoot getBoot() {
+        return boot;
     }
 }
