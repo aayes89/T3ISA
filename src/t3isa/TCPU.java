@@ -722,6 +722,16 @@ public final class TCPU {
                 pendingProcessAction = TSyscall.EXIT;
                 break;
 
+            case TSyscall.BLOCK:
+                if (kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
+                incrementPC();
+                pendingProcessAction = TSyscall.BLOCK;
+                break;
+                
             default:
                 raiseTrap(TTrap.INVALID_SYSCALL);
                 break;
@@ -948,5 +958,9 @@ public final class TCPU {
         this.sp = userSP;
         this.kernelMode = false;
         this.trap = null;
+    }
+
+    public void resume() {
+        halted = false;
     }
 }

@@ -97,6 +97,7 @@ public class TPCB {
         cpu.setUserSP(userSP);
         cpu.setCompare(compare);
         cpu.setProcessMemoryRange(memoryBase, memoryLimit);
+        cpu.setKernelMode(false);
     }
 
     public TWord[] getRegisters() {

@@ -52,6 +52,7 @@ public class TKernel {
         // Cargar traps básicos (ej. división por cero, error de memoria)
         cpu.loadTrapVector(TTrap.DIVIDE_BY_ZERO, TCPU.TRAP_HANDLER_DIV_ZERO);
         cpu.loadTrapVector(TTrap.INVALID_MEMORY, TCPU.TRAP_HANDLER_MEMORY);
+        cpu.loadTrapVector(TTrap.INVALID_SYSCALL, TCPU.TRAP_HANDLER_SYSCALL);
     }
 
     /**
@@ -100,22 +101,37 @@ public class TKernel {
 
         System.out.println("PENDING ACTION = " + action);
 
-        if (action == TSyscall.YIELD) {
-            cpu.clearPendingProcessAction();
-            scheduler.schedule(cpu);
-
-        } else if (action == TSyscall.EXIT) {
-            cpu.clearPendingProcessAction();
-            scheduler.terminateCurrentProcess(cpu);
-
-            if (scheduler.getCurrentProcess() == null) {
-                cpu.halt();
-                return;
-            }
+        switch (action) {
+            case TSyscall.YIELD:
+                cpu.clearPendingProcessAction();
+                scheduler.schedule(cpu);
+                break;
+            case TSyscall.BLOCK:
+                cpu.clearPendingProcessAction();
+                scheduler.blockCurrentProcess(cpu);
+                break;
+            case TSyscall.EXIT:
+                cpu.clearPendingProcessAction();
+                scheduler.terminateCurrentProcess(cpu);
+                if (scheduler.getCurrentProcess() == null) {
+                    cpu.halt();
+                    return;
+                }
+                break;
+            default:
+                break;
         }
 
         if (cpu.isKernelMode() && cpu.getPC() == TCPU.INTERRUPT_HANDLER_TIMER) {
             scheduler.scheduleAfterInterrupt(cpu);
+        }
+    }
+
+    public void unblockProcess(TPCB pcb) {
+        scheduler.unblockProcess(pcb);
+
+        if (cpu.isHalted() && scheduler.hasReadyProcesses()) {
+            cpu.resume();
         }
     }
 

@@ -32,24 +32,17 @@ package t3isa;
 public class T3ISA {
 
     public static void main(String[] args) {
-        // 1. Instanciar la CPU
+
         TCPU cpu = new TCPU();
 
-        // 2. Definir dos programas de prueba sencillos
         String programA
-                = "inicio:\n"
-                + "MOVI R0, 123\n"
-                + "MOVI R1, 2000\n"
-                + "STORE R1, R0, 0\n"
-                + "MOVI R1, 2000\n"
-                + "LOAD R0, R1, 0\n"
-                + "MOVI R1, 5000\n"
-                + "JMP 5000\n";
+                = "MOVI R1, 13\n"
+                + "SYS\n"
+                + "MOVI R1, 12\n"
+                + "SYS\n";
 
         String programB
-                = "inicio:\n"
-                + "MOVI R2, 200\n"
-                + "MOVI R1, 11\n"
+                = "MOVI R1, 11\n"
                 + "SYS\n"
                 + "MOVI R1, 12\n"
                 + "SYS\n";
@@ -58,29 +51,61 @@ public class T3ISA {
                 = "MOVI R7, 1234\n"
                 + "IRET\n";
 
-        // 3. Compilar los programas
         TWord[] binaryA = TAssemblerText.assemble(programA, 1000);
         TWord[] binaryB = TAssemblerText.assemble(programB, 5000);
         TWord[] timer = TAssemblerText.assemble(timerSource);
 
-        // 4. Instanciar el Kernel
+        TWord[] syscallHandler = TAssemblerText.assemble(
+                "IRET\n"
+        );
+
         TKernel kernel = new TKernel(cpu, 10);
 
-        // 5. Cargar los dos procesos en regiones separadas
-        TPCB process1 = kernel.loadProcess(binaryA, TCPU.USER_MEMORY_START, 4999);
-        TPCB process2 = kernel.loadProcess(binaryB, 5000, 9999);
+        TPCB process1 = kernel.loadProcess(
+                binaryA,
+                TCPU.USER_MEMORY_START,
+                4999
+        );
 
-        // Cargar el manejador de interrupción del timer
+        TPCB process2 = kernel.loadProcess(
+                binaryB,
+                5000,
+                9999
+        );
+
         cpu.loadProgram(TCPU.INTERRUPT_HANDLER_TIMER, timer);
+        cpu.loadProgram(TCPU.TRAP_HANDLER_SYSCALL, syscallHandler);
 
-        System.out.println("Proceso 1 creado (PID: " + process1.getPid() + ")");
-        System.out.println("Proceso 2 creado (PID: " + process2.getPid() + ")");
+        System.out.println(
+                "Proceso 1 creado (PID: "
+                + process1.getPid() + ")"
+        );
 
-        // 6. Ejecutar por 50 ciclos
-        for (int i = 0; i < 50; i++) {
+        System.out.println(
+                "Proceso 2 creado (PID: "
+                + process2.getPid() + ")"
+        );
+
+        for (int i = 0; i < 20; i++) {
+
             kernel.step();
 
-            TPCB current = kernel.getScheduler().getCurrentProcess();
+            TPCB current
+                    = kernel.getScheduler().getCurrentProcess();
+
+            if (process1.getState() == TPCB.ProcessState.BLOCKED) {
+                System.out.println(
+                        "PID " + process1.getPid()
+                        + " -> BLOCKED"
+                );
+
+                kernel.unblockProcess(process1);
+
+                System.out.println(
+                        "PID " + process1.getPid()
+                        + " -> READY"
+                );
+            }
 
             if (current != null) {
                 System.out.println(
