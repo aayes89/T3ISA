@@ -18,64 +18,50 @@ Implementa una arquitectura completa de 27 trits con CPU, ALU, memoria, kernel, 
 - Bus de dispositivos y consola
 
 ## Estructura del proyecto
-```
-T3ISA/
-├── .gitignore
-├── README.md
-├── build.xml
-├── manifest.mf
-├── nbproject/
-│   ├── build-impl.xml
-│   ├── genfiles.properties
-│   ├── project.properties
-│   └── project.xml
-├── src/
-│   ├── t3isa/
-│   │   ├── BOOT/
-│   │   │   └── TBoot.java
-│   │   ├── Core/
-│   │   │   ├── TALU.java
-│   │   │   ├── TCPU.java
-│   │   │   ├── TWord.java
-│   │   │   └── Trit.java
-│   │   ├── DEVICE/
-│   │   │   ├── TConsoleDevice.java
-│   │   │   ├── TDevice.java
-│   │   │   ├── TDeviceBus.java
-│   │   │   └── TGraphicsDevice.java
-│   │   ├── Exceptions/
-│   │   │   └── TMemoryException.java
-│   │   ├── FS/
-│   │   │   ├── TFileSystem.java
-│   │   │   └── TVFS.java
-│   │   ├── ISA/
-│   │   │   ├── TAssembler.java
-│   │   │   ├── TAssemblerText.java
-│   │   │   ├── TInstruction.java
-│   │   │   ├── TInterrupt.java
-│   │   │   ├── TOpcode.java
-│   │   │   ├── TSyscall.java
-│   │   │   └── TTrap.java
-│   │   ├── KERNEL/
-│   │   │   ├── TKernel.java
-│   │   │   ├── TPCB.java
-│   │   │   └── TScheduler.java
-│   │   ├── Memory/
-│   │   │   └── TMemoryManager.java
-│   │   ├── SHELL/
-│   │   │   └── TShell.java
-│   │   ├── T3ISA.java
-│   │   └── T3OS.java
-│   └── test/
-│       └── Tests.java
-├── t3fs.dat
-└── README.md
-```
 
+```
+   ├── t3isa/                         # Paquete principal de la máquina virtual
+   │   ├── BOOT/
+   │   │   └── TBoot.java              # Inicialización del sistema y sector de arranque
+   │   ├── Core/
+   │   │   ├── TALU.java               # Unidad aritmética y lógica ternaria
+   │   │   ├── TCPU.java               # Unidad central de proceso
+   │   │   ├── TWord.java              # Palabra ternaria de 27 trits
+   │   │   └── Trit.java               # Representación de un trit (-1, 0, +1)
+   │   ├── DEVICE/
+   │   │   ├── TConsoleDevice.java     # Dispositivo de consola
+   │   │   ├── TDevice.java            # Interfaz base para dispositivos
+   │   │   ├── TDeviceBus.java         # Bus de comunicación entre dispositivos
+   │   │   └── TGraphicsDevice.java    # Dispositivo gráfico
+   │   ├── Exceptions/
+   │   │   └── TMemoryException.java   # Excepción de errores de memoria
+   │   ├── FS/
+   │   │   ├── TFileSystem.java        # Sistema de archivos abstracto
+   │   │   └── TVFS.java               # Sistema de archivos virtual
+   │   ├── ISA/
+   │   │   ├── TAssembler.java         # Ensamblador del conjunto de instrucciones
+   │   │   ├── TAssemblerText.java     # Ensamblador basado en texto
+   │   │   ├── TInstruction.java       # Definición de instrucciones
+   │   │   ├── TInterrupt.java         # Manejo de interrupciones
+   │   │   ├── TOpcode.java            # Códigos de operación
+   │   │   ├── TSyscall.java           # Llamadas al sistema
+   │   │   └── TTrap.java              # Trampas del sistema
+   │   ├── KERNEL/
+   │   │   ├── TKernel.java            # Núcleo del sistema operativo
+   │   │   ├── TPCB.java               # Bloque de control de proceso
+   │   │   └── TScheduler.java         # Planificador de procesos
+   │   ├── Memory/
+   │   │   └── TMemoryManager.java     # Gestión de memoria del sistema
+   │   ├── SHELL/
+   │   │   └── TShell.java             # Shell interactivo del sistema
+   │   ├── T3ISA.java                 # Punto de entrada principal
+   │   └── T3OS.java                  # Sistema operativo mínimo
+   └── test/
+       └── Tests.java                 # Pruebas automáticas del proyecto
+```
 
 ## Mapa de memoria
 
-  
     *
     * 0      - Boot sector
     * 1..6   - Trap vectors
