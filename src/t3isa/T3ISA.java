@@ -34,38 +34,35 @@ public class T3ISA {
     public static void main(String[] args) {
 
         System.out.println("========================================");
-        System.out.println(" T3OS BOOT TEST");
+        System.out.println(" T3OS");
         System.out.println("========================================");
 
         T3OS os = new T3OS();
 
+        /*
+     * RESET -> BOOT -> KERNEL
+         */
         os.boot();
 
         TCPU cpu = os.getCPU();
 
-        System.out.println();
-        System.out.println("RESET VECTOR = "
-                + cpu.readMemory(0).toLong());
-
-        System.out.println("BOOT START = "
-                + TCPU.BOOT_START);
-
-        System.out.println("OS START = "
-                + TCPU.OS_START);
-
-        System.out.println("PC = "
-                + cpu.getPC());
-
-        System.out.println("KERNEL MODE = "
-                + cpu.isKernelMode());
+        System.out.println(
+                "Kernel entry: PC=" + cpu.getPC()
+        );
 
         if (cpu.getPC() != TCPU.OS_START) {
             throw new IllegalStateException(
-                    "T3OS no inició correctamente"
+                    "T3OS no llegó al kernel"
             );
         }
 
-        System.out.println();
-        System.out.println("BOOT -> T3OS OK");
+        /*
+     * Entrar directamente al shell.
+     *
+     * NO ejecutar os.run() aquí:
+     * todavía no queremos que INIT termine
+     * y haga halt de la máquina.
+         */
+        os.shell();
     }
 }

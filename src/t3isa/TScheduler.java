@@ -281,4 +281,8 @@ public class TScheduler {
         return findParent(child);
     }
 
+    public TPCB[] getProcesses() {
+        return processTable.toArray(new TPCB[0]);
+    }
+
 }

@@ -29,9 +29,9 @@ package t3isa;
  */
 import java.io.BufferedReader;
 import java.io.IOException;
-
 import java.io.InputStreamReader;
 import java.util.ArrayDeque;
+
 import java.util.Queue;
 
 public final class TConsoleDevice implements TDevice {
@@ -49,6 +49,26 @@ public final class TConsoleDevice implements TDevice {
         System.out.println("DEVICE OUT = " + value.toLong());
     }
 
+    public void writeText(String text) {
+        System.out.print(text);
+    }
+
+    public void writeLine(String text) {
+        System.out.println(text);
+    }
+
+    public String readLine() {
+        try {
+            return input.readLine();
+        } catch (IOException e) {
+            throw new IllegalStateException("Error leyendo consola", e);
+        }
+    }
+
+    public void enqueueInput(long value) {
+        inputQueue.add(TWord.fromLong(value));
+    }
+
     @Override
     public TWord read() {
         if (!inputQueue.isEmpty()) {
@@ -56,15 +76,14 @@ public final class TConsoleDevice implements TDevice {
         }
 
         System.out.print("DEVICE IN > ");
+        String line = readLine();
+
+        if (line == null || line.trim().isEmpty()) {
+            return TWord.zero();
+        }
 
         try {
-            String line = input.readLine();
-            if (line == null || line.trim().isEmpty()) {
-                return TWord.zero();
-            }
             return TWord.fromLong(Long.parseLong(line.trim()));
-        } catch (IOException e) {
-            throw new IllegalStateException("Error leyendo dispositivo", e);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Entrada no numérica", e);
         }
@@ -72,6 +91,7 @@ public final class TConsoleDevice implements TDevice {
 
     @Override
     public boolean hasInput() {
+
         if (!inputQueue.isEmpty()) {
             return true;
         }
@@ -81,9 +101,5 @@ public final class TConsoleDevice implements TDevice {
         } catch (IOException e) {
             return false;
         }
-    }
-
-    public void enqueueInput(long value) {
-        inputQueue.add(TWord.fromLong(value));
     }
 }

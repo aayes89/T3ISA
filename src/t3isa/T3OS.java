@@ -34,11 +34,14 @@ public final class T3OS {
     private final TCPU cpu;
     private final TKernel kernel;
     private final TBoot boot;
+    private final TConsoleDevice console;
 
     public T3OS() {
         cpu = new TCPU();
         boot = new TBoot(cpu);
         kernel = new TKernel(cpu, 10);
+        console = new TConsoleDevice();
+        cpu.getDeviceBus().attach(0, console);
     }
 
     public void boot() {
@@ -59,6 +62,45 @@ public final class T3OS {
         if (cpu.getPC() != TCPU.OS_START) {
             throw new IllegalStateException("BOOT no transfirió control a T3OS");
         }
+    }
+
+    public TPCB startInit(String source) {
+        if (cpu.getPC() != TCPU.OS_START) {
+            throw new IllegalStateException("T3OS todavía no está en OS_START");
+        }
+
+        if (!cpu.isKernelMode()) {
+            throw new IllegalStateException("INIT debe crearse desde kernel mode");
+        }
+
+        // El kernel crea el primer proceso.
+        TPCB init = kernel.createProcess(source);
+
+        // El scheduler selecciona INIT.
+        kernel.getScheduler().schedule(cpu);
+
+        if (kernel.getScheduler().getCurrentProcess() != init) {
+            throw new IllegalStateException("INIT no fue seleccionado");
+        }
+
+        /*
+         * El contexto restaurado por el scheduler
+         * coloca la CPU en USER MODE.
+         */
+        if (cpu.isKernelMode()) {
+            throw new IllegalStateException("INIT no entró en USER MODE");
+        }
+
+        return init;
+    }
+
+    public void shell() {
+        TShell shell = new TShell(cpu, kernel, console);
+        shell.start();
+    }
+
+    public void run() {
+        kernel.run();
     }
 
     public TCPU getCPU() {
