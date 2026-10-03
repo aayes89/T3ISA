@@ -19,7 +19,7 @@ Implementa una arquitectura completa de 27 trits con CPU, ALU, memoria, kernel, 
 
 ## Estructura del proyecto
 
-```text
+```
    ├── t3isa/                         # Paquete principal de la máquina virtual
    │   ├── BOOT/
    │   │   └── TBoot.java              # Inicialización del sistema y sector de arranque
@@ -58,11 +58,10 @@ Implementa una arquitectura completa de 27 trits con CPU, ALU, memoria, kernel, 
    │   └── T3OS.java                  # Sistema operativo mínimo
    └── test/
        └── Tests.java                 # Pruebas automáticas del proyecto
-
+```
 
 ## Mapa de memoria
 
-  
     *
     * 0      - Boot sector
     * 1..6   - Trap vectors
