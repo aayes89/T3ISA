@@ -36,12 +36,30 @@ src/t3isa/
 
 ## Mapa de memoria
 
-0          Boot sector
-1..6       Vectores de trap
-7..26      Reservado / boot
-27..       T3OS y programas
-1000..15999  Memoria de usuario
-16000..19682 Stack (crece hacia abajo)
+  
+    *
+    * 0      - Boot sector
+    * 1..6   - Trap vectors
+    * 7..26  - Reserved
+    * 27..   - T3OS / programs
+    * 7..9   - interrupt vectors
+    * 10..26 - reservado
+    * 27...  - T3OS
+    * 100    - DIVIDE_BY_ZERO
+    * 110    - INVALID_MEMORY
+    * 120    - INVALID_INSTRUCTION
+    * 130    - INVALID_SYSCALL
+    * 140    - DEVICE_ERROR
+    * 150    - STACK_ERROR
+    * 160    - timer interrupt
+    * 170    - device interrupt
+    * 180    - keyboard interrupt
+    *
+    * 0..999       KERNEL
+    * 1000..15999  USER
+    * 16000..19682 STACK
+    *
+    * La pila crece hacia abajo.
 
 
 ## Conjunto de instrucciones (resumen)
