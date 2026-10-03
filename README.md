@@ -19,20 +19,57 @@ Implementa una arquitectura completa de 27 trits con CPU, ALU, memoria, kernel, 
 
 ## Estructura del proyecto
 ```
-src/t3isa/
-├── Trit.java              # Trit (-1, 0, +1)
-├── TWord.java             # Palabra de 27 trits
-├── TALU.java              # Unidad aritmético-lógica
-├── TCPU.java              # Procesador + memoria
-├── TInstruction.java      # Decodificación de instrucciones
-├── TOpcode.java           # Conjunto de instrucciones
-├── TAssembler.java        # Ensamblador
-├── TKernel.java           # Kernel
-├── TScheduler.java        # Planificador
-├── TMemoryManager.java    # Gestión de memoria
-├── TShell.java            # Shell interactivo
-├── T3OS.java              # Sistema operativo
-└── T3ISA.java             # Punto de entrada
+T3ISA/
+├── .gitignore
+├── README.md
+├── build.xml
+├── manifest.mf
+├── nbproject/
+│   ├── build-impl.xml
+│   ├── genfiles.properties
+│   ├── project.properties
+│   └── project.xml
+├── src/
+│   ├── t3isa/
+│   │   ├── BOOT/
+│   │   │   └── TBoot.java
+│   │   ├── Core/
+│   │   │   ├── TALU.java
+│   │   │   ├── TCPU.java
+│   │   │   ├── TWord.java
+│   │   │   └── Trit.java
+│   │   ├── DEVICE/
+│   │   │   ├── TConsoleDevice.java
+│   │   │   ├── TDevice.java
+│   │   │   ├── TDeviceBus.java
+│   │   │   └── TGraphicsDevice.java
+│   │   ├── Exceptions/
+│   │   │   └── TMemoryException.java
+│   │   ├── FS/
+│   │   │   ├── TFileSystem.java
+│   │   │   └── TVFS.java
+│   │   ├── ISA/
+│   │   │   ├── TAssembler.java
+│   │   │   ├── TAssemblerText.java
+│   │   │   ├── TInstruction.java
+│   │   │   ├── TInterrupt.java
+│   │   │   ├── TOpcode.java
+│   │   │   ├── TSyscall.java
+│   │   │   └── TTrap.java
+│   │   ├── KERNEL/
+│   │   │   ├── TKernel.java
+│   │   │   ├── TPCB.java
+│   │   │   └── TScheduler.java
+│   │   ├── Memory/
+│   │   │   └── TMemoryManager.java
+│   │   ├── SHELL/
+│   │   │   └── TShell.java
+│   │   ├── T3ISA.java
+│   │   └── T3OS.java
+│   └── test/
+│       └── Tests.java
+├── t3fs.dat
+└── README.md
 ```
 
 
