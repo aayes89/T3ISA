@@ -164,27 +164,52 @@ public final class TShell {
             return;
         }
 
-        switch (parts[1].toLowerCase()) {
+        String program = parts[1].toLowerCase();
+        String source;
+
+        switch (program) {
             case "hello":
-                kernel.createProcess(
-                        "MOVI R7, 123\n"
-                        + "MOVI R1, 12\n"
+                source
+                        = "MOVI R2, 0\n"
+                        + "MOVI R3, 72\n"
+                        + "MOVI R1, 6\n"
                         + "SYS\n"
-                );
+                        + "MOVI R3, 101\n"
+                        + "MOVI R1, 6\n"
+                        + "SYS\n"
+                        + "MOVI R3, 108\n"
+                        + "MOVI R1, 6\n"
+                        + "SYS\n"
+                        + "MOVI R3, 108\n"
+                        + "MOVI R1, 6\n"
+                        + "SYS\n"
+                        + "MOVI R3, 111\n"
+                        + "MOVI R1, 6\n"
+                        + "SYS\n"
+                        + "MOVI R3, 10\n"
+                        + "MOVI R1, 6\n"
+                        + "SYS\n"
+                        + "MOVI R1, 12\n"
+                        + "SYS\n";
 
-                console.writeLine("program 'hello' started");
-
-                if (kernel.getScheduler().getCurrentProcess() == null) {
-                    kernel.getScheduler().schedule(cpu);
-                }
-
-                while (!cpu.isHalted() && kernel.getScheduler().hasReadyProcesses()) {
-                    kernel.step();
-                }
                 break;
 
             default:
-                console.writeLine("program not found: " + parts[1]);
+                console.writeLine("program not found: " + program);
+                return;
         }
+
+        kernel.createProcess(source);
+        console.writeLine("program '" + program + "' started");
+
+        if (kernel.getScheduler().getCurrentProcess() == null) {
+            kernel.getScheduler().schedule(cpu);
+        }
+
+        while (!cpu.isHalted() && kernel.getScheduler().hasReadyProcesses()) {
+            kernel.step();
+        }
+
+        console.writeLine("");
     }
 }

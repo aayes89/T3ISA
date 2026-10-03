@@ -41,8 +41,10 @@ public class TKernel {
         this.quantumTicks = quantumTicks;
         this.memoryManager = new TMemoryManager();
         this.timerTicks = 0;
+    }
 
-        // Configurar los vectores de interrupción/trap en TCPU
+    // Configurar los vectores de interrupción/trap en TCPU
+    public void initialize() {
         setupInterruptVectors();
         setupTrapHandlers();
         setupInterruptHandlers();
@@ -165,9 +167,9 @@ public class TKernel {
         }
 
         cpu.step();
-
-        System.out.println("DEBUG CPU: PC=" + cpu.getPC() + " SP=" + cpu.getSP() + " KERNEL=" + cpu.isKernelMode() + " TRAP=" + cpu.getTrap());
-
+        if (T3ISA.isDEBUG) {
+            System.out.println("DEBUG CPU: PC=" + cpu.getPC() + " SP=" + cpu.getSP() + " KERNEL=" + cpu.isKernelMode() + " TRAP=" + cpu.getTrap());
+        }
         if (deviceInterrupt) {
             cpu.clearInterruptReturned();
             while (cpu.isKernelMode() && !cpu.isHalted()) {
@@ -207,8 +209,9 @@ public class TKernel {
 
         int action = cpu.getPendingProcessAction();
 
-        System.out.println("PENDING ACTION = " + action);
-
+        if (T3ISA.isDEBUG) {
+            System.out.println("PENDING ACTION = " + action);
+        }
         switch (action) {
 
             case TSyscall.YIELD:

@@ -30,6 +30,7 @@ package t3isa;
  * T3ISA - Ternary 3-State Instruction Set Architecture
  */
 public class T3ISA {
+    public static final boolean isDEBUG = false;
 
     public static void main(String[] args) {
 

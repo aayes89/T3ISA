@@ -341,13 +341,17 @@ public final class TCPU {
 
         try {
             if (pc < 0 || pc >= MEMORY_SIZE) {
-                System.out.println("INVALID PC: " + pc);
+                if (T3ISA.isDEBUG) {
+                    System.out.println("INVALID PC: " + pc);
+                }
                 raiseTrap(TTrap.INVALID_MEMORY);
                 return;
             }
 
             if (!kernelMode && (pc < currentMemoryBase || pc > currentMemoryLimit)) {
-                System.out.println("PROCESS MEMORY VIOLATION PC=" + pc + " RANGE=" + currentMemoryBase + ".." + currentMemoryLimit);
+                if (T3ISA.isDEBUG) {
+                    System.out.println("PROCESS MEMORY VIOLATION PC=" + pc + " RANGE=" + currentMemoryBase + ".." + currentMemoryLimit);
+                }
                 raiseTrap(TTrap.INVALID_MEMORY);
 
                 // Violación de ejecución: el proceso no puede continuar.
@@ -356,35 +360,48 @@ public final class TCPU {
             }
 
             int instructionAddress = pc;
-            System.out.println("FETCH PC=" + pc + " WORD=" + memory[pc].toLong());
+            if (T3ISA.isDEBUG) {
+                System.out.println("FETCH PC=" + pc + " WORD=" + memory[pc].toLong());
+            }
             TInstruction instruction;
 
             try {
                 instruction = TInstruction.decode(memory[pc]);
             } catch (IllegalStateException e) {
-                System.out.println("DECODE ERROR PC=" + pc + " WORD=" + memory[pc].toLong() + " MSG=" + e.getMessage());
+                if (T3ISA.isDEBUG) {
+                    System.out.println("DECODE ERROR PC=" + pc + " WORD=" + memory[pc].toLong() + " MSG=" + e.getMessage());
+                }
                 raiseTrap(TTrap.INVALID_INSTRUCTION);
                 return;
             }
 
             if (instruction == null) {
-                System.out.println("DECODE NULL PC=" + pc);
+                if (T3ISA.isDEBUG) {
+                    System.out.println("DECODE NULL PC=" + pc);
+                }
                 raiseTrap(TTrap.INVALID_INSTRUCTION);
                 return;
             }
-
-            System.out.println("DECODE OK PC=" + pc + " OPCODE=" + instruction.getOpcode());
+            if (T3ISA.isDEBUG) {
+                System.out.println("DECODE OK PC=" + pc + " OPCODE=" + instruction.getOpcode());
+            }
             pc = instructionAddress;
 
             execute(instruction);
         } catch (TMemoryException e) {
-            System.out.println("MEMORY EXCEPTION PC=" + pc);
+            if (T3ISA.isDEBUG) {
+                System.out.println("MEMORY EXCEPTION PC=" + pc);
+            }
             raiseTrap(TTrap.INVALID_MEMORY);
         } catch (ArithmeticException e) {
-            System.out.println("ARITHMETIC EXCEPTION PC=" + pc);
+            if (T3ISA.isDEBUG) {
+                System.out.println("ARITHMETIC EXCEPTION PC=" + pc);
+            }
             raiseTrap(TTrap.DIVIDE_BY_ZERO);
         } catch (IllegalArgumentException e) {
-            System.out.println("ILLEGAL ARGUMENT PC=" + pc + " MSG=" + e.getMessage());
+            if (T3ISA.isDEBUG) {
+                System.out.println("ILLEGAL ARGUMENT PC=" + pc + " MSG=" + e.getMessage());
+            }
             raiseTrap(TTrap.INVALID_INSTRUCTION);
         }
     }
@@ -671,12 +688,14 @@ public final class TCPU {
     }
 
     private void executeSys() {
-        System.out.println(
-                "SYS -> R1=" + getRegister(1).toLong()
-                + " R2=" + getRegister(2).toLong()
-                + " R3=" + getRegister(3).toLong()
-                + " PC=" + pc
-        );
+        if (T3ISA.isDEBUG) {
+            System.out.println(
+                    "SYS -> R1=" + getRegister(1).toLong()
+                    + " R2=" + getRegister(2).toLong()
+                    + " R3=" + getRegister(3).toLong()
+                    + " PC=" + pc
+            );
+        }
         int service = (int) getRegister(1).toLong();
         switch (service) {
             case TSyscall.HALT:

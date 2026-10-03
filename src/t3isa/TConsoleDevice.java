@@ -46,7 +46,15 @@ public final class TConsoleDevice implements TDevice {
 
     @Override
     public void write(TWord value) {
-        System.out.println("DEVICE OUT = " + value.toLong());
+        long code = value.toLong();
+
+        if (code == 10) {
+            System.out.println();
+        } else if (code >= 32 && code <= 126) {
+            System.out.print((char) code);
+        } else {
+            System.out.print("[" + code + "]");
+        }
     }
 
     public void writeText(String text) {

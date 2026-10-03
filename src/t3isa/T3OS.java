@@ -51,6 +51,9 @@ public final class T3OS {
         // Después instalar el contenido del boot.
         boot.install();
 
+        // Configurar los vectores de interrupción/trap en TCPU
+        kernel.initialize();
+
         // El hardware arranca desde el reset vector.
         boot.resetVector();
         System.out.println("T3OS BOOT PC=" + cpu.getPC());
