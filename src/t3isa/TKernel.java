@@ -45,6 +45,7 @@ public class TKernel {
         // Configurar los vectores de interrupción/trap en TCPU
         setupInterruptVectors();
         setupTrapHandlers();
+        setupInterruptHandlers();
     }
 
     private void setupInterruptVectors() {
@@ -57,6 +58,14 @@ public class TKernel {
         cpu.loadTrapVector(TTrap.DEVICE_ERROR, TCPU.TRAP_HANDLER_DEVICE);
         cpu.loadTrapVector(TTrap.INVALID_INSTRUCTION, TCPU.TRAP_HANDLER_INSTRUCTION);
         cpu.loadTrapVector(TTrap.STACK_ERROR, TCPU.TRAP_HANDLER_STACK);
+    }
+
+    private void setupInterruptHandlers() {
+        TWord[] deviceHandler = TAssemblerText.assemble("IRET\n");
+        TWord[] timerHandler = TAssemblerText.assemble("IRET\n");
+
+        cpu.loadProgram(TCPU.INTERRUPT_HANDLER_DEVICE, deviceHandler);
+        cpu.loadProgram(TCPU.INTERRUPT_HANDLER_TIMER, timerHandler);
     }
 
     /**
@@ -136,6 +145,9 @@ public class TKernel {
 
         if (scheduler.getCurrentProcess() == null && scheduler.hasReadyProcesses()) {
             scheduler.schedule(cpu);
+        }
+        if (scheduler.getCurrentProcess() == null) {
+            return;
         }
 
         timerTicks++;
@@ -292,7 +304,7 @@ public class TKernel {
     private void setupTrapHandlers() {
 
         TWord[] fatalHandler = TAssemblerText.assemble(
-                "MOVI R1, 12\n"
+                "MOVI R1, 0\n"
                 + "SYS\n"
         );
 
