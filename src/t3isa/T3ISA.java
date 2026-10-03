@@ -33,84 +33,85 @@ public class T3ISA {
 
     public static void main(String[] args) {
 
+        System.out.println("========================================");
+        System.out.println(" TEST ENTER_USER / EXIT_USER");
+        System.out.println("========================================");
+
         TCPU cpu = new TCPU();
         TKernel kernel = new TKernel(cpu, 100);
 
-        TConsoleDevice console = new TConsoleDevice();
-        cpu.getDeviceBus().attach(0, console);
-
-        /*
-     * PID 1:
-     *
-     * DEVICE_IN puerto 0
-     * Si no hay entrada -> BLOCK
-     * Cuando despierta:
-     *   R7 = dato
-     *   YIELD
-     *   EXIT
-         */
-        TWord[] program = TAssemblerText.assemble(
-                "MOVI R2, 0\n"
-                + "MOVI R1, 7\n"
+        TPCB process = kernel.createProcess(
+                // USER
+                "MOVI R7, 111\n"
+                // USER -> KERNEL
+                + "MOVI R1, 9\n"
                 + "SYS\n"
-                + "MOVI R1, 11\n"
+                // KERNEL
+                + "MOVI R7, 222\n"
+                + "MOVI R1, 8\n"
                 + "SYS\n"
+                // USER
+                + "MOVI R7, 333\n"
                 + "MOVI R1, 12\n"
                 + "SYS\n"
         );
 
-        TPCB process = kernel.createProcess(program);
-
         kernel.getScheduler().schedule(cpu);
 
-        int steps = 0;
+        System.out.println("\n--- INICIO ---");
+        System.out.println("PID=" + process.getPid());
+        System.out.println("PC=" + cpu.getPC());
+        System.out.println("SP=" + cpu.getSP());
+        System.out.println("USER_SP=" + cpu.getUserSP());
+        System.out.println("KERNEL=" + cpu.isKernelMode());
 
-        while (!cpu.isHalted() && steps < 50) {
+        boolean sawKernel = false;
+        boolean returnedUser = false;
+
+        for (int i = 0; i < 20 && !cpu.isHalted(); i++) {
 
             System.out.println(
-                    "ANTES STEP="
-                    + steps
-                    + " PID="
-                    + (kernel.getScheduler().getCurrentProcess() == null
-                    ? -1
-                    : kernel.getScheduler().getCurrentProcess().getPid())
-                    + " PC="
-                    + cpu.getPC()
-                    + " R7="
-                    + cpu.getRegister(7).toLong()
+                    "\nSTEP=" + i
+                    + " PC=" + cpu.getPC()
+                    + " SP=" + cpu.getSP()
+                    + " USER_SP=" + cpu.getUserSP()
+                    + " R7=" + cpu.getRegister(7).toLong()
+                    + " KERNEL=" + cpu.isKernelMode()
             );
 
             kernel.step();
 
-            System.out.println(
-                    "DESPUES STEP="
-                    + steps
-                    + " PID="
-                    + (kernel.getScheduler().getCurrentProcess() == null
-                    ? -1
-                    : kernel.getScheduler().getCurrentProcess().getPid())
-                    + " PC="
-                    + cpu.getPC()
-                    + " R7="
-                    + cpu.getRegister(7).toLong()
-            );
-
-            /*
-         * Después de que DEVICE_IN haya bloqueado
-         * al proceso, inyectamos la entrada.
-             */
-            if (steps == 3) {
-                System.out.println(">>> INYECTANDO DEVICE INPUT = 123");
-
-                console.enqueueInput(123);
+            if (cpu.isKernelMode()) {
+                sawKernel = true;
             }
 
-            steps++;
+            if (sawKernel && !cpu.isKernelMode()) {
+                returnedUser = true;
+            }
         }
 
-        System.out.println();
-        System.out.println("===== RESULTADO =====");
+        System.out.println("\n========================================");
+        System.out.println(" RESULTADO");
+        System.out.println("========================================");
+
         System.out.println("HALTED=" + cpu.isHalted());
-        System.out.println("STEPS=" + steps);
+        System.out.println("TRAP=" + cpu.getTrap());
+        System.out.println("KERNEL=" + cpu.isKernelMode());
+        System.out.println("SAW KERNEL=" + sawKernel);
+        System.out.println("RETURNED USER=" + returnedUser);
+        System.out.println("R7=" + cpu.getRegister(7).toLong());
+
+        if (!cpu.isHalted()
+                || cpu.getTrap() != null
+                || !sawKernel
+                || !returnedUser) {
+
+            throw new IllegalStateException(
+                    "FALLO ENTER_USER / EXIT_USER"
+            );
+        }
+
+        System.out.println("\nENTER_USER / EXIT_USER OK");
+        System.out.println("BUILD SUCCESSFUL");
     }
 }
