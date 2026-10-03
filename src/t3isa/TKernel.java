@@ -76,9 +76,15 @@ public class TKernel {
 
         TMemoryManager.MemoryBlock block = memoryManager.allocate(binary.length);
         TMemoryManager.MemoryBlock stack = memoryManager.allocateStack(256);
-        cpu.loadProgram(block.getBase(), binary);
 
-        return scheduler.createProcess(block.getBase(), block.getBase(), block.getLimit(), stack.getBase(), stack.getLimit());
+        try {
+            cpu.loadProgram(block.getBase(), binary);
+            return scheduler.createProcess(block.getBase(), block.getBase(), block.getLimit(), stack.getBase(), stack.getLimit());
+        } catch (RuntimeException e) {
+            memoryManager.free(block.getBase());
+            memoryManager.freeStack(stack.getBase());
+            throw e;
+        }
     }
 
     // Avanza la CPU un ciclo de instrucción y simula el temporizador.
@@ -186,6 +192,16 @@ public class TKernel {
                 }
                 break;
 
+            case TSyscall.FORK:
+                cpu.clearPendingProcessAction();
+                forkCurrentProcess();
+                break;
+
+            case TSyscall.WAIT:
+                cpu.clearPendingProcessAction();
+                handleWait();
+                break;
+
             default:
                 break;
         }
@@ -234,5 +250,78 @@ public class TKernel {
 
     public TScheduler getScheduler() {
         return scheduler;
+    }
+
+    private void forkCurrentProcess() {
+        TPCB parent = scheduler.getCurrentProcess();
+
+        if (parent == null) {
+            cpu.clearPendingProcessAction();
+            return;
+        }
+
+        int memorySize = parent.getMemoryLimit() - parent.getMemoryBase() + 1;
+        int stackSize = parent.getStackLimit() - parent.getStackBase() + 1;
+
+        TMemoryManager.MemoryBlock memoryBlock = null;
+        TMemoryManager.MemoryBlock stackBlock = null;
+
+        try {
+            memoryBlock = memoryManager.allocate(memorySize);
+            stackBlock = memoryManager.allocateStack(stackSize);
+
+            cpu.copyMemoryRange(parent.getMemoryBase(), parent.getMemoryLimit(), memoryBlock.getBase());
+            cpu.copyProcessStack(parent.getStackBase(), parent.getStackLimit(), stackBlock.getBase());
+
+            TPCB child = scheduler.forkProcess(parent, memoryBlock.getBase(), memoryBlock.getLimit(), stackBlock.getBase(), stackBlock.getLimit());
+
+            int codeOffset = cpu.getPC() - parent.getMemoryBase();
+            child.setPc(memoryBlock.getBase() + codeOffset);
+
+            int childSP = stackBlock.getBase() + (cpu.getUserSP() - parent.getStackBase());
+            child.setUserSP(childSP);
+
+            for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
+                child.setRegister(i, cpu.getRegister(i));
+            }
+
+            child.setRegister(7, TWord.zero());
+            cpu.setRegister(7, TWord.fromLong(child.getPid()));
+        } catch (RuntimeException e) {
+            if (memoryBlock != null) {
+                memoryManager.free(memoryBlock.getBase());
+            }
+
+            if (stackBlock != null) {
+                memoryManager.freeStack(stackBlock.getBase());
+            }
+            throw e;
+        }
+    }
+
+    private void handleWait() {
+        TPCB parent = scheduler.getCurrentProcess();
+        if (parent == null) {
+            return;
+        }
+
+        TPCB child = scheduler.findTerminatedChild(parent);
+        if (child != null) {
+            cpu.setRegister(7, TWord.fromLong(child.getPid()));
+
+            memoryManager.free(child.getMemoryBase());
+            memoryManager.freeStack(child.getStackBase());
+
+            scheduler.removeProcess(child);
+
+            return;
+        }
+
+        if (!scheduler.hasChild(parent)) {
+            cpu.setRegister(7, TWord.fromLong(-1));
+            return;
+        }
+        parent.setWaitingForPid(-1);
+        scheduler.blockCurrentProcess(cpu);
     }
 }

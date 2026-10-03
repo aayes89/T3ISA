@@ -71,28 +71,17 @@ public class TMemoryManager {
         );
     }
 
-    public TMemoryManager(
-            int memoryStart,
-            int memoryEnd,
-            int stackStart,
-            int stackEnd) {
-
-        if (memoryStart < 0
-                || memoryEnd >= TCPU.MEMORY_SIZE
-                || memoryStart > memoryEnd) {
+    public TMemoryManager(int memoryStart, int memoryEnd, int stackStart, int stackEnd) {
+        if (memoryStart < 0 || memoryEnd >= TCPU.MEMORY_SIZE || memoryStart > memoryEnd) {
             throw new IllegalArgumentException("Rango de memoria inválido");
         }
 
-        if (stackStart < 0
-                || stackEnd >= TCPU.MEMORY_SIZE
-                || stackStart > stackEnd) {
+        if (stackStart < 0 || stackEnd >= TCPU.MEMORY_SIZE || stackStart > stackEnd) {
             throw new IllegalArgumentException("Rango de stack inválido");
         }
 
         if (memoryEnd >= stackStart) {
-            throw new IllegalArgumentException(
-                    "Los rangos de memoria y stack se superponen"
-            );
+            throw new IllegalArgumentException("Los rangos de memoria y stack se superponen");
         }
 
         this.memoryStart = memoryStart;
@@ -108,50 +97,29 @@ public class TMemoryManager {
      * Reserva memoria para código/datos.
      */
     public MemoryBlock allocate(int size) {
-        return allocate(
-                size,
-                memoryStart,
-                memoryEnd,
-                allocatedBlocks
-        );
+        return allocate(size, memoryStart, memoryEnd, allocatedBlocks);
     }
 
     /**
      * Reserva memoria para el stack de un proceso.
      */
     public MemoryBlock allocateStack(int size) {
-        return allocate(
-                size,
-                stackStart,
-                stackEnd,
-                allocatedStacks
-        );
+        return allocate(size, stackStart, stackEnd, allocatedStacks);
     }
 
-    private MemoryBlock allocate(
-            int size,
-            int start,
-            int end,
-            List<MemoryBlock> blocks) {
-
+    private MemoryBlock allocate(int size, int start, int end, List<MemoryBlock> blocks) {
         if (size <= 0) {
-            throw new IllegalArgumentException(
-                    "El tamaño debe ser mayor que cero"
-            );
+            throw new IllegalArgumentException("El tamaño debe ser mayor que cero");
         }
 
         blocks.sort(Comparator.comparingInt(MemoryBlock::getBase));
-
         int candidate = start;
 
         for (MemoryBlock block : blocks) {
-
             int candidateLimit = candidate + size - 1;
 
             if (candidateLimit < block.getBase()) {
-                MemoryBlock allocated
-                        = new MemoryBlock(candidate, candidateLimit);
-
+                MemoryBlock allocated = new MemoryBlock(candidate, candidateLimit);
                 blocks.add(allocated);
                 return allocated;
             }
@@ -160,16 +128,11 @@ public class TMemoryManager {
         }
 
         int candidateLimit = candidate + size - 1;
-
         if (candidateLimit > end) {
-            throw new IllegalStateException(
-                    "Memoria insuficiente"
-            );
+            throw new IllegalStateException("Memoria insuficiente");
         }
 
-        MemoryBlock allocated
-                = new MemoryBlock(candidate, candidateLimit);
-
+        MemoryBlock allocated = new MemoryBlock(candidate, candidateLimit);
         blocks.add(allocated);
 
         return allocated;
@@ -192,32 +155,22 @@ public class TMemoryManager {
     private void free(int base, List<MemoryBlock> blocks) {
 
         for (int i = 0; i < blocks.size(); i++) {
-
             if (blocks.get(i).getBase() == base) {
                 blocks.remove(i);
                 return;
             }
         }
 
-        throw new IllegalArgumentException(
-                "No existe un bloque con base: " + base
-        );
+        throw new IllegalArgumentException("No existe un bloque con base: " + base);
     }
 
     public boolean isAllocated(int address) {
-
-        return isAllocated(address, allocatedBlocks)
-                || isAllocated(address, allocatedStacks);
+        return isAllocated(address, allocatedBlocks) || isAllocated(address, allocatedStacks);
     }
 
-    private boolean isAllocated(
-            int address,
-            List<MemoryBlock> blocks) {
-
+    private boolean isAllocated(int address, List<MemoryBlock> blocks) {
         for (MemoryBlock block : blocks) {
-
-            if (address >= block.getBase()
-                    && address <= block.getLimit()) {
+            if (address >= block.getBase() && address <= block.getLimit()) {
                 return true;
             }
         }
@@ -226,26 +179,14 @@ public class TMemoryManager {
     }
 
     public int getFreeMemory() {
-        return getFreeMemory(
-                memoryStart,
-                memoryEnd,
-                allocatedBlocks
-        );
+        return getFreeMemory(memoryStart, memoryEnd, allocatedBlocks);
     }
 
     public int getFreeStack() {
-        return getFreeMemory(
-                stackStart,
-                stackEnd,
-                allocatedStacks
-        );
+        return getFreeMemory(stackStart, stackEnd, allocatedStacks);
     }
 
-    private int getFreeMemory(
-            int start,
-            int end,
-            List<MemoryBlock> blocks) {
-
+    private int getFreeMemory(int start, int end, List<MemoryBlock> blocks) {
         int free = end - start + 1;
 
         for (MemoryBlock block : blocks) {
@@ -256,7 +197,6 @@ public class TMemoryManager {
     }
 
     public int getAllocatedMemory() {
-
         int allocated = 0;
 
         for (MemoryBlock block : allocatedBlocks) {
@@ -267,7 +207,6 @@ public class TMemoryManager {
     }
 
     public int getAllocatedStack() {
-
         int allocated = 0;
 
         for (MemoryBlock block : allocatedStacks) {

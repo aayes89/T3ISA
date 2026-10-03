@@ -34,6 +34,58 @@ public class T3ISA {
     public static void main(String[] args) {
 
         TCPU cpu = new TCPU();
+        TKernel kernel = new TKernel(cpu, 100);
+
+        String program
+                = "MOVI R1, 14\n"
+                + "SYS\n"
+                + "CMP R7, R0\n"
+                + "JZERO child_exit\n"
+                + "MOVI R1, 15\n"
+                + "SYS\n"
+                + "MOVI R1, 12\n"
+                + "SYS\n"
+                + "child_exit:\n"
+                + "MOVI R1, 12\n"
+                + "SYS\n";
+
+        TWord[] binary
+                = TAssemblerText.assemble(program);
+
+        kernel.createProcess(binary);
+
+        for (int i = 0; i < 20; i++) {
+
+            kernel.step();
+
+            TPCB current
+                    = kernel.getScheduler().getCurrentProcess();
+
+            if (current != null) {
+
+                System.out.println(
+                        "Paso " + i
+                        + " -> PID=" + current.getPid()
+                        + " STATE=" + current.getState()
+                        + " PCB_PC=" + current.getPc()
+                        + " CPU_PC=" + cpu.getPC()
+                        + " R7=" + cpu.getRegister(7).toLong()
+                        + " SP=" + cpu.getSP()
+                );
+
+            } else {
+
+                System.out.println(
+                        "Paso " + i + " -> SIN PROCESO"
+                );
+            }
+        }
+    }
+}
+
+/* public static void main(String[] args) {
+
+        TCPU cpu = new TCPU();
         TConsoleDevice console = new TConsoleDevice();
         cpu.getDeviceBus().attach(0, console);
 
@@ -86,12 +138,12 @@ public class T3ISA {
 
         cpu.loadProgram(TCPU.INTERRUPT_HANDLER_TIMER, timer);
         cpu.loadProgram(TCPU.INTERRUPT_HANDLER_DEVICE, TAssemblerText.assemble("IRET\n"));
-        TPCB process1 = kernel.loadProcess(binaryA);
-        TPCB process2 = kernel.loadProcess(binaryB);
-        TPCB process3 = kernel.loadProcess(binaryBad);
-        TPCB process4 = kernel.loadProcess(binaryBadMemory);
-        TPCB process5 = kernel.loadProcess(binaryBadInstruction);
-        TPCB process6 = kernel.loadProcess(binaryBadStack);
+        kernel.createProcess(binaryA);
+        kernel.createProcess(binaryB);
+        kernel.createProcess(binaryBad);
+        kernel.createProcess(binaryBadMemory);
+        kernel.createProcess(binaryBadInstruction);
+        kernel.createProcess(binaryBadStack);
 
         kernel.step(); // 0
         kernel.step(); // 1
@@ -119,3 +171,4 @@ public class T3ISA {
         }
     }
 }
+ */

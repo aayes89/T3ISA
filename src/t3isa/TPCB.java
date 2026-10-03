@@ -50,6 +50,8 @@ public class TPCB {
 
     private final int stackBase;
     private final int stackLimit;
+    private int waitingForPid = -1;
+    private int parentPid = -1;
 
     public TPCB(
             int pid,
@@ -105,10 +107,6 @@ public class TPCB {
         }
     }
 
-    public TWord[] getRegisters() {
-        return registers;
-    }
-
     public int getPid() {
         return pid;
     }
@@ -123,6 +121,10 @@ public class TPCB {
 
     public int getPc() {
         return pc;
+    }
+
+    public void setPc(int pc) {
+        this.pc = pc;
     }
 
     public int getUserSP() {
@@ -147,5 +149,39 @@ public class TPCB {
 
     public int getStackLimit() {
         return stackLimit;
+    }
+
+    public TWord[] getRegisters() {
+        TWord[] copy = new TWord[TCPU.REGISTER_COUNT];
+
+        for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
+            copy[i] = registers[i].copy();
+        }
+
+        return copy;
+    }
+
+    public void setRegister(int index, TWord value) {
+        if (index < 0 || index >= TCPU.REGISTER_COUNT) {
+            throw new IllegalArgumentException("Registro inválido: " + index);
+        }
+
+        registers[index] = value.copy();
+    }
+
+    public int getWaitingForPid() {
+        return waitingForPid;
+    }
+
+    public void setWaitingForPid(int pid) {
+        this.waitingForPid = pid;
+    }
+
+    public int getParentPid() {
+        return parentPid;
+    }
+
+    public void setParentPid(int parentPid) {
+        this.parentPid = parentPid;
     }
 }

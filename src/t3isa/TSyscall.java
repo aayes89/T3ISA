@@ -47,4 +47,6 @@ public final class TSyscall {
     public static final int EXIT = 12;
     public static final int BLOCK = 13;
     public static final int FORK = 14;
+    public static final int WAIT = 15;
+    public static final int EXEC = 16;
 }

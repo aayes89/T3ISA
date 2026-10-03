@@ -147,9 +147,7 @@ public final class TDeviceBus {
         TDevice device = get(port);
 
         if (device == null) {
-            throw new IllegalStateException(
-                    "No hay dispositivo conectado en el puerto: " + port
-            );
+            throw new IllegalStateException("No hay dispositivo conectado en el puerto: " + port);
         }
 
         return device.hasInput();

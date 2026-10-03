@@ -289,18 +289,6 @@ public final class TCPU {
         deviceBus.attach(port, device);
     }
 
-    public TWord readMemory(int address) {
-        return memory[checkedAddress(address)].copy();
-    }
-
-    public void writeMemory(int address, TWord value) {
-        if (value == null) {
-            throw new IllegalArgumentException("Valor de memoria no puede ser null");
-        }
-
-        memory[checkedAddress(address)] = value.copy();
-    }
-
     public void loadBootSector(TWord[] boot) {
         if (boot == null) {
             throw new IllegalArgumentException("Boot sector null");
@@ -813,6 +801,26 @@ public final class TCPU {
                 pendingProcessAction = TSyscall.BLOCK;
                 break;
 
+            case TSyscall.FORK:
+                if (kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
+                incrementPC();
+                pendingProcessAction = TSyscall.FORK;
+                break;
+
+            case TSyscall.WAIT:
+                if (kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
+                incrementPC();
+                pendingProcessAction = TSyscall.WAIT;
+                break;
+
             default:
                 raiseTrap(TTrap.INVALID_SYSCALL);
                 break;
@@ -1070,6 +1078,69 @@ public final class TCPU {
         this.sp = userSP;
         this.kernelMode = false;
         this.trap = null;
+    }
+
+    public int getProcessMemoryBase() {
+        return currentMemoryBase;
+    }
+
+    public int getProcessMemoryLimit() {
+        return currentMemoryLimit;
+    }
+
+    public int getProcessStackBase() {
+        return currentStackBase;
+    }
+
+    public int getProcessStackLimit() {
+        return currentStackLimit;
+    }
+
+    public TWord readMemory(int address) {
+        checkAddress(address);
+        return memory[address].copy();
+    }
+
+    public void writeMemory(int address, TWord value) {
+        checkAddress(address);
+
+        if (value == null) {
+            throw new IllegalArgumentException("Valor de memoria null");
+        }
+
+        memory[address] = value.copy();
+    }
+
+    public void copyMemoryRange(int sourceBase, int sourceLimit, int destinationBase) {
+        if (sourceBase < 0 || sourceLimit >= MEMORY_SIZE || sourceBase > sourceLimit) {
+            throw new IllegalArgumentException("Rango origen inválido");
+        }
+
+        int size = sourceLimit - sourceBase + 1;
+
+        if (destinationBase < 0 || destinationBase + size > MEMORY_SIZE) {
+            throw new IllegalArgumentException("Rango destino inválido");
+        }
+
+        for (int i = 0; i < size; i++) {
+            memory[destinationBase + i] = memory[sourceBase + i].copy();
+        }
+    }
+
+    public void copyProcessStack(int sourceBase, int sourceLimit, int destinationBase) {
+        if (sourceBase < 0 || sourceLimit >= MEMORY_SIZE || sourceBase > sourceLimit) {
+            throw new IllegalArgumentException("Stack origen inválido");
+        }
+
+        int size = sourceLimit - sourceBase + 1;
+
+        if (destinationBase < 0 || destinationBase + size > MEMORY_SIZE) {
+            throw new IllegalArgumentException("Stack destino inválido");
+        }
+
+        for (int i = 0; i < size; i++) {
+            memory[destinationBase + i] = memory[sourceBase + i].copy();
+        }
     }
 
     public void resume() {

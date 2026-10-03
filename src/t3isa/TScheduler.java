@@ -68,6 +68,13 @@ public class TScheduler {
         return pcb;
     }
 
+    public TPCB createProcess(TWord[] binary, TCPU cpu) {
+        if (binary == null || binary.length == 0) {
+            throw new IllegalArgumentException("El programa está vacío");
+        }
+        throw new UnsupportedOperationException();
+    }
+
     /**
      * Realiza la conmutación de contexto (Context Switch) usando un algoritmo
      * Round-Robin.
@@ -101,9 +108,19 @@ public class TScheduler {
      */
     public void terminateCurrentProcess(TCPU cpu) {
         if (currentProcess != null) {
-            currentProcess.setState(TPCB.ProcessState.TERMINATED);
+            TPCB terminated = currentProcess;
+            terminated.setState(TPCB.ProcessState.TERMINATED);
+            TPCB parent = findParent(terminated);
+
             currentProcess = null;
+
+            if (parent != null && parent.getState() == TPCB.ProcessState.BLOCKED && (parent.getWaitingForPid() == -1 || parent.getWaitingForPid() == terminated.getPid())) {
+                parent.setWaitingForPid(-1);
+                parent.setState(TPCB.ProcessState.READY);
+                readyQueue.add(parent);
+            }
         }
+
         schedule(cpu);
     }
 
@@ -112,18 +129,30 @@ public class TScheduler {
      *
      * @param cpu
      */
+    public void blockCurrentProcess(TCPU cpu) {
+        if (currentProcess != null) {
+            currentProcess.saveContext(cpu);
+            currentProcess.setState(TPCB.ProcessState.BLOCKED);
+            currentProcess = null;
+        }
+
+        schedule(cpu);
+    }
+
+    /**
+     * Bloquea el proceso actual (por ejemplo, en espera de E/S).
+     *
+     * @param cpu
+     * @param devicePort
+     */
     public void blockCurrentProcess(TCPU cpu, int devicePort) {
         if (currentProcess != null) {
             currentProcess.saveContext(cpu);
             currentProcess.setState(TPCB.ProcessState.BLOCKED);
 
-            blockedByDevice
-                    .computeIfAbsent(devicePort, k -> new ArrayDeque<>())
-                    .add(currentProcess);
-
+            blockedByDevice.computeIfAbsent(devicePort, k -> new ArrayDeque<>()).add(currentProcess);
             currentProcess = null;
         }
-
         schedule(cpu);
     }
 
@@ -134,10 +163,10 @@ public class TScheduler {
             return;
         }
 
-        TPCB pcb = queue.poll();
+        TPCB process = queue.poll();
 
-        pcb.setState(TPCB.ProcessState.READY);
-        readyQueue.add(pcb);
+        process.setState(TPCB.ProcessState.READY);
+        readyQueue.add(process);
 
         if (queue.isEmpty()) {
             blockedByDevice.remove(devicePort);
@@ -178,11 +207,70 @@ public class TScheduler {
         return currentProcess;
     }
 
+    public TPCB forkProcess(TPCB parent, int memoryBase, int memoryLimit, int stackBase, int stackLimit) {
+        TPCB child = new TPCB(nextPid++, parent.getPc(), memoryBase, memoryLimit, stackBase, stackLimit);
+
+        child.setState(TPCB.ProcessState.READY);
+        child.setParentPid(parent.getPid());
+        processTable.add(child);
+        readyQueue.add(child);
+        return child;
+    }
+
+    public boolean hasChild(TPCB parent) {
+        int parentPid = parent.getPid();
+
+        for (TPCB process : processTable) {
+            if (process.getParentPid() == parentPid) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public TPCB getCurrentProcess() {
         return currentProcess;
+    }
+
+    public boolean hasProcesses() {
+        return !processTable.isEmpty();
     }
 
     public boolean hasReadyProcesses() {
         return !readyQueue.isEmpty() || currentProcess != null;
     }
+
+    private TPCB findParent(TPCB child) {
+        int parentPid = child.getParentPid();
+        if (parentPid < 0) {
+            return null;
+        }
+
+        for (TPCB process : processTable) {
+            if (process.getPid() == parentPid) {
+                return process;
+            }
+        }
+        return null;
+    }
+
+    public TPCB findTerminatedChild(TPCB parent) {
+        int parentPid = parent.getPid();
+
+        for (TPCB process : processTable) {
+            if (process.getParentPid() == parentPid && process.getState() == TPCB.ProcessState.TERMINATED) {
+                return process;
+            }
+        }
+        return null;
+    }
+
+    public void removeProcess(TPCB process) {
+        if (process == null) {
+            return;
+        }
+        processTable.remove(process);
+    }
+
 }
