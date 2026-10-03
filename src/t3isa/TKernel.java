@@ -241,7 +241,6 @@ public class TKernel {
                 }
 
                 if (scheduler.getCurrentProcess() == null) {
-                    cpu.halt();
                     return;
                 }
                 break;

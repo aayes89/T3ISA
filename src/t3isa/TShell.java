@@ -158,6 +158,7 @@ public final class TShell {
     }
 
     private void run(String[] parts) {
+
         if (parts.length < 2) {
             console.writeLine("usage: run <program>");
             return;
@@ -172,7 +173,14 @@ public final class TShell {
                 );
 
                 console.writeLine("program 'hello' started");
-                kernel.step();
+
+                if (kernel.getScheduler().getCurrentProcess() == null) {
+                    kernel.getScheduler().schedule(cpu);
+                }
+
+                while (!cpu.isHalted() && kernel.getScheduler().hasReadyProcesses()) {
+                    kernel.step();
+                }
                 break;
 
             default:
