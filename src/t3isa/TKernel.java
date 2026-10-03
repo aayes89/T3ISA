@@ -23,6 +23,8 @@
  */
 package t3isa;
 
+import t3isa.FS.TFileSystem;
+
 /**
  *
  * @author Slam
@@ -32,6 +34,7 @@ public class TKernel {
     private final TCPU cpu;
     private final TScheduler scheduler;
     private final TMemoryManager memoryManager;
+    private final TFileSystem fileSystem;
     private int timerTicks;
     private final int quantumTicks; // Cuántos pasos de CPU equivalen a 1 quántum/tic de temporizador
 
@@ -41,6 +44,8 @@ public class TKernel {
         this.quantumTicks = quantumTicks;
         this.memoryManager = new TMemoryManager();
         this.timerTicks = 0;
+        fileSystem = new TFileSystem();
+        fileSystem.format();
     }
 
     // Configurar los vectores de interrupción/trap en TCPU
@@ -482,5 +487,9 @@ public class TKernel {
             memoryManager.free(newBlock.getBase());
             throw e;
         }
+    }
+
+    public TFileSystem getFileSystem() {
+        return fileSystem;
     }
 }

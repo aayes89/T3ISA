@@ -79,35 +79,37 @@ public final class TConsoleDevice implements TDevice {
 
     @Override
     public TWord read() {
-        if (!inputQueue.isEmpty()) {
-            return inputQueue.poll();
+        if (inputQueue.isEmpty()) {
+            readLineIntoQueue();
         }
 
-        System.out.print("DEVICE IN > ");
-        String line = readLine();
-
-        if (line == null || line.trim().isEmpty()) {
+        if (inputQueue.isEmpty()) {
             return TWord.zero();
         }
 
-        try {
-            return TWord.fromLong(Long.parseLong(line.trim()));
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Entrada no numérica", e);
-        }
+        return inputQueue.poll();
     }
 
     @Override
     public boolean hasInput() {
+        return !inputQueue.isEmpty();
+    }
 
-        if (!inputQueue.isEmpty()) {
-            return true;
-        }
+    private void readLineIntoQueue() {
+        System.out.print("DEVICE IN > ");
 
         try {
-            return System.in.available() > 0;
+            String line = input.readLine();
+            if (line == null) {
+                return;
+            }
+
+            for (int i = 0; i < line.length(); i++) {
+                inputQueue.add(TWord.fromLong(line.charAt(i)));
+            }
+            inputQueue.add(TWord.fromLong(10));
         } catch (IOException e) {
-            return false;
+            throw new IllegalStateException("Error leyendo consola", e);
         }
     }
 }

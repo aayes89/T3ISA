@@ -23,6 +23,9 @@
  */
 package t3isa;
 
+import t3isa.Exceptions.TMemoryException;
+import t3isa.FS.TFileSystem;
+
 /**
  *
  * @author Slam
@@ -87,6 +90,46 @@ public final class TShell {
                 echo(line);
                 return true;
 
+            case "peek":
+                peek(parts);
+                return true;
+
+            case "poke":
+                poke(parts);
+                return true;
+
+            case "regs":
+                regs();
+                return true;
+
+            case "cpu":
+                cpu();
+                return true;
+
+            case "ls":
+                ls();
+                return true;
+
+            case "touch":
+                touch(parts);
+                return true;
+
+            case "write":
+                write(parts);
+                return true;
+
+            case "cat":
+                cat(parts);
+                return true;
+
+            case "rm":
+                rm(parts);
+                return true;
+
+            case "fs":
+                fs();
+                return true;
+
             case "clear":
                 clear();
                 return true;
@@ -114,8 +157,18 @@ public final class TShell {
         console.writeLine("  help");
         console.writeLine("  ps");
         console.writeLine("  mem");
+        console.writeLine("  peek <address>");
+        console.writeLine("  poke <address> <value>");
+        console.writeLine("  regs");
+        console.writeLine("  cpu");
         console.writeLine("  echo <text>");
         console.writeLine("  run <program>");
+        console.writeLine("  ls");
+        console.writeLine("  touch <file>");
+        console.writeLine("  write <file> <text>");
+        console.writeLine("  cat <file>");
+        console.writeLine("  rm <file>");
+        console.writeLine("  fs");
         console.writeLine("  clear");
         console.writeLine("  exit");
         console.writeLine("");
@@ -134,10 +187,11 @@ public final class TShell {
 
     private void mem() {
         console.writeLine("");
+        console.writeLine("MEMORY MAP");
         console.writeLine("KERNEL    0.." + TCPU.KERNEL_MEMORY_END);
         console.writeLine("USER      " + TCPU.USER_MEMORY_START + ".." + (TCPU.KERNEL_STACK_TOP - 1));
-        console.writeLine("KSTACK    " + TCPU.KERNEL_STACK_BOTTOM + ".." + TCPU.KERNEL_STACK_TOP);
-        console.writeLine("USTACK    " + TCPU.USER_STACK_BOTTOM + ".." + TCPU.USER_STACK_TOP);
+        console.writeLine("KERNEL STACK    " + TCPU.KERNEL_STACK_BOTTOM + ".." + TCPU.KERNEL_STACK_TOP);
+        console.writeLine("USER STACK    " + TCPU.USER_STACK_BOTTOM + ".." + TCPU.USER_STACK_TOP);
         console.writeLine("");
     }
 
@@ -212,4 +266,164 @@ public final class TShell {
 
         console.writeLine("");
     }
+
+    private void peek(String[] parts) {
+        if (parts.length != 2) {
+            console.writeLine("usage: peek <address>");
+            return;
+        }
+
+        try {
+            int address = Integer.parseInt(parts[1]);
+            TWord value = cpu.readMemory(address);
+            console.writeLine("[" + address + "] = " + value.toLong());
+        } catch (NumberFormatException e) {
+            console.writeLine("invalid address");
+        } catch (TMemoryException e) {
+            console.writeLine("invalid memory address");
+        }
+    }
+
+    private void poke(String[] parts) {
+        if (parts.length != 3) {
+            console.writeLine("usage: poke <address> <value>");
+            return;
+        }
+
+        try {
+            int address = Integer.parseInt(parts[1]);
+            long value = Long.parseLong(parts[2]);
+            cpu.writeMemory(address, TWord.fromLong(value));
+            console.writeLine("[" + address + "] <- " + value);
+
+        } catch (NumberFormatException e) {
+            console.writeLine("invalid number");
+        } catch (TMemoryException e) {
+            console.writeLine("invalid memory address");
+        }
+    }
+
+    private void regs() {
+        console.writeLine("");
+        console.writeLine("REGISTERS");
+
+        for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
+            console.writeLine("R" + i + " = " + cpu.getRegister(i).toLong());
+        }
+
+        console.writeLine("");
+    }
+
+    private void cpu() {
+        console.writeLine("");
+        console.writeLine("CPU");
+        console.writeLine("PC      = " + cpu.getPC());
+        console.writeLine("SP      = " + cpu.getSP());
+        console.writeLine("PID     = " + cpu.getCurrentPid());
+        console.writeLine("KERNEL  = " + cpu.isKernelMode());
+        console.writeLine("TRAP    = " + cpu.getTrap());
+        console.writeLine("HALTED  = " + cpu.isHalted());
+        console.writeLine("");
+    }
+
+    private void ls() {
+        TFileSystem.TFileInfo[] files = kernel.getFileSystem().list();
+
+        if (files.length == 0) {
+            console.writeLine("filesystem empty");
+            return;
+        }
+
+        console.writeLine("");
+        console.writeLine("NAME                 SIZE      BLOCKS");
+
+        for (TFileSystem.TFileInfo file : files) {
+            console.writeLine(
+                    String.format(
+                            "%-20s %-9d %d",
+                            file.getName(),
+                            file.getSize(),
+                            file.getBlocks()
+                    )
+            );
+        }
+
+        console.writeLine("");
+    }
+
+    private void touch(String[] parts) {
+        if (parts.length != 2) {
+            console.writeLine("usage: touch <file>");
+            return;
+        }
+
+        try {
+            kernel.getFileSystem().create(parts[1]);
+            console.writeLine("created: " + parts[1]);
+        } catch (RuntimeException e) {
+            console.writeLine(e.getMessage());
+        }
+    }
+
+    private void write(String[] parts) {
+        if (parts.length < 3) {
+            console.writeLine("usage: write <file> <text>");
+            return;
+        }
+
+        StringBuilder text = new StringBuilder();
+        for (int i = 2; i < parts.length; i++) {
+            if (i > 2) {
+                text.append(' ');
+            }
+            text.append(parts[i]);
+        }
+
+        try {
+            kernel.getFileSystem().write(parts[1], text.toString());
+            console.writeLine("written: " + parts[1]);
+        } catch (RuntimeException e) {
+            console.writeLine(e.getMessage());
+        }
+    }
+
+    private void cat(String[] parts) {
+        if (parts.length != 2) {
+            console.writeLine("usage: cat <file>");
+            return;
+        }
+
+        try {
+            console.writeLine(kernel.getFileSystem().read(parts[1]));
+        } catch (RuntimeException e) {
+            console.writeLine(e.getMessage());
+        }
+    }
+
+    private void rm(String[] parts) {
+        if (parts.length != 2) {
+            console.writeLine("usage: rm <file>");
+            return;
+        }
+
+        try {
+            kernel.getFileSystem().delete(parts[1]);
+            console.writeLine("removed: " + parts[1]);
+        } catch (RuntimeException e) {
+            console.writeLine(e.getMessage());
+        }
+    }
+
+    private void fs() {
+        TFileSystem fs = kernel.getFileSystem();
+
+        console.writeLine("");
+        console.writeLine("FILESYSTEM");
+        console.writeLine("BLOCK SIZE  = " + TFileSystem.BLOCK_SIZE);
+        console.writeLine("BLOCKS      = " + fs.getTotalBlocks());
+        console.writeLine("USED        = " + fs.getUsedBlocks());
+        console.writeLine("FREE        = " + fs.getFreeBlocks());
+        console.writeLine("");
+    }
+
 }

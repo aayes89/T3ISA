@@ -759,12 +759,6 @@ public final class TCPU {
                 try {
                     int port = (int) getRegister(2).toLong();
 
-                    if (!deviceBus.hasInput(port)) {
-                        pendingDevicePort = port;
-                        pendingProcessAction = TSyscall.BLOCK;
-                        return;
-                    }
-
                     setRegister(7, deviceBus.read(port));
                     incrementPC();
 

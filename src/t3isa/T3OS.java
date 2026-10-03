@@ -23,6 +23,8 @@
  */
 package t3isa;
 
+import t3isa.FS.TFileSystem;
+
 /**
  *
  * @author Slam
@@ -35,13 +37,19 @@ public final class T3OS {
     private final TKernel kernel;
     private final TBoot boot;
     private final TConsoleDevice console;
+    private final TGraphicsDevice graphics;
+    private final TFileSystem fileSystem;
 
     public T3OS() {
         cpu = new TCPU();
         boot = new TBoot(cpu);
         kernel = new TKernel(cpu, 10);
         console = new TConsoleDevice();
+        graphics = new TGraphicsDevice();
+        fileSystem = new TFileSystem();
+        fileSystem.format();
         cpu.getDeviceBus().attach(0, console);
+        cpu.getDeviceBus().attach(1, graphics);
     }
 
     public void boot() {
@@ -116,5 +124,9 @@ public final class T3OS {
 
     public TBoot getBoot() {
         return boot;
+    }
+
+    public TFileSystem getFileSystem() {
+        return fileSystem;
     }
 }
