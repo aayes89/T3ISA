@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright 2025 Allan (Slam).
+ * Copyright 2026 Slam.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,32 +21,18 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.DEVICE;
+
+import t3isa.Core.TWord;
 
 /**
  *
  * @author Slam
  */
+public interface TDevice {
 
-public enum Trit {
+    void write(TWord value);
 
-    NEG(-1),
-    ZERO(0),
-    POS(1);
-
-    public final int value;
-
-    Trit(int value) {
-        this.value = value;
-    }
-
-    public static Trit fromInt(int value) {
-        if (value < 0) return NEG;
-        if (value > 0) return POS;
-        return ZERO;
-    }
-
-    public static Trit negate(Trit t) {
-        return fromInt(-t.value);
-    }
+    TWord read();
+    boolean hasInput();
 }

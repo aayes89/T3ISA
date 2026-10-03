@@ -21,32 +21,24 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.ISA;
 
 /**
  *
  * @author Slam
  */
-public final class TSyscall {
+public enum TTrap {
 
-    private TSyscall() {
+    DIVIDE_BY_ZERO(0),
+    INVALID_MEMORY(1),
+    INVALID_INSTRUCTION(2),
+    INVALID_SYSCALL(3),
+    DEVICE_ERROR(4),
+    STACK_ERROR(5);
+
+    public final int code;
+
+    TTrap(int code) {
+        this.code = code;
     }
-
-    public static final int HALT = 0;
-    public static final int GET_PC = 1;
-    public static final int GET_SP = 2;
-    public static final int GET_CMP = 3;
-    public static final int MEM_READ = 4;
-    public static final int MEM_WRITE = 5;
-    public static final int DEVICE_OUT = 6;
-    public static final int DEVICE_IN = 7;
-    public static final int ENTER_USER = 8;
-    public static final int EXIT_USER = 9;
-    public static final int GETPID = 10;
-    public static final int YIELD = 11;
-    public static final int EXIT = 12;
-    public static final int BLOCK = 13;
-    public static final int FORK = 14;
-    public static final int WAIT = 15;
-    public static final int EXEC = 16;
 }

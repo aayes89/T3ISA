@@ -23,6 +23,13 @@
  */
 package t3isa;
 
+import t3isa.SHELL.TShell;
+import t3isa.DEVICE.TGraphicsDevice;
+import t3isa.DEVICE.TConsoleDevice;
+import t3isa.KERNEL.TPCB;
+import t3isa.KERNEL.TKernel;
+import t3isa.BOOT.TBoot;
+import t3isa.Core.TCPU;
 import t3isa.FS.TFileSystem;
 
 /**
@@ -47,7 +54,6 @@ public final class T3OS {
         console = new TConsoleDevice();
         graphics = new TGraphicsDevice();
         fileSystem = new TFileSystem();
-        fileSystem.format();
         cpu.getDeviceBus().attach(0, console);
         cpu.getDeviceBus().attach(1, graphics);
     }

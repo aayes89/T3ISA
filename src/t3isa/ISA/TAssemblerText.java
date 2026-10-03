@@ -21,12 +21,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.ISA;
 
 /**
  *
  * @author Slam
  */
+import t3isa.Core.TWord;
 import java.util.ArrayList;
 import java.util.List;
 

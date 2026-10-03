@@ -21,7 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.KERNEL;
+
+import t3isa.Core.TCPU;
+import t3isa.Core.TWord;
 
 /**
  *

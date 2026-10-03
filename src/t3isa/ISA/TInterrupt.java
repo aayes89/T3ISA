@@ -21,24 +21,22 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.ISA;
 
 /**
  *
  * @author Slam
  */
-public enum TTrap {
 
-    DIVIDE_BY_ZERO(0),
-    INVALID_MEMORY(1),
-    INVALID_INSTRUCTION(2),
-    INVALID_SYSCALL(3),
-    DEVICE_ERROR(4),
-    STACK_ERROR(5);
+public enum TInterrupt {
+
+    TIMER(0),
+    DEVICE(1),
+    KEYBOARD(2);
 
     public final int code;
 
-    TTrap(int code) {
+    TInterrupt(int code) {
         this.code = code;
     }
 }

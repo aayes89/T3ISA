@@ -21,7 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.BOOT;
+
+import t3isa.ISA.TAssemblerText;
+import t3isa.Core.TCPU;
+import t3isa.Core.TWord;
 
 /**
  * Boot loader de T3OS.

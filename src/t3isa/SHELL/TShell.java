@@ -21,10 +21,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.SHELL;
 
+import t3isa.DEVICE.TConsoleDevice;
+import t3isa.KERNEL.TPCB;
+import t3isa.KERNEL.TKernel;
+import t3isa.Core.TCPU;
+import t3isa.Core.TWord;
 import t3isa.Exceptions.TMemoryException;
 import t3isa.FS.TFileSystem;
+import t3isa.FS.TVFS;
 
 /**
  *
@@ -35,6 +41,7 @@ public final class TShell {
     private final TCPU cpu;
     private final TKernel kernel;
     private final TConsoleDevice console;
+    private String currentDirectory = "/";
 
     public TShell(TCPU cpu, TKernel kernel, TConsoleDevice console) {
         this.cpu = cpu;
@@ -130,6 +137,18 @@ public final class TShell {
                 fs();
                 return true;
 
+            case "mkdir":
+                mkdir(parts);
+                return true;
+
+            case "cd":
+                cd(parts);
+                return true;
+
+            case "pwd":
+                pwd();
+                return true;
+
             case "clear":
                 clear();
                 return true;
@@ -144,16 +163,14 @@ public final class TShell {
                 return false;
 
             default:
-                console.writeLine(
-                        "command not found: " + command
-                );
+                console.writeLine("command not found: " + command);
                 return true;
         }
     }
 
     private void help() {
         console.writeLine("");
-        console.writeLine("commands:");
+        console.writeLine("Commands:");
         console.writeLine("  help");
         console.writeLine("  ps");
         console.writeLine("  mem");
@@ -163,6 +180,9 @@ public final class TShell {
         console.writeLine("  cpu");
         console.writeLine("  echo <text>");
         console.writeLine("  run <program>");
+        console.writeLine("  mkdir <directory>");
+        console.writeLine("  cd <directory>");
+        console.writeLine("  pwd");
         console.writeLine("  ls");
         console.writeLine("  touch <file>");
         console.writeLine("  write <file> <text>");
@@ -326,29 +346,59 @@ public final class TShell {
         console.writeLine("");
     }
 
-    private void ls() {
-        TFileSystem.TFileInfo[] files = kernel.getFileSystem().list();
-
-        if (files.length == 0) {
-            console.writeLine("filesystem empty");
+    private void cd(String[] parts) {
+        if (parts.length != 2) {
+            console.writeLine("usage: cd <directory>");
             return;
         }
 
-        console.writeLine("");
-        console.writeLine("NAME                 SIZE      BLOCKS");
+        String path = resolvePath(parts[1]);
 
-        for (TFileSystem.TFileInfo file : files) {
-            console.writeLine(
-                    String.format(
-                            "%-20s %-9d %d",
-                            file.getName(),
-                            file.getSize(),
-                            file.getBlocks()
-                    )
-            );
+        if (!kernel.getVFS().isDirectory(path)) {
+            console.writeLine("directory not found: " + path);
+            return;
         }
 
-        console.writeLine("");
+        currentDirectory = path;
+    }
+
+    private void ls() {
+        try {
+            TVFS.TFileInfo[] files = kernel.getVFS().list(currentDirectory);
+
+            if (files.length == 0) {
+                console.writeLine("filesystem empty");
+                return;
+            }
+
+            console.writeLine("");
+            console.writeLine("NAME                 TYPE      SIZE      BLOCKS");
+
+            for (TVFS.TFileInfo file : files) {
+                String type = file.isDirectory() ? "DIR" : "FILE";
+                console.writeLine(String.format("%-20s %-9s %-9d %d", file.getName(), type, file.getSize(), file.getBlocks()));
+            }
+
+            console.writeLine("");
+
+        } catch (RuntimeException e) {
+            console.writeLine(e.getMessage());
+        }
+    }
+
+    private void mkdir(String[] parts) {
+        if (parts.length != 2) {
+            console.writeLine("usage: mkdir <directory>");
+            return;
+        }
+
+        try {
+            String path = resolvePath(parts[1]);
+            kernel.getVFS().mkdir(path);
+            console.writeLine("directory created: " + path);
+        } catch (RuntimeException e) {
+            console.writeLine(e.getMessage());
+        }
     }
 
     private void touch(String[] parts) {
@@ -358,8 +408,9 @@ public final class TShell {
         }
 
         try {
-            kernel.getFileSystem().create(parts[1]);
-            console.writeLine("created: " + parts[1]);
+            String path = resolvePath(parts[1]);
+            kernel.getVFS().create(path);
+            console.writeLine("created: " + path);
         } catch (RuntimeException e) {
             console.writeLine(e.getMessage());
         }
@@ -379,9 +430,15 @@ public final class TShell {
             text.append(parts[i]);
         }
 
+        String content = text.toString();
+        if (content.length() >= 2 && content.startsWith("\"") && content.endsWith("\"")) {
+            content = content.substring(1, content.length() - 1);
+        }
+
         try {
-            kernel.getFileSystem().write(parts[1], text.toString());
-            console.writeLine("written: " + parts[1]);
+            String path = resolvePath(parts[1]);
+            kernel.getVFS().write(path, content);
+            console.writeLine("written: " + path);
         } catch (RuntimeException e) {
             console.writeLine(e.getMessage());
         }
@@ -394,7 +451,7 @@ public final class TShell {
         }
 
         try {
-            console.writeLine(kernel.getFileSystem().read(parts[1]));
+            console.writeLine(kernel.getVFS().read(resolvePath(parts[1])));
         } catch (RuntimeException e) {
             console.writeLine(e.getMessage());
         }
@@ -407,23 +464,80 @@ public final class TShell {
         }
 
         try {
-            kernel.getFileSystem().delete(parts[1]);
-            console.writeLine("removed: " + parts[1]);
+            String path = resolvePath(parts[1]);
+            kernel.getVFS().delete(path);
+            console.writeLine("removed: " + path);
         } catch (RuntimeException e) {
             console.writeLine(e.getMessage());
         }
     }
 
     private void fs() {
-        TFileSystem fs = kernel.getFileSystem();
+        TVFS vfs = kernel.getVFS();
 
         console.writeLine("");
         console.writeLine("FILESYSTEM");
         console.writeLine("BLOCK SIZE  = " + TFileSystem.BLOCK_SIZE);
-        console.writeLine("BLOCKS      = " + fs.getTotalBlocks());
-        console.writeLine("USED        = " + fs.getUsedBlocks());
-        console.writeLine("FREE        = " + fs.getFreeBlocks());
+        console.writeLine("BLOCKS      = " + vfs.getTotalBlocks());
+        console.writeLine("USED        = " + vfs.getUsedBlocks());
+        console.writeLine("FREE        = " + vfs.getFreeBlocks());
         console.writeLine("");
+    }
+
+    private void pwd() {
+        console.writeLine(currentDirectory);
+    }
+
+    private String resolvePath(String path) {
+        if (path == null || path.isEmpty()) {
+            return currentDirectory;
+        }
+
+        if (path.equals(".")) {
+            return currentDirectory;
+        }
+
+        if (path.equals("..")) {
+            return parentDirectory(currentDirectory);
+        }
+
+        if (path.equals("/")) {
+            return "/";
+        }
+
+        String result;
+
+        if (path.startsWith("/")) {
+            result = path;
+        } else if ("/".equals(currentDirectory)) {
+            result = "/" + path;
+        } else {
+            result = currentDirectory + "/" + path;
+        }
+
+        while (result.contains("//")) {
+            result = result.replace("//", "/");
+        }
+
+        if (result.length() > 1 && result.endsWith("/")) {
+            result = result.substring(0, result.length() - 1);
+        }
+
+        return result;
+    }
+
+    private String parentDirectory(String path) {
+        if ("/".equals(path)) {
+            return "/";
+        }
+
+        int index = path.lastIndexOf('/');
+
+        if (index <= 0) {
+            return "/";
+        }
+
+        return path.substring(0, index);
     }
 
 }

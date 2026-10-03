@@ -21,9 +21,19 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.Core;
 
+import t3isa.Core.TALU;
+import t3isa.Core.TWord;
 import t3isa.Exceptions.TMemoryException;
+import t3isa.T3ISA;
+import t3isa.DEVICE.TDevice;
+import t3isa.DEVICE.TDeviceBus;
+import t3isa.ISA.TInstruction;
+import t3isa.ISA.TInterrupt;
+import t3isa.ISA.TOpcode;
+import t3isa.ISA.TSyscall;
+import t3isa.ISA.TTrap;
 
 /**
  *

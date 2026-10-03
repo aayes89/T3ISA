@@ -27,8 +27,12 @@ package t3isa.FS;
  *
  * @author Slam
  */
-import java.util.ArrayList;
-import java.util.List;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 public final class TFileSystem {
 
@@ -36,103 +40,98 @@ public final class TFileSystem {
     public static final int BLOCK_COUNT = 256;
 
     private final boolean[] usedBlocks;
-    private final List<TFile> files;
+    private final String persistenceFile;
+
+    private final byte[][] blocks;
 
     public TFileSystem() {
-        usedBlocks = new boolean[BLOCK_COUNT];
-        files = new ArrayList<>();
+        this("t3fs.dat");
+    }
+
+    public TFileSystem(String persistenceFile) {
+
+        if (persistenceFile == null || persistenceFile.isEmpty()) {
+            throw new IllegalArgumentException("Archivo de persistencia inválido");
+        }
+
+        this.persistenceFile = persistenceFile;
+        this.usedBlocks = new boolean[BLOCK_COUNT];
+        this.blocks = new byte[BLOCK_COUNT][BLOCK_SIZE];
+
+        if (!load()) {
+            format();
+        }
     }
 
     public void format() {
-        files.clear();
-
-        for (int i = 0; i < usedBlocks.length; i++) {
+        for (int i = 0; i < BLOCK_COUNT; i++) {
             usedBlocks[i] = false;
+            for (int j = 0; j < BLOCK_SIZE; j++) {
+                blocks[i][j] = 0;
+            }
         }
+        save();
     }
 
-    public boolean exists(String name) {
-        return find(name) != null;
+    // Bloque 0 - directorios y Bloques 1-255 archivos
+    public int allocateBlock() {
+        for (int i = 0; i < BLOCK_COUNT; i++) {
+            if (!usedBlocks[i]) {
+                usedBlocks[i] = true;
+                save();
+                return i;
+            }
+        }
+
+        throw new IllegalStateException("No hay bloques libres");
     }
 
-    public void create(String name) {
-        validateName(name);
-
-        if (exists(name)) {
-            throw new IllegalStateException("El archivo ya existe: " + name);
+    public void freeBlock(int block) {
+        checkBlock(block);
+        usedBlocks[block] = false;
+        for (int i = 0; i < BLOCK_SIZE; i++) {
+            blocks[block][i] = 0;
         }
 
-        files.add(new TFile(name));
+        save();
     }
 
-    public void delete(String name) {
-        TFile file = find(name);
+    public void writeBlock(int block, byte[] data) {
+        checkBlock(block);
 
-        if (file == null) {
-            throw new IllegalStateException("Archivo no encontrado: " + name);
+        if (!usedBlocks[block]) {
+            throw new IllegalStateException("El bloque no está asignado: " + block);
         }
 
-        freeBlocks(file);
-        files.remove(file);
+        if (data == null) {
+            throw new IllegalArgumentException("Datos null");
+        }
+
+        if (data.length > BLOCK_SIZE) {
+            throw new IllegalArgumentException("Datos exceden el tamaño del bloque");
+        }
+
+        for (int i = 0; i < BLOCK_SIZE; i++) {
+            blocks[block][i] = 0;
+        }
+
+        System.arraycopy(data, 0, blocks[block], 0, data.length);
+        save();
     }
 
-    public void write(String name, String content) {
-        TFile file = find(name);
+    public byte[] readBlock(int block) {
+        checkBlock(block);
 
-        if (file == null) {
-            throw new IllegalStateException("Archivo no encontrado: " + name);
+        if (!usedBlocks[block]) {
+            throw new IllegalStateException("El bloque no está asignado: " + block);
         }
 
-        if (content == null) {
-            content = "";
-        }
-
-        int requiredBlocks = (content.length() + BLOCK_SIZE - 1) / BLOCK_SIZE;
-        freeBlocks(file);
-
-        if (requiredBlocks > freeBlockCount()) {
-            throw new IllegalStateException("Espacio insuficiente");
-        }
-
-        file.blocks.clear();
-        int position = 0;
-
-        for (int i = 0; i < requiredBlocks; i++) {
-            int block = allocateBlock();
-            file.blocks.add(block);
-            int end = Math.min(position + BLOCK_SIZE, content.length());
-            file.data.add(content.substring(position, end));
-            position = end;
-        }
-
-        file.size = content.length();
+        return blocks[block].clone();
     }
 
-    public String read(String name) {
-        TFile file = find(name);
-
-        if (file == null) {
-            throw new IllegalStateException("Archivo no encontrado: " + name);
-        }
-
-        StringBuilder result = new StringBuilder();
-
-        for (String block : file.data) {
-            result.append(block);
-        }
-
-        return result.toString();
-    }
-
-    public TFileInfo[] list() {
-        TFileInfo[] result = new TFileInfo[files.size()];
-
-        for (int i = 0; i < files.size(); i++) {
-            TFile file = files.get(i);
-            result[i] = new TFileInfo(file.name, file.size, file.blocks.size());
-        }
-
-        return result;
+    public boolean isBlockUsed(int block) {
+        checkBlock(block);
+        return usedBlocks[block];
     }
 
     public int getTotalBlocks() {
@@ -141,13 +140,11 @@ public final class TFileSystem {
 
     public int getUsedBlocks() {
         int count = 0;
-
         for (boolean used : usedBlocks) {
             if (used) {
                 count++;
             }
         }
-
         return count;
     }
 
@@ -155,92 +152,58 @@ public final class TFileSystem {
         return BLOCK_COUNT - getUsedBlocks();
     }
 
-    private TFile find(String name) {
-        for (TFile file : files) {
-            if (file.name.equals(name)) {
-                return file;
+    public void save() {
+        try (DataOutputStream out = new DataOutputStream(new FileOutputStream(persistenceFile))) {
+            out.writeInt(1);
+
+            out.writeInt(BLOCK_COUNT);
+            out.writeInt(BLOCK_SIZE);
+
+            for (int i = 0; i < BLOCK_COUNT; i++) {
+                out.writeBoolean(usedBlocks[i]);
+                if (usedBlocks[i]) {
+                    out.write(blocks[i]);
+                }
             }
-        }
 
-        return null;
+        } catch (IOException e) {
+            throw new IllegalStateException("No se pudo guardar el filesystem", e);
+        }
     }
 
-    private int allocateBlock() {
-        for (int i = 0; i < BLOCK_COUNT; i++) {
-            if (!usedBlocks[i]) {
-                usedBlocks[i] = true;
-                return i;
+    private boolean load() {
+        try (DataInputStream in = new DataInputStream(new FileInputStream(persistenceFile))) {
+            int version = in.readInt();
+
+            if (version != 1) {
+                return false;
             }
-        }
 
-        throw new IllegalStateException("No hay bloques libres");
-    }
+            int blockCount = in.readInt();
+            int blockSize = in.readInt();
 
-    private void freeBlocks(TFile file) {
-        for (int block : file.blocks) {
-            usedBlocks[block] = false;
-        }
+            if (blockCount != BLOCK_COUNT || blockSize != BLOCK_SIZE) {
+                return false;
+            }
 
-        file.blocks.clear();
-        file.data.clear();
-        file.size = 0;
-    }
+            for (int i = 0; i < BLOCK_COUNT; i++) {
+                usedBlocks[i] = in.readBoolean();
+                if (usedBlocks[i]) {
+                    in.readFully(blocks[i]);
+                }
+            }
 
-    private int freeBlockCount() {
-        return BLOCK_COUNT - getUsedBlocks();
-    }
-
-    private void validateName(String name) {
-        if (name == null || name.isEmpty()) {
-            throw new IllegalArgumentException("Nombre de archivo inválido");
-        }
-
-        if (name.length() > 64) {
-            throw new IllegalArgumentException("Nombre de archivo demasiado largo");
-        }
-
-        if (name.contains("/") || name.contains("\\")) {
-            throw new IllegalArgumentException("Nombre de archivo inválido");
+            return true;
+        } catch (EOFException e) {
+            return false;
+        } catch (IOException e) {
+            return false;
         }
     }
 
-    private static final class TFile {
-
-        private final String name;
-        private final List<Integer> blocks;
-        private final List<String> data;
-        private int size;
-
-        private TFile(String name) {
-            this.name = name;
-            this.blocks = new ArrayList<>();
-            this.data = new ArrayList<>();
-            this.size = 0;
-        }
-    }
-
-    public static final class TFileInfo {
-
-        private final String name;
-        private final int size;
-        private final int blocks;
-
-        private TFileInfo(String name, int size, int blocks) {
-            this.name = name;
-            this.size = size;
-            this.blocks = blocks;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public int getSize() {
-            return size;
-        }
-
-        public int getBlocks() {
-            return blocks;
+    private void checkBlock(int block) {
+        if (block < 0 || block >= BLOCK_COUNT) {
+            throw new IllegalArgumentException("Bloque inválido: " + block);
         }
     }
 }

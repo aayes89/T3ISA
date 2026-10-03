@@ -23,6 +23,8 @@
  */
 package t3isa;
 
+import t3isa.Core.TCPU;
+
 /**
  *
  * @author Slam

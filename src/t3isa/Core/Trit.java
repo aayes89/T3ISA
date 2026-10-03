@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright 2026 Slam.
+ * Copyright 2025 Allan (Slam).
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,22 +21,32 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.Core;
 
 /**
  *
  * @author Slam
  */
 
-public enum TInterrupt {
+public enum Trit {
 
-    TIMER(0),
-    DEVICE(1),
-    KEYBOARD(2);
+    NEG(-1),
+    ZERO(0),
+    POS(1);
 
-    public final int code;
+    public final int value;
 
-    TInterrupt(int code) {
-        this.code = code;
+    Trit(int value) {
+        this.value = value;
+    }
+
+    public static Trit fromInt(int value) {
+        if (value < 0) return NEG;
+        if (value > 0) return POS;
+        return ZERO;
+    }
+
+    public static Trit negate(Trit t) {
+        return fromInt(-t.value);
     }
 }

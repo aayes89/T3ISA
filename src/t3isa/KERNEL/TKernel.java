@@ -21,9 +21,21 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3isa.KERNEL;
 
+import t3isa.Memory.TMemoryManager;
+import t3isa.ISA.TInterrupt;
+import t3isa.ISA.TTrap;
+import t3isa.ISA.TOpcode;
+import t3isa.ISA.TSyscall;
+import t3isa.ISA.TAssembler;
+import t3isa.ISA.TInstruction;
+import t3isa.ISA.TAssemblerText;
+import t3isa.Core.TCPU;
+import t3isa.Core.TWord;
 import t3isa.FS.TFileSystem;
+import t3isa.FS.TVFS;
+import t3isa.T3ISA;
 
 /**
  *
@@ -35,6 +47,7 @@ public class TKernel {
     private final TScheduler scheduler;
     private final TMemoryManager memoryManager;
     private final TFileSystem fileSystem;
+    private final TVFS vfs;
     private int timerTicks;
     private final int quantumTicks; // Cuántos pasos de CPU equivalen a 1 quántum/tic de temporizador
 
@@ -45,7 +58,7 @@ public class TKernel {
         this.memoryManager = new TMemoryManager();
         this.timerTicks = 0;
         fileSystem = new TFileSystem();
-        fileSystem.format();
+        vfs = new TVFS(fileSystem);
     }
 
     // Configurar los vectores de interrupción/trap en TCPU
@@ -491,5 +504,9 @@ public class TKernel {
 
     public TFileSystem getFileSystem() {
         return fileSystem;
+    }
+
+    public TVFS getVFS() {
+        return vfs;
     }
 }
