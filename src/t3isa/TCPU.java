@@ -821,6 +821,28 @@ public final class TCPU {
                 pendingProcessAction = TSyscall.WAIT;
                 break;
 
+            case TSyscall.EXEC:
+                if (kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
+                int execAddress = (int) getRegister(2).toLong();
+                int execSize = (int) getRegister(3).toLong();
+
+                if (execAddress < currentMemoryBase
+                        || execAddress > currentMemoryLimit
+                        || execSize <= 0
+                        || execSize > currentMemoryLimit - execAddress + 1) {
+
+                    raiseTrap(TTrap.INVALID_MEMORY);
+                    return;
+                }
+
+                incrementPC();
+                pendingProcessAction = TSyscall.EXEC;
+                break;
+
             default:
                 raiseTrap(TTrap.INVALID_SYSCALL);
                 break;

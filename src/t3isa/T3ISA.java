@@ -36,139 +36,165 @@ public class T3ISA {
         TCPU cpu = new TCPU();
         TKernel kernel = new TKernel(cpu, 100);
 
-        String program
+        /*
+     * Programa del hijo después de EXEC:
+     *
+     * GETPID
+     * YIELD
+     * EXIT
+         */
+        TWord[] execProgram
+                = TAssemblerText.assemble(
+                        "MOVI R1, 10\n"
+                        + "SYS\n"
+                        + "MOVI R1, 11\n"
+                        + "SYS\n"
+                        + "MOVI R1, 12\n"
+                        + "SYS\n"
+                );
+
+        /*
+     * Programa principal:
+     *
+     * FORK
+     * YIELD
+     * FORK
+     * WAIT
+     * WAIT
+     * EXIT
+     *
+     * El hijo detecta R7 == 0 y hace EXEC.
+         */
+        String source
                 = "MOVI R1, 14\n"
                 + "SYS\n"
                 + "CMP R7, R0\n"
-                + "JZERO child_exit\n"
+                + "JZERO hijo\n"
+                // PADRE
+                + "MOVI R1, 11\n"
+                + "SYS\n"
+                + "MOVI R1, 14\n"
+                + "SYS\n"
+                + "CMP R7, R0\n"
+                + "JZERO hijo\n"
+                // PADRE espera hijo 1
                 + "MOVI R1, 15\n"
                 + "SYS\n"
+                // PADRE espera hijo 2
+                + "MOVI R1, 15\n"
+                + "SYS\n"
+                // PADRE termina
                 + "MOVI R1, 12\n"
                 + "SYS\n"
-                + "child_exit:\n"
-                + "MOVI R1, 12\n"
+                // HIJO
+                + "hijo:\n"
+                + "MOVI R1, 16\n"
                 + "SYS\n";
 
         TWord[] binary
-                = TAssemblerText.assemble(program);
+                = TAssemblerText.assemble(source);
 
-        kernel.createProcess(binary);
+        /*
+     * Reservamos espacio adicional para EXEC.
+         */
+        TWord[] complete
+                = new TWord[binary.length + execProgram.length];
 
-        for (int i = 0; i < 20; i++) {
+        System.arraycopy(
+                binary,
+                0,
+                complete,
+                0,
+                binary.length
+        );
 
-            kernel.step();
+        System.arraycopy(
+                execProgram,
+                0,
+                complete,
+                binary.length,
+                execProgram.length
+        );
+
+        TPCB parent
+                = kernel.createProcess(complete);
+
+        kernel.getScheduler().schedule(cpu);
+
+        boolean[] execDone
+                = new boolean[32];
+
+        int steps = 0;
+
+        while (!cpu.isHalted() && steps < 200) {
 
             TPCB current
                     = kernel.getScheduler().getCurrentProcess();
 
             if (current != null) {
 
+                int pid = current.getPid();
+
+                /*
+             * Todo hijo que llegue a su SYS EXEC
+             * recibe la dirección del programa preparado.
+                 */
+                if (pid != parent.getPid()
+                        && !execDone[pid]) {
+
+                    int address
+                            = current.getMemoryBase()
+                            + binary.length;
+
+                    cpu.setRegister(
+                            2,
+                            TWord.fromLong(address)
+                    );
+
+                    cpu.setRegister(
+                            3,
+                            TWord.fromLong(
+                                    execProgram.length
+                            )
+                    );
+
+                    execDone[pid] = true;
+                }
+            }
+
+            kernel.step();
+
+            current
+                    = kernel.getScheduler().getCurrentProcess();
+
+            if (current != null) {
+
                 System.out.println(
-                        "Paso " + i
-                        + " -> PID=" + current.getPid()
-                        + " STATE=" + current.getState()
-                        + " PCB_PC=" + current.getPc()
-                        + " CPU_PC=" + cpu.getPC()
+                        "STEP=" + steps
+                        + " PID=" + current.getPid()
+                        + " PC=" + cpu.getPC()
                         + " R7=" + cpu.getRegister(7).toLong()
-                        + " SP=" + cpu.getSP()
+                        + " STATE=" + current.getState()
                 );
 
             } else {
 
                 System.out.println(
-                        "Paso " + i + " -> SIN PROCESO"
+                        "STEP=" + steps
+                        + " SIN PROCESO"
                 );
             }
+
+            steps++;
         }
+
+        System.out.println();
+        System.out.println("===== RESULTADO =====");
+        System.out.println(
+                "HALTED=" + cpu.isHalted()
+        );
+        System.out.println(
+                "STEPS=" + steps
+        );
     }
 }
-
-/* public static void main(String[] args) {
-
-        TCPU cpu = new TCPU();
-        TConsoleDevice console = new TConsoleDevice();
-        cpu.getDeviceBus().attach(0, console);
-
-        String programA
-                = "MOVI R1, 7\n"
-                + "MOVI R2, 0\n"
-                + "SYS\n"
-                + "MOVI R1, 12\n"
-                + "SYS\n";
-
-        String programB
-                = "MOVI R7, 222\n"
-                + "MOVI R7, 333\n"
-                + "MOVI R7, 444\n"
-                + "MOVI R7, 555\n"
-                + "MOVI R7, 666\n"
-                + "MOVI R7, 777\n"
-                + "MOVI R1, 12\n"
-                + "SYS\n";
-
-        String timerSource
-                = "MOVI R7, 1234\n"
-                + "IRET\n";
-        String programBad
-                = "MOVI R1, 100\n"
-                + "MOVI R2, 0\n"
-                + "DIV R3, R1, R2\n"
-                + "MOVI R1, 12\n"
-                + "SYS\n";
-        String programBadMemory
-                = "MOVI R1, 1000\n"
-                + "LOAD R3, R1, 0\n"
-                + "MOVI R1, 12\n"
-                + "SYS\n";
-        String programBadStack
-                = "POP R3\n"
-                + "POP R3\n"
-                + "MOVI R1, 12\n"
-                + "SYS\n";
-
-        TKernel kernel = new TKernel(cpu, 3);
-
-        TWord[] binaryA = TAssemblerText.assemble(programA);
-        TWord[] binaryB = TAssemblerText.assemble(programB);
-        TWord[] binaryBad = TAssemblerText.assemble(programBad);
-        TWord[] timer = TAssemblerText.assemble(timerSource);
-        TWord[] binaryBadMemory = TAssemblerText.assemble(programBadMemory);
-        TWord[] binaryBadInstruction = {TWord.fromLong(2)};
-        TWord[] binaryBadStack = TAssemblerText.assemble(programBadStack);
-
-        cpu.loadProgram(TCPU.INTERRUPT_HANDLER_TIMER, timer);
-        cpu.loadProgram(TCPU.INTERRUPT_HANDLER_DEVICE, TAssemblerText.assemble("IRET\n"));
-        kernel.createProcess(binaryA);
-        kernel.createProcess(binaryB);
-        kernel.createProcess(binaryBad);
-        kernel.createProcess(binaryBadMemory);
-        kernel.createProcess(binaryBadInstruction);
-        kernel.createProcess(binaryBadStack);
-
-        kernel.step(); // 0
-        kernel.step(); // 1
-        kernel.step(); // 2
-
-        for (int i = 0; i < 20; i++) {
-
-            if (i == 17) {
-                System.out.println("=== INYECTANDO ENTRADA ===");
-                console.enqueueInput(1234);
-            }
-
-            kernel.step();
-
-            TPCB current = kernel.getScheduler().getCurrentProcess();
-
-            if (current != null) {
-                System.out.println(
-                        "Paso " + i
-                        + " -> PID: " + current.getPid()
-                        + " | PCB PC: " + current.getPc()
-                        + " | CPU PC: " + cpu.getPC()
-                );
-            }
-        }
-    }
-}
- */

@@ -105,23 +105,27 @@ public class TScheduler {
      * Finaliza la ejecución del proceso actual y conmuta al siguiente.
      *
      * @param cpu
+     * @return
      */
-    public void terminateCurrentProcess(TCPU cpu) {
-        if (currentProcess != null) {
-            TPCB terminated = currentProcess;
+    public TPCB terminateCurrentProcess(TCPU cpu) {
+        TPCB terminated = currentProcess;
+
+        if (terminated != null) {
             terminated.setState(TPCB.ProcessState.TERMINATED);
             TPCB parent = findParent(terminated);
 
             currentProcess = null;
 
             if (parent != null && parent.getState() == TPCB.ProcessState.BLOCKED && (parent.getWaitingForPid() == -1 || parent.getWaitingForPid() == terminated.getPid())) {
-                parent.setWaitingForPid(-1);
+                parent.setRegister(7, TWord.fromLong(terminated.getPid()));
+                parent.setWaitingForPid(terminated.getPid());
                 parent.setState(TPCB.ProcessState.READY);
                 readyQueue.add(parent);
             }
         }
 
         schedule(cpu);
+        return terminated;
     }
 
     /**
@@ -271,6 +275,10 @@ public class TScheduler {
             return;
         }
         processTable.remove(process);
+    }
+
+    public TPCB findParentOf(TPCB child) {
+        return findParent(child);
     }
 
 }

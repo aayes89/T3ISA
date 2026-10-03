@@ -45,8 +45,8 @@ public class TPCB {
     private int compare;
     private final TWord[] registers;
 
-    private final int memoryBase;
-    private final int memoryLimit;
+    private int memoryBase;
+    private int memoryLimit;
 
     private final int stackBase;
     private final int stackLimit;
@@ -183,5 +183,17 @@ public class TPCB {
 
     public void setParentPid(int parentPid) {
         this.parentPid = parentPid;
+    }
+
+    public void setMemoryBase(int memoryBase) {
+        this.memoryBase = memoryBase;
+    }
+
+    public void setMemoryLimit(int memoryLimit) {
+        this.memoryLimit = memoryLimit;
+    }
+
+    public void setCompare(int compare) {
+        this.compare = compare;
     }
 }

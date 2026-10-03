@@ -69,20 +69,59 @@ public class TKernel {
         return createProcess(binary);
     }
 
+    public TPCB createProcess(String source) {
+        if (source == null || source.trim().isEmpty()) {
+            throw new IllegalArgumentException("El programa está vacío");
+        }
+
+        int estimatedSize = source.split("\\R").length;
+
+        TMemoryManager.MemoryBlock block = memoryManager.allocate(estimatedSize);
+        TMemoryManager.MemoryBlock stack = null;
+
+        try {
+            TWord[] binary = TAssemblerText.assemble(source, block.getBase());
+
+            memoryManager.free(block.getBase());
+            block = memoryManager.allocate(binary.length);
+            stack = memoryManager.allocateStack(256);
+
+            TWord[] relocated = TAssemblerText.assemble(source, block.getBase());
+            cpu.loadProgram(block.getBase(), relocated);
+            return scheduler.createProcess(block.getBase(), block.getBase(), block.getLimit(), stack.getBase(), stack.getLimit());
+        } catch (RuntimeException e) {
+            if (block != null) {
+                memoryManager.free(block.getBase());
+            }
+            if (stack != null) {
+                memoryManager.freeStack(stack.getBase());
+            }
+            throw e;
+        }
+    }
+
     public TPCB createProcess(TWord[] binary) {
         if (binary == null || binary.length == 0) {
             throw new IllegalArgumentException("El programa está vacío");
         }
 
         TMemoryManager.MemoryBlock block = memoryManager.allocate(binary.length);
-        TMemoryManager.MemoryBlock stack = memoryManager.allocateStack(256);
+        TMemoryManager.MemoryBlock stack = null;
 
         try {
-            cpu.loadProgram(block.getBase(), binary);
+            TWord[] relocated = relocateProgram(binary, block.getBase());
+
+            stack = memoryManager.allocateStack(256);
+
+            cpu.loadProgram(block.getBase(), relocated);
             return scheduler.createProcess(block.getBase(), block.getBase(), block.getLimit(), stack.getBase(), stack.getLimit());
         } catch (RuntimeException e) {
             memoryManager.free(block.getBase());
-            memoryManager.freeStack(stack.getBase());
+
+            if (stack != null) {
+                memoryManager.freeStack(stack.getBase());
+            }
+
             throw e;
         }
     }
@@ -177,14 +216,17 @@ public class TKernel {
             case TSyscall.EXIT:
                 cpu.clearPendingProcessAction();
 
-                TPCB process = scheduler.getCurrentProcess();
+                TPCB terminated = scheduler.terminateCurrentProcess(cpu);
 
-                if (process != null) {
-                    memoryManager.free(process.getMemoryBase());
-                    memoryManager.freeStack(process.getStackBase());
+                if (terminated != null) {
+                    TPCB parent = scheduler.findParentOf(terminated);
+
+                    if (parent != null && parent.getWaitingForPid() == terminated.getPid()) {
+                        memoryManager.free(terminated.getMemoryBase());
+                        memoryManager.freeStack(terminated.getStackBase());
+                        scheduler.removeProcess(terminated);
+                    }
                 }
-
-                scheduler.terminateCurrentProcess(cpu);
 
                 if (scheduler.getCurrentProcess() == null) {
                     cpu.halt();
@@ -200,6 +242,20 @@ public class TKernel {
             case TSyscall.WAIT:
                 cpu.clearPendingProcessAction();
                 handleWait();
+                break;
+
+            case TSyscall.EXEC:
+                cpu.clearPendingProcessAction();
+                int execAddress = (int) cpu.getRegister(2).toLong();
+                int execSize = (int) cpu.getRegister(3).toLong();
+
+                TWord[] execBinary = new TWord[execSize];
+
+                for (int i = 0; i < execSize; i++) {
+                    execBinary[i] = cpu.readMemory(execAddress + i);
+                }
+
+                execCurrentProcess(execBinary);
                 break;
 
             default:
@@ -270,28 +326,60 @@ public class TKernel {
             memoryBlock = memoryManager.allocate(memorySize);
             stackBlock = memoryManager.allocateStack(stackSize);
 
-            cpu.copyMemoryRange(parent.getMemoryBase(), parent.getMemoryLimit(), memoryBlock.getBase());
+            // Copiar memoria del proceso y relocalizar
+            // las direcciones absolutas de JMP/JNEG/JZERO/JPOS/CALL.
+            int codeOffset = memoryBlock.getBase() - parent.getMemoryBase();
+
+            for (int address = parent.getMemoryBase(); address <= parent.getMemoryLimit(); address++) {
+                TWord word = cpu.readMemory(address);
+                TInstruction instruction = TInstruction.decode(word);
+                TOpcode opcode = instruction.getOpcode();
+
+                if (opcode == TOpcode.JMP
+                        || opcode == TOpcode.JNEG
+                        || opcode == TOpcode.JZERO
+                        || opcode == TOpcode.JPOS
+                        || opcode == TOpcode.CALL) {
+
+                    int target = instruction.getImmediate() + codeOffset;
+                    word = TAssembler.encode(opcode, instruction.getDst(), instruction.getSrc1(), instruction.getSrc2(), target);
+                }
+
+                int destination = memoryBlock.getBase() + (address - parent.getMemoryBase());
+                cpu.writeMemory(destination, word);
+            }
+
+            // Copiar stack.
             cpu.copyProcessStack(parent.getStackBase(), parent.getStackLimit(), stackBlock.getBase());
 
+            // Crear PCB hijo.
             TPCB child = scheduler.forkProcess(parent, memoryBlock.getBase(), memoryBlock.getLimit(), stackBlock.getBase(), stackBlock.getLimit());
 
-            int codeOffset = cpu.getPC() - parent.getMemoryBase();
-            child.setPc(memoryBlock.getBase() + codeOffset);
+            // Relocalizar PC.
+            int pcOffset = cpu.getPC() - parent.getMemoryBase();
+            child.setPc(memoryBlock.getBase() + pcOffset);
 
+            // Relocalizar SP.
             int childSP = stackBlock.getBase() + (cpu.getUserSP() - parent.getStackBase());
             child.setUserSP(childSP);
 
+            // Copiar registros.
             for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
                 child.setRegister(i, cpu.getRegister(i));
             }
 
+            /*
+         * Convención fork():
+         * hijo recibe 0.
+         * padre recibe PID del hijo.
+             */
             child.setRegister(7, TWord.zero());
             cpu.setRegister(7, TWord.fromLong(child.getPid()));
+
         } catch (RuntimeException e) {
             if (memoryBlock != null) {
                 memoryManager.free(memoryBlock.getBase());
             }
-
             if (stackBlock != null) {
                 memoryManager.freeStack(stackBlock.getBase());
             }
@@ -323,5 +411,62 @@ public class TKernel {
         }
         parent.setWaitingForPid(-1);
         scheduler.blockCurrentProcess(cpu);
+    }
+
+    private TWord[] relocateProgram(TWord[] binary, int memoryBase) {
+        TWord[] relocated = new TWord[binary.length];
+
+        for (int i = 0; i < binary.length; i++) {
+            TInstruction instruction = TInstruction.decode(binary[i]);
+            TOpcode opcode = instruction.getOpcode();
+
+            if (opcode == TOpcode.JMP || opcode == TOpcode.JNEG || opcode == TOpcode.JZERO || opcode == TOpcode.JPOS || opcode == TOpcode.CALL) {
+                int target = instruction.getImmediate() + memoryBase;
+                relocated[i] = TAssembler.encode(opcode, instruction.getDst(), instruction.getSrc1(), instruction.getSrc2(), target);
+            } else {
+                relocated[i] = binary[i].copy();
+            }
+        }
+
+        return relocated;
+    }
+
+    public void execCurrentProcess(TWord[] binary) {
+        TPCB process = scheduler.getCurrentProcess();
+
+        if (process == null) {
+            throw new IllegalStateException("No hay proceso ejecutándose");
+        }
+
+        if (binary == null || binary.length == 0) {
+            throw new IllegalArgumentException("El programa está vacío");
+        }
+
+        TMemoryManager.MemoryBlock newBlock = memoryManager.allocate(binary.length);
+
+        try {
+            TWord[] relocated = relocateProgram(binary, newBlock.getBase());
+            cpu.loadProgram(newBlock.getBase(), relocated);
+            int oldBase = process.getMemoryBase();
+
+            process.setMemoryBase(newBlock.getBase());
+            process.setMemoryLimit(newBlock.getLimit());
+            process.setPc(newBlock.getBase());
+
+            for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
+                process.setRegister(i, TWord.zero());
+            }
+
+            process.setRegister(0, TWord.zero());
+            process.setUserSP(process.getStackLimit());
+            process.setCompare(0);
+
+            cpu.restoreProcessContext(newBlock.getBase(), process.getRegisters(), process.getStackLimit(), 0, process.getStackBase(), process.getStackLimit());
+            cpu.setProcessMemoryRange(newBlock.getBase(), newBlock.getLimit());
+            memoryManager.free(oldBase);
+        } catch (RuntimeException e) {
+            memoryManager.free(newBlock.getBase());
+            throw e;
+        }
     }
 }
