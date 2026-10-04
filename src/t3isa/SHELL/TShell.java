@@ -159,6 +159,10 @@ public final class TShell {
                 run(parts);
                 return true;
 
+            case "ifconfig":
+                ifconfig();
+                return true;
+
             case "exit":
                 console.writeLine("shutdown");
                 cpu.halt();
@@ -192,6 +196,7 @@ public final class TShell {
         console.writeLine("  rm <file>");
         console.writeLine("  fs");
         console.writeLine("  clear");
+        console.writeLine("  ifconfig");
         console.writeLine("  exit");
         console.writeLine("");
     }
@@ -540,4 +545,30 @@ public final class TShell {
         return path.substring(0, index);
     }
 
+    private void ifconfig() {
+        TNetworkDevice device = kernel.getNetworkDevice();
+        byte[] mac = device.getMAC();
+
+        console.writeLine("");
+        console.writeLine("NETWORK INTERFACE");
+        console.writeLine("  MAC      = " + formatMAC(mac));
+        console.writeLine("  STATUS   = " + (device.hasPacket() ? "RX" : "UP"));
+        console.writeLine("");
+    }
+
+    private String formatMAC(byte[] mac) {
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < mac.length; i++) {
+            if (i > 0) {
+                result.append(':');
+            }
+
+            int value = mac[i] & 0xFF;
+            if (value < 16) {
+                result.append('0');
+            }
+            result.append(Integer.toHexString(value));
+        }
+        return result.toString();
+    }
 }
