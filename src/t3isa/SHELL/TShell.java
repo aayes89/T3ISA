@@ -23,16 +23,18 @@
  */
 package t3isa.SHELL;
 
+import java.util.Map;
 import t3isa.DEVICE.TConsoleDevice;
 import t3isa.KERNEL.TPCB;
 import t3isa.KERNEL.TKernel;
 import t3isa.Core.TCPU;
 import t3isa.Core.TWord;
 import t3isa.DEVICE.TNetworkDevice;
-import t3isa.DEVICE.TNetworkLinkBackend;
 import t3isa.Exceptions.TMemoryException;
 import t3isa.FS.TFileSystem;
 import t3isa.FS.TVFS;
+import t3isa.NETWORKING.TARP;
+import t3isa.NETWORKING.TIPv4;
 
 /**
  *
@@ -163,6 +165,10 @@ public final class TShell {
                 ifconfig();
                 return true;
 
+            case "arp":
+                arp(parts);
+                return true;
+
             case "exit":
                 console.writeLine("shutdown");
                 cpu.halt();
@@ -197,6 +203,8 @@ public final class TShell {
         console.writeLine("  fs");
         console.writeLine("  clear");
         console.writeLine("  ifconfig");
+        console.writeLine("  arp");
+        console.writeLine("  arp <ip>");
         console.writeLine("  exit");
         console.writeLine("");
     }
@@ -570,5 +578,62 @@ public final class TShell {
             result.append(Integer.toHexString(value));
         }
         return result.toString();
+    }
+
+    private void arp(String[] args) {
+        TARP arp = kernel.getARP();
+        if (args.length == 1) {
+            Map<Integer, byte[]> cache = arp.getCache();
+
+            console.writeLine("");
+            console.writeLine("ARP TABLE");
+
+            if (cache.isEmpty()) {
+                console.writeLine("  <empty>");
+            } else {
+                for (Map.Entry<Integer, byte[]> entry : cache.entrySet()) {
+                    console.writeLine("  " + TARP.intToIP(entry.getKey()) + " -> " + formatMAC(entry.getValue()));
+                }
+            }
+
+            console.writeLine("");
+            return;
+        }
+
+        if (args.length == 2) {
+            byte[] ip = parseIP(args[1]);
+            arp.request(ip);
+            console.writeLine("ARP request enviado para " + TIPv4.ipToString(ip));
+
+            return;
+        }
+
+        console.writeLine("Uso: arp");
+        console.writeLine("     arp <ip>");
+    }
+
+    private byte[] parseIP(String value) {
+        String[] parts = value.split("\\.");
+        if (parts.length != 4) {
+            throw new IllegalArgumentException("IPv4 inválida: " + value);
+        }
+
+        byte[] ip = new byte[4];
+        for (int i = 0; i < 4; i++) {
+            int n;
+
+            try {
+                n = Integer.parseInt(parts[i]);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("IPv4 inválida: " + value);
+            }
+
+            if (n < 0 || n > 255) {
+                throw new IllegalArgumentException("IPv4 inválida: " + value);
+            }
+
+            ip[i] = (byte) n;
+        }
+        return ip;
     }
 }

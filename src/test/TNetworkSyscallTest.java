@@ -50,8 +50,12 @@ public final class TNetworkSyscallTest {
         TCPU cpuA = new TCPU();
         TCPU cpuB = new TCPU();
 
-        TKernel kernelA = new TKernel(cpuA, 10, backendA);
-        TKernel kernelB = new TKernel(cpuB, 10, backendB);
+        TKernel kernelA = new TKernel(cpuA, 10, backendA, new byte[]{
+            (byte) 192, (byte) 168, 1, 100
+        });
+        TKernel kernelB = new TKernel(cpuB, 10, backendB, new byte[]{
+            (byte) 192, (byte) 168, 1, 101
+        });
 
         cpuA.setKernel(kernelA);
         cpuB.setKernel(kernelB);
@@ -109,7 +113,11 @@ public final class TNetworkSyscallTest {
         * PROCESAR RX DEL KERNEL
         * -------------------------------------------------
          */
+        System.out.println("backendB hasFrame = " + backendB.hasFrame());
+
         kernelB.step();
+
+        System.out.println("NET RX disponible = " + kernelB.hasNetworkFrame());
 
         /*
         * -------------------------------------------------

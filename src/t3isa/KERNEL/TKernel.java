@@ -67,10 +67,12 @@ public class TKernel {
     private final int quantumTicks; // Cuántos pasos de CPU equivalen a 1 quántum/tic de temporizador
 
     public TKernel(TCPU cpu, int quantumTicks) {
-        this(cpu, quantumTicks, new TNetworkLinkBackend());
+        TNetworkLinkBackend tnlb = new TNetworkLinkBackend();
+        tnlb.open();
+        this(cpu, quantumTicks, tnlb, new byte[]{(byte) 192, (byte) 168, 1, 100});
     }
 
-    public TKernel(TCPU cpu, int quantumTicks, TNetworkLinkBackend networkBackend) {
+    public TKernel(TCPU cpu, int quantumTicks, TNetworkLinkBackend networkBackend, byte[] localIP) {
         this.cpu = cpu;
         this.scheduler = new TScheduler();
         this.quantumTicks = quantumTicks;
@@ -82,12 +84,9 @@ public class TKernel {
         vfs = new TVFS(fileSystem);
 
         this.networkDevice = new TNetworkDevice(networkBackend);
-        // Inicializar dispositivo de red
         this.networkDevice.open();
 
-        // Inicializar por defecto el dispositivo de red
         byte[] localMAC = networkDevice.getMAC();
-        byte[] localIP = {(byte) 192, (byte) 168, 1, 100};
         byte[] netmask = {(byte) 255, (byte) 255, (byte) 255, 0};
         byte[] gateway = {(byte) 192, (byte) 168, 1, 1};
 
@@ -199,7 +198,8 @@ public class TKernel {
         }
 
         byte[] frame = networkDevice.receiveFrame();
-        if (frame == null || frame.length < TEthernet.MIN_FRAME_SIZE) {
+
+        if (frame == null || frame.length == 0){ //< TEthernet.MIN_FRAME_SIZE) {
             return;
         }
 
@@ -211,20 +211,21 @@ public class TKernel {
 
         networkRxQueue.add(frame);
 
-        int etherType = ((frame[12] & 0xFF) << 8) | (frame[13] & 0xFF);
+        int etherType = etframe.getEtherType();
+
         if (T3ISA.isDEBUG) {
             System.out.println("NETWORK SERVICE: frame=" + frame.length + " etherType=0x" + Integer.toHexString(etherType));
         }
 
         switch (etherType) {
-            case 0x0806: // ARP
+            case TEthernet.TYPE_ARP:
                 System.out.println("NETWORK SERVICE: ARP frame");
-                arp.receive();
+                arp.receive(etframe);
                 break;
 
-            case 0x0800: // IPv4
+            case TEthernet.TYPE_IPV4:
                 System.out.println("NETWORK SERVICE: IPv4 frame");
-                ipv4.receive();
+                ipv4.receive(etframe);
                 break;
 
             default:

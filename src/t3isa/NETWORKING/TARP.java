@@ -111,6 +111,13 @@ public final class TARP {
         return resolve(ip) != null;
     }
 
+    public static String intToIP(int value) {
+        return ((value >>> 24) & 0xFF) + "."
+                + ((value >>> 16) & 0xFF) + "."
+                + ((value >>> 8) & 0xFF) + "."
+                + (value & 0xFF);
+    }
+
     private void parsePacket(byte[] ethernetSource, byte[] packet) {
         int hardwareType = read16(packet, 0);
         int protocolType = read16(packet, 2);

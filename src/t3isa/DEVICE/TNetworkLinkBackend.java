@@ -66,7 +66,8 @@ public final class TNetworkLinkBackend implements TNetworkBackend {
         }
 
         if (peer == null) {
-            throw new IllegalStateException("El backend no está conectado");
+            return;
+            //throw new IllegalStateException("El backend no está conectado");
         }
 
         if (frame == null || frame.length == 0) {
