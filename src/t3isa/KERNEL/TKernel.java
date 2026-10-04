@@ -23,6 +23,8 @@
  */
 package t3isa.KERNEL;
 
+import java.util.ArrayDeque;
+import java.util.Queue;
 import t3isa.MEMORY.TMemoryManager;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TTrap;
@@ -51,7 +53,9 @@ public class TKernel {
     private final TFileSystem fileSystem;
     private final TVFS vfs;
     private final TNetworkDevice networkDevice;
+    private final Queue<byte[]> networkRxQueue = new ArrayDeque<>();
     private int timerTicks;
+    private int networkTicks;
     private final int quantumTicks; // Cuántos pasos de CPU equivalen a 1 quántum/tic de temporizador
 
     public TKernel(TCPU cpu, int quantumTicks) {
@@ -64,6 +68,7 @@ public class TKernel {
         this.quantumTicks = quantumTicks;
         this.memoryManager = new TMemoryManager();
         this.timerTicks = 0;
+        this.networkTicks = 0;
 
         fileSystem = new TFileSystem();
         vfs = new TVFS(fileSystem);
@@ -110,6 +115,7 @@ public class TKernel {
         return createProcess(binary);
     }
 
+    // Crear procesos
     public TPCB createProcess(String source) {
         if (source == null || source.trim().isEmpty()) {
             throw new IllegalArgumentException("El programa está vacío");
@@ -167,10 +173,50 @@ public class TKernel {
         }
     }
 
+    // Servicio de redes
+    private void networkService() {
+        if (!networkDevice.hasPacket()) {
+            return;
+        }
+
+        byte[] frame = networkDevice.receiveFrame();
+        if (frame == null || frame.length < 14) {
+            return;
+        }
+
+        networkRxQueue.add(frame);
+
+        int etherType = ((frame[12] & 0xFF) << 8) | (frame[13] & 0xFF);
+        if (T3ISA.isDEBUG) {
+            System.out.println("NETWORK SERVICE: frame=" + frame.length + " etherType=0x" + Integer.toHexString(etherType));
+        }
+
+        switch (etherType) {
+            case 0x0806: // ARP
+                System.out.println("NETWORK SERVICE: ARP frame");
+                break;
+
+            case 0x0800: // IPv4
+                System.out.println("NETWORK SERVICE: IPv4 frame");
+                break;
+
+            default:
+                System.out.println("NETWORK SERVICE: EtherType desconocido 0x" + Integer.toHexString(etherType));
+                break;
+        }
+    }
+
     // Avanza la CPU un ciclo de instrucción y simula el temporizador.
     public void step() {
         if (cpu.isHalted()) {
             return;
+        }
+
+        networkTicks++;
+
+        if (networkTicks >= 1) {
+            networkTicks = 0;
+            networkService();
         }
 
         boolean deviceInterrupt = checkDeviceInterrupts();
@@ -524,5 +570,13 @@ public class TKernel {
 
     public TNetworkDevice getNetworkDevice() {
         return networkDevice;
+    }
+
+    public boolean hasNetworkFrame() {
+        return !networkRxQueue.isEmpty();
+    }
+
+    public byte[] receiveNetworkFrame() {
+        return networkRxQueue.poll();
     }
 }

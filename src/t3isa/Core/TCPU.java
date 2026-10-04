@@ -872,7 +872,7 @@ public final class TCPU {
                 break;
 
             case TSyscall.NET_STATUS:
-                setRegister(7, TWord.fromLong(kernel.getNetworkDevice().hasPacket() ? 1 : 0));
+                registers[7] = TWord.fromLong(kernel.hasNetworkFrame() ? 1 : 0);
                 incrementPC();
                 break;
 
@@ -918,14 +918,14 @@ public final class TCPU {
                     return;
                 }
 
-                if (!kernel.getNetworkDevice().hasPacket()) {
+                if (!kernel.hasNetworkFrame()) {
                     setRegister(7, TWord.fromLong(-1));
                     incrementPC();
                     break;
                 }
 
                 try {
-                    byte[] recvFrame = kernel.getNetworkDevice().receiveFrame();
+                    byte[] recvFrame = kernel.receiveNetworkFrame();
 
                     if (recvFrame == null) {
                         setRegister(7, TWord.fromLong(-1));

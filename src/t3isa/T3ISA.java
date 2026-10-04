@@ -64,9 +64,9 @@ public class T3ISA {
         */
         
         // Prueba de redes
-        //TNetworkSyscallTest.run();
+        TNetworkSyscallTest.run();
         
         // Lanzando shell 
-        //os.shell();
+        os.shell();
     }
 }

@@ -103,6 +103,19 @@ public final class TNetworkSyscallTest {
          * -------------------------------------------------
          */
         cpuB.loadProgram(programAddress, TAssemblerText.assemble("SYS\n"));
+
+        /*
+        * -------------------------------------------------
+        * PROCESAR RX DEL KERNEL
+        * -------------------------------------------------
+         */
+        kernelB.step();
+
+        /*
+        * -------------------------------------------------
+        * NET_STATUS
+        * -------------------------------------------------
+         */
         cpuB.setRegister(1, TWord.fromLong(TSyscall.NET_STATUS));
         cpuB.setPC(programAddress);
         cpuB.step();
