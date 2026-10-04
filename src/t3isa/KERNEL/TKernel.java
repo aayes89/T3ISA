@@ -35,7 +35,9 @@ import t3isa.ISA.TInstruction;
 import t3isa.ISA.TAssemblerText;
 import t3isa.Core.TCPU;
 import t3isa.Core.TWord;
+import t3isa.DEVICE.TNetworkBackend;
 import t3isa.DEVICE.TNetworkDevice;
+import t3isa.DEVICE.TNetworkHostBackend;
 import t3isa.DEVICE.TNetworkLinkBackend;
 import t3isa.FS.TFileSystem;
 import t3isa.FS.TVFS;
@@ -67,12 +69,10 @@ public class TKernel {
     private final int quantumTicks; // Cuántos pasos de CPU equivalen a 1 quántum/tic de temporizador
 
     public TKernel(TCPU cpu, int quantumTicks) {
-        TNetworkLinkBackend tnlb = new TNetworkLinkBackend();
-        tnlb.open();
-        this(cpu, quantumTicks, tnlb, new byte[]{(byte) 192, (byte) 168, 1, 100});
+        this(cpu, quantumTicks, new TNetworkHostBackend("./t3bpf", "en0"), new byte[]{(byte) 10, (byte) 10, (byte) 10, (byte) 100});
     }
 
-    public TKernel(TCPU cpu, int quantumTicks, TNetworkLinkBackend networkBackend, byte[] localIP) {
+    public TKernel(TCPU cpu, int quantumTicks, TNetworkBackend networkBackend, byte[] localIP) {
         this.cpu = cpu;
         this.scheduler = new TScheduler();
         this.quantumTicks = quantumTicks;
@@ -88,7 +88,7 @@ public class TKernel {
 
         byte[] localMAC = networkDevice.getMAC();
         byte[] netmask = {(byte) 255, (byte) 255, (byte) 255, 0};
-        byte[] gateway = {(byte) 192, (byte) 168, 1, 1};
+        byte[] gateway = {(byte) 10, (byte) 10, (byte) 10, (byte) 254};
 
         this.ethernet = new TEthernet(networkDevice);
         this.arp = new TARP(ethernet, localMAC, localIP);
@@ -198,40 +198,71 @@ public class TKernel {
         }
 
         byte[] frame = networkDevice.receiveFrame();
-
-        if (frame == null || frame.length == 0){ //< TEthernet.MIN_FRAME_SIZE) {
+        if (frame == null || frame.length < 14) {
             return;
         }
 
-        TEthernet.Frame etframe = ethernet.receive(frame);
-
-        if (etframe == null) {
-            return;
-        }
-
-        networkRxQueue.add(frame);
-
-        int etherType = etframe.getEtherType();
-
+        int etherType = ((frame[12] & 0xFF) << 8) | (frame[13] & 0xFF);
         if (T3ISA.isDEBUG) {
             System.out.println("NETWORK SERVICE: frame=" + frame.length + " etherType=0x" + Integer.toHexString(etherType));
         }
 
         switch (etherType) {
             case TEthernet.TYPE_ARP:
-                System.out.println("NETWORK SERVICE: ARP frame");
-                arp.receive(etframe);
+                if (T3ISA.isDEBUG) {
+                    System.out.println("NETWORK SERVICE: ARP frame");
+                }
+
+                // ARP no requiere el mínimo Ethernet de 60 bytes
+                if (frame.length < 42) {
+                    if (T3ISA.isDEBUG) {
+                        System.out.println("NETWORK SERVICE: ARP frame inválido: " + frame.length);
+                    }
+                    return;
+                }
+
+                byte[] arpFrame = frame;
+                TEthernet.Frame arpEthernet = ethernet.receive(padEthernetFrame(arpFrame));
+                arp.receive(arpEthernet);
                 break;
 
             case TEthernet.TYPE_IPV4:
-                System.out.println("NETWORK SERVICE: IPv4 frame");
-                ipv4.receive(etframe);
+                if (T3ISA.isDEBUG) {
+                    System.out.println("NETWORK SERVICE: IPv4 frame");
+                }
+                if (frame.length < TEthernet.MIN_FRAME_SIZE) {
+                    if (T3ISA.isDEBUG) {
+                        System.out.println("NETWORK SERVICE: IPv4 frame inválido: " + frame.length);
+                    }
+                    return;
+                }
+
+                TEthernet.Frame ipv4Frame = ethernet.receive(frame);
+                ipv4.receive(ipv4Frame);
+                break;
+            case TEthernet.TYPE_IPV6:
+                // Ignorar paquetes IPv6
                 break;
 
             default:
-                System.out.println("NETWORK SERVICE: EtherType desconocido 0x" + Integer.toHexString(etherType));
+                if (T3ISA.isDEBUG) {
+                    System.out.println("NETWORK SERVICE: EtherType desconocido 0x" + Integer.toHexString(etherType));
+                }
                 break;
         }
+
+        networkRxQueue.add(frame);
+    }
+
+    private static byte[] padEthernetFrame(byte[] frame) {
+        if (frame.length >= TEthernet.MIN_FRAME_SIZE) {
+            return frame;
+        }
+
+        byte[] padded = new byte[TEthernet.MIN_FRAME_SIZE];
+        System.arraycopy(frame, 0, padded, 0, frame.length);
+
+        return padded;
     }
 
     // Avanza la CPU un ciclo de instrucción y simula el temporizador.

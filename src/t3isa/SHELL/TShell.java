@@ -23,6 +23,10 @@
  */
 package t3isa.SHELL;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.List;
 import java.util.Map;
 import t3isa.DEVICE.TConsoleDevice;
 import t3isa.KERNEL.TPCB;
@@ -34,6 +38,8 @@ import t3isa.Exceptions.TMemoryException;
 import t3isa.FS.TFileSystem;
 import t3isa.FS.TVFS;
 import t3isa.NETWORKING.TARP;
+import t3isa.NETWORKING.THostNetwork;
+import t3isa.NETWORKING.TICMP;
 import t3isa.NETWORKING.TIPv4;
 
 /**
@@ -165,6 +171,22 @@ public final class TShell {
                 ifconfig();
                 return true;
 
+            case "ping":
+                ping(parts);
+                return true;
+
+            case "nslookup":
+                nslookup(parts);
+                return true;
+
+            case "whois":
+                whois(parts);
+                return true;
+
+            case "wget":
+                wget(parts);
+                return true;
+
             case "arp":
                 arp(parts);
                 return true;
@@ -205,6 +227,10 @@ public final class TShell {
         console.writeLine("  ifconfig");
         console.writeLine("  arp");
         console.writeLine("  arp <ip>");
+        console.writeLine("  ping <host>");
+        console.writeLine("  nslookup <host>");
+        console.writeLine("  whois <domain>");
+        console.writeLine("  wget <url>");
         console.writeLine("  exit");
         console.writeLine("");
     }
@@ -553,7 +579,8 @@ public final class TShell {
         return path.substring(0, index);
     }
 
-    private void ifconfig() {
+    private void ifconfig_old() {
+        // Para la abstracción de red cuando esté en modo ASM
         TNetworkDevice device = kernel.getNetworkDevice();
         byte[] mac = device.getMAC();
 
@@ -562,6 +589,163 @@ public final class TShell {
         console.writeLine("  MAC      = " + formatMAC(mac));
         console.writeLine("  STATUS   = " + (device.hasPacket() ? "RX" : "UP"));
         console.writeLine("");
+    }
+
+    private void ifconfig() {
+        try {
+            List<NetworkInterface> interfaces = THostNetwork.getInterfaces();
+
+            console.writeLine("");
+            console.writeLine("HOST NETWORK INTERFACES");
+
+            for (NetworkInterface ni : interfaces) {
+                console.writeLine("");
+                console.writeLine(ni.getName() + "  " + ni.getDisplayName());
+                String mac = THostNetwork.getMAC(ni);
+
+                console.writeLine("  MAC      = " + (mac != null ? mac : "N/A"));
+
+                for (String address : THostNetwork.getAddresses(ni)) {
+                    console.writeLine("  ADDRESS  = " + address);
+                }
+            }
+
+            console.writeLine("");
+
+        } catch (IOException e) {
+            console.writeLine("ifconfig: " + e.getMessage());
+        }
+    }
+
+    private void ping(String[] args) {
+        if (args.length < 2) {
+            console.writeLine("usage: ping <host>");
+            return;
+        }
+
+        String host = args[1];
+
+        try {
+            InetAddress address = InetAddress.getByName(host);
+            byte[] destinationIP = address.getAddress();
+
+            if (destinationIP.length != 4) {
+                console.writeLine("ping: IPv4 requerida");
+                return;
+            }
+
+            console.writeLine("");
+            console.writeLine("PING " + host + " (" + TIPv4.ipToString(destinationIP) + ")");
+
+            TICMP icmp = kernel.getICMP();
+            for (int i = 0; i < 4; i++) {
+                long start = System.nanoTime();
+
+                try {
+                    TARP arp = kernel.getARP();
+                    byte[] mac = arp.resolve(destinationIP);
+
+                    if (mac == null) {
+                        arp.request(destinationIP);
+                        long arpDeadline = System.currentTimeMillis() + 3000;
+
+                        while (System.currentTimeMillis() < arpDeadline) {
+                            kernel.step();
+
+                            mac = arp.resolve(destinationIP);
+                            if (mac != null) {
+                                break;
+                            }
+                            Thread.yield();
+                        }
+                    }
+
+                    if (mac == null) {
+                        console.writeLine("Request timeout.");
+                        continue;
+                    }
+
+                    icmp.ping(destinationIP);
+                    long deadline = System.currentTimeMillis() + 3000;
+
+                    TICMP.Echo reply = null;
+
+                    while (System.currentTimeMillis() < deadline) {
+                        kernel.step();
+                        reply = icmp.receive();
+
+                        if (reply != null) {
+                            break;
+                        }
+
+                        Thread.yield();
+                    }
+                    long elapsed = (System.nanoTime() - start) / 1_000_000;
+
+                    if (reply != null) {
+                        console.writeLine("Reply from " + TIPv4.ipToString(reply.getSourceIP()) + ": time=" + elapsed + " ms");
+                    } else {
+                        console.writeLine("Request timeout.");
+                    }
+                } catch (Exception e) {
+                    console.writeLine("ping: " + e.getMessage());
+                }
+            }
+            console.writeLine("");
+        } catch (IOException e) {
+            console.writeLine("ping: " + e.getMessage());
+        }
+    }
+
+    private void nslookup(String[] args) {
+
+        if (args.length < 1) {
+            console.writeLine("usage: nslookup <host>");
+            return;
+        }
+
+        try {
+            InetAddress[] addresses = THostNetwork.resolveAll(args[1]);
+
+            console.writeLine("");
+            console.writeLine("NSLOOKUP " + args[1]);
+
+            for (InetAddress address : addresses) {
+                console.writeLine("  " + address.getHostAddress());
+            }
+
+            console.writeLine("");
+        } catch (Exception e) {
+            console.writeLine("nslookup: " + e.getMessage());
+        }
+    }
+
+    private void whois(String[] args) {
+        if (args.length < 1) {
+            console.writeLine("usage: whois <domain>");
+            return;
+        }
+
+        try {
+            String result = THostNetwork.whois(args[1], "whois.iana.org", 43);
+            console.writeLine(result);
+        } catch (IOException e) {
+            console.writeLine("whois: " + e.getMessage());
+        }
+    }
+
+    private void wget(String[] args) {
+        if (args.length < 1) {
+            console.writeLine("usage: wget <url>");
+            return;
+        }
+
+        try {
+            String result = THostNetwork.wget(args[1]);
+            console.writeLine(result);
+        } catch (Exception e) {
+            console.writeLine("wget: " + e.getMessage());
+        }
     }
 
     private String formatMAC(byte[] mac) {

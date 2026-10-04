@@ -37,6 +37,7 @@ public final class TEthernet {
     public static final int MAX_FRAME_SIZE = 1518;
 
     public static final int TYPE_IPV4 = 0x0800;
+    public static final int TYPE_IPV6 = 0x86dd;
     public static final int TYPE_ARP = 0x0806;
 
     private static final byte[] BROADCAST_MAC = {

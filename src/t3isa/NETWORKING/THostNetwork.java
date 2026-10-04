@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 
+// Clase para funcionalidades de redes
 public final class THostNetwork {
 
     private THostNetwork() {
@@ -123,11 +124,6 @@ public final class THostNetwork {
 
     public static InetAddress[] resolveAll(String host) throws IOException {
         return InetAddress.getAllByName(host);
-    }
-
-    public static boolean ping(String host, int timeout) throws IOException {
-        InetAddress address = InetAddress.getByName(host);
-        return address.isReachable(timeout);
     }
 
     public static String whois(String host, String server, int port) throws IOException {
