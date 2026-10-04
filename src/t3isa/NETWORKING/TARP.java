@@ -27,9 +27,11 @@ package t3isa.NETWORKING;
  *
  * @author Slam
  */
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Queue;
 
 public final class TARP {
 
@@ -46,6 +48,7 @@ public final class TARP {
     private final byte[] localIP;
 
     private final Map<Integer, byte[]> cache;
+    private final Queue<TEthernet.Frame> rxQueue = new ArrayDeque<>();
 
     public TARP(TEthernet ethernet, byte[] localMAC, byte[] localIP) {
         if (ethernet == null) {
@@ -71,18 +74,27 @@ public final class TARP {
     public void receive() {
         while (ethernet.hasFrame()) {
             TEthernet.Frame frame = ethernet.receive();
-
-            if (frame == null || frame.getEtherType() != TEthernet.TYPE_ARP) {
-                continue;
+            if (frame != null) {
+                receive(frame);
             }
-
-            byte[] packet = frame.getPayload();
-            if (packet.length < PACKET_SIZE) {
-                continue;
-            }
-
-            parsePacket(frame.getSource(), packet);
         }
+    }
+
+    public void receive(TEthernet.Frame frame) {
+        if (frame == null || frame.getEtherType() != TEthernet.TYPE_ARP) {
+            return;
+        }
+
+        rxQueue.add(frame);
+        processFrame(frame);
+    }
+
+    private void processFrame(TEthernet.Frame frame) {
+        byte[] packet = frame.getPayload();
+        if (packet.length < PACKET_SIZE) {
+            return;
+        }
+        parsePacket(frame.getSource(), packet);
     }
 
     public byte[] resolve(byte[] ip) {
@@ -175,5 +187,15 @@ public final class TARP {
         if (ip == null || ip.length != 4) {
             throw new IllegalArgumentException("IPv4 inválida");
         }
+    }
+
+    public Map<Integer, byte[]> getCache() {
+        Map<Integer, byte[]> result = new HashMap<>();
+
+        for (Map.Entry<Integer, byte[]> entry : cache.entrySet()) {
+            result.put(entry.getKey(), Arrays.copyOf(entry.getValue(), 6));
+        }
+
+        return result;
     }
 }

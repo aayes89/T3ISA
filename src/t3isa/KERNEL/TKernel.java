@@ -39,6 +39,10 @@ import t3isa.DEVICE.TNetworkDevice;
 import t3isa.DEVICE.TNetworkLinkBackend;
 import t3isa.FS.TFileSystem;
 import t3isa.FS.TVFS;
+import t3isa.NETWORKING.TARP;
+import t3isa.NETWORKING.TEthernet;
+import t3isa.NETWORKING.TICMP;
+import t3isa.NETWORKING.TIPv4;
 import t3isa.T3ISA;
 
 /**
@@ -53,6 +57,10 @@ public class TKernel {
     private final TFileSystem fileSystem;
     private final TVFS vfs;
     private final TNetworkDevice networkDevice;
+    private final TEthernet ethernet;
+    private final TARP arp;
+    private final TIPv4 ipv4;
+    private final TICMP icmp;
     private final Queue<byte[]> networkRxQueue = new ArrayDeque<>();
     private int timerTicks;
     private int networkTicks;
@@ -74,8 +82,19 @@ public class TKernel {
         vfs = new TVFS(fileSystem);
 
         this.networkDevice = new TNetworkDevice(networkBackend);
-
+        // Inicializar dispositivo de red
         this.networkDevice.open();
+
+        // Inicializar por defecto el dispositivo de red
+        byte[] localMAC = networkDevice.getMAC();
+        byte[] localIP = {(byte) 192, (byte) 168, 1, 100};
+        byte[] netmask = {(byte) 255, (byte) 255, (byte) 255, 0};
+        byte[] gateway = {(byte) 192, (byte) 168, 1, 1};
+
+        this.ethernet = new TEthernet(networkDevice);
+        this.arp = new TARP(ethernet, localMAC, localIP);
+        this.ipv4 = new TIPv4(ethernet, arp, localIP, netmask, gateway);
+        this.icmp = new TICMP(ipv4);
     }
 
     // Configurar los vectores de interrupción/trap en TCPU
@@ -180,7 +199,13 @@ public class TKernel {
         }
 
         byte[] frame = networkDevice.receiveFrame();
-        if (frame == null || frame.length < 14) {
+        if (frame == null || frame.length < TEthernet.MIN_FRAME_SIZE) {
+            return;
+        }
+
+        TEthernet.Frame etframe = ethernet.receive(frame);
+
+        if (etframe == null) {
             return;
         }
 
@@ -194,10 +219,12 @@ public class TKernel {
         switch (etherType) {
             case 0x0806: // ARP
                 System.out.println("NETWORK SERVICE: ARP frame");
+                arp.receive();
                 break;
 
             case 0x0800: // IPv4
                 System.out.println("NETWORK SERVICE: IPv4 frame");
+                ipv4.receive();
                 break;
 
             default:
@@ -570,6 +597,18 @@ public class TKernel {
 
     public TNetworkDevice getNetworkDevice() {
         return networkDevice;
+    }
+
+    public TARP getARP() {
+        return arp;
+    }
+
+    public TIPv4 getIPv4() {
+        return ipv4;
+    }
+
+    public TICMP getICMP() {
+        return icmp;
     }
 
     public boolean hasNetworkFrame() {

@@ -27,7 +27,9 @@ package t3isa.NETWORKING;
  *
  * @author Slam
  */
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Queue;
 
 public final class TIPv4 {
 
@@ -43,6 +45,8 @@ public final class TIPv4 {
     private final byte[] localIP;
     private final byte[] netmask;
     private final byte[] gateway;
+
+    private Queue<Packet> rxQueue = new ArrayDeque<>();
 
     public TIPv4(TEthernet ethernet, TARP arp, byte[] localIP, byte[] netmask, byte[] gateway) {
 
@@ -64,6 +68,7 @@ public final class TIPv4 {
         this.localIP = Arrays.copyOf(localIP, 4);
         this.netmask = Arrays.copyOf(netmask, 4);
         this.gateway = Arrays.copyOf(gateway, 4);
+        this.rxQueue = new ArrayDeque<>();
     }
 
     public byte[] getLocalIP() {
@@ -150,59 +155,50 @@ public final class TIPv4 {
     }
 
     public Packet receive() {
-        while (ethernet.hasFrame()) {
-            TEthernet.Frame frame = ethernet.receive();
-            if (frame == null) {
-                continue;
-            }
+        return rxQueue.poll();
+    }
 
-            if (frame.getEtherType() != TEthernet.TYPE_IPV4) {
-                continue;
-            }
-
-            byte[] packet = frame.getPayload();
-            if (packet.length < HEADER_SIZE) {
-                continue;
-            }
-
-            int version = (packet[0] >>> 4) & 0x0F;
-            int ihl = packet[0] & 0x0F;
-
-            if (version != 4 || ihl < 5) {
-                continue;
-            }
-
-            int headerLength = ihl * 4;
-            if (packet.length < headerLength) {
-                continue;
-            }
-
-            int totalLength = read16(packet, 2);
-            if (totalLength < headerLength || totalLength > packet.length) {
-                continue;
-            }
-
-            // Verificar checksum del encabezado.
-            if (checksum(packet, 0, headerLength) != 0) {
-                continue;
-            }
-
-            byte[] sourceIP = Arrays.copyOfRange(packet, 12, 16);
-            byte[] destinationIP = Arrays.copyOfRange(packet, 16, 20);
-
-            // Solo aceptar paquetes destinados a nuestra dirección.
-            if (!Arrays.equals(destinationIP, localIP)) {
-                continue;
-            }
-
-            int protocol = packet[9] & 0xFF;
-            byte[] payload = Arrays.copyOfRange(packet, headerLength, totalLength);
-
-            return new Packet(sourceIP, destinationIP, protocol, payload
-            );
+    public void receive(TEthernet.Frame frame) {
+        if (frame == null || frame.getEtherType() != TEthernet.TYPE_IPV4) {
+            return;
         }
 
-        return null;
+        byte[] packet = frame.getPayload();
+        if (packet.length < HEADER_SIZE) {
+            return;
+        }
+
+        int version = (packet[0] >>> 4) & 0x0F;
+        int ihl = packet[0] & 0x0F;
+        if (version != 4 || ihl < 5) {
+            return;
+        }
+
+        int headerLength = ihl * 4;
+        if (packet.length < headerLength) {
+            return;
+        }
+
+        int totalLength = read16(packet, 2);
+        if (totalLength < headerLength || totalLength > packet.length) {
+            return;
+        }
+
+        if (checksum(packet, 0, headerLength) != 0) {
+            return;
+        }
+
+        byte[] sourceIP = Arrays.copyOfRange(packet, 12, 16);
+        byte[] destinationIP = Arrays.copyOfRange(packet, 16, 20);
+
+        if (!Arrays.equals(destinationIP, localIP)) {
+            return;
+        }
+
+        int protocol = packet[9] & 0xFF;
+
+        byte[] payload = Arrays.copyOfRange(packet, headerLength, totalLength);
+        rxQueue.add(new Packet(sourceIP, destinationIP, protocol, payload));
     }
 
     private boolean sameNetwork(byte[] a, byte[] b) {

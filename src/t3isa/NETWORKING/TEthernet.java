@@ -90,6 +90,24 @@ public final class TEthernet {
         device.sendFrame(frame);
     }
 
+    public Frame receive(byte[] frame) {
+        if (frame == null) {
+            return null;
+        }
+
+        if (frame.length < MIN_FRAME_SIZE || frame.length > MAX_FRAME_SIZE) {
+            throw new IllegalStateException("Frame Ethernet inválido: " + frame.length);
+        }
+
+        byte[] destination = Arrays.copyOfRange(frame, 0, 6);
+        byte[] source = Arrays.copyOfRange(frame, 6, 12);
+
+        int etherType = ((frame[12] & 0xFF) << 8) | (frame[13] & 0xFF);
+        byte[] payload = Arrays.copyOfRange(frame, HEADER_SIZE, frame.length);
+
+        return new Frame(destination, source, etherType, payload);
+    }
+
     public Frame receive() {
         byte[] frame = device.receiveFrame();
 
