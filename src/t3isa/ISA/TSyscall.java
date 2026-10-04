@@ -49,4 +49,7 @@ public final class TSyscall {
     public static final int FORK = 14;
     public static final int WAIT = 15;
     public static final int EXEC = 16;
+    public static final int NET_STATUS = 17;
+    public static final int NET_SEND = 18;
+    public static final int NET_RECV = 19;
 }

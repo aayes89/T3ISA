@@ -95,4 +95,12 @@ public final class TNetworkLinkBackend implements TNetworkBackend {
     public boolean hasFrame() {
         return !rxQueue.isEmpty();
     }
+
+    @Override
+    public byte[] getMAC() {
+        // Harcodeada por ahora, tocará obtenerla de adaptador físico
+        return new byte[]{
+            0x02, 0x54, 0x33, 0x00, 0x00, 0x01
+        };
+    }
 }

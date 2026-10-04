@@ -24,6 +24,7 @@
 package t3isa;
 
 import t3isa.Core.TCPU;
+import test.TNetworkSyscallTest;
 
 /**
  *
@@ -32,6 +33,7 @@ import t3isa.Core.TCPU;
  * T3ISA - Ternary 3-State Instruction Set Architecture
  */
 public class T3ISA {
+
     public static final boolean isDEBUG = false;
 
     public static void main(String[] args) {
@@ -42,30 +44,29 @@ public class T3ISA {
 
         T3OS os = new T3OS();
 
-        /*
-     * RESET -> BOOT -> KERNEL
-         */
+        // RESET -> BOOT -> KERNEL
         os.boot();
 
         TCPU cpu = os.getCPU();
 
-        System.out.println(
-                "Kernel entry: PC=" + cpu.getPC()
-        );
+        System.out.println("Kernel entry: PC=" + cpu.getPC());
 
         if (cpu.getPC() != TCPU.OS_START) {
-            throw new IllegalStateException(
-                    "T3OS no llegó al kernel"
-            );
+            throw new IllegalStateException("T3OS no llegó al kernel");
         }
 
         /*
-     * Entrar directamente al shell.
-     *
-     * NO ejecutar os.run() aquí:
-     * todavía no queremos que INIT termine
-     * y haga halt de la máquina.
-         */
-        os.shell();
+        * Entrar directamente al shell.
+        *
+        * NO ejecutar os.run() aquí:
+        * todavía no queremos que INIT termine
+        * y haga halt de la máquina.
+        */
+        
+        // Prueba de redes
+        //TNetworkSyscallTest.run();
+        
+        // Lanzando shell 
+        //os.shell();
     }
 }

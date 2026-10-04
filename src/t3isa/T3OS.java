@@ -51,6 +51,7 @@ public final class T3OS {
         cpu = new TCPU();
         boot = new TBoot(cpu);
         kernel = new TKernel(cpu, 10);
+        cpu.setKernel(kernel);
         console = new TConsoleDevice();
         graphics = new TGraphicsDevice();
         fileSystem = new TFileSystem();

@@ -30,8 +30,14 @@ package t3isa.DEVICE;
 public interface TNetworkBackend {
 
     void open();
+
     void close();
+
     void writeFrame(byte[] frame);
+
     byte[] readFrame();
+
     boolean hasFrame();
+
+    byte[] getMAC();
 }

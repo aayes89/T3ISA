@@ -28,35 +28,38 @@ package t3isa.DEVICE;
  * @author Slam
  */
 import t3isa.Core.TWord;
-import java.util.ArrayDeque;
 import java.util.Arrays;
-import java.util.Queue;
 
-/**
- *
- * @author Slam
- */
 public final class TNetworkDevice implements TDevice {
 
     private static final int MAC_LENGTH = 6;
-    private static final int MAX_FRAME_SIZE = 1518;
-
     private final byte[] macAddress;
-    private final Queue<byte[]> rxQueue;
+    private final TNetworkBackend backend;
 
-    private byte[] txFrame;
-
-    public TNetworkDevice(byte[] macAddress) {
-        if (macAddress == null || macAddress.length != MAC_LENGTH) {
-            throw new IllegalArgumentException("La dirección MAC debe tener 6 bytes");
+    public TNetworkDevice(TNetworkBackend backend) {
+        if (backend == null) {
+            throw new IllegalArgumentException("El backend no puede ser null");
         }
 
-        this.macAddress = Arrays.copyOf(macAddress, MAC_LENGTH);
-        this.rxQueue = new ArrayDeque<>();
+        macAddress = backend.getMAC();
+
+        if (macAddress == null || macAddress.length != MAC_LENGTH) {
+            throw new IllegalArgumentException("MAC inválida");
+        }
+        this.backend = backend;
+
     }
 
     public byte[] getMAC() {
         return Arrays.copyOf(macAddress, MAC_LENGTH);
+    }
+
+    public void open() {
+        backend.open();
+    }
+
+    public void close() {
+        backend.close();
     }
 
     public void sendFrame(byte[] frame) {
@@ -64,69 +67,33 @@ public final class TNetworkDevice implements TDevice {
             throw new IllegalArgumentException("El frame no puede ser null");
         }
 
-        if (frame.length == 0 || frame.length > MAX_FRAME_SIZE) {
+        if (frame.length == 0 || frame.length > 1518) {
             throw new IllegalArgumentException("Tamaño de frame inválido: " + frame.length);
         }
 
-        txFrame = Arrays.copyOf(frame, frame.length);
+        backend.writeFrame(frame);
     }
 
     public byte[] receiveFrame() {
-        byte[] frame = rxQueue.poll();
-
-        if (frame == null) {
-            return null;
-        }
-
-        return Arrays.copyOf(frame, frame.length);
+        return backend.readFrame();
     }
 
     public boolean hasPacket() {
-        return !rxQueue.isEmpty();
-    }
-
-    // Entrada de frames desde el medio de red.
-    public void injectFrame(byte[] frame) {
-        if (frame == null) {
-            throw new IllegalArgumentException("El frame no puede ser null");
-        }
-
-        if (frame.length == 0 || frame.length > MAX_FRAME_SIZE) {
-            throw new IllegalArgumentException("Tamaño de frame inválido: " + frame.length);
-        }
-
-        rxQueue.add(Arrays.copyOf(frame, frame.length));
-    }
-
-    // Obtiene el último frame transmitido.
-    public byte[] getTransmittedFrame() {
-        if (txFrame == null) {
-            return null;
-        }
-
-        return Arrays.copyOf(txFrame, txFrame.length);
+        return backend.hasFrame();
     }
 
     @Override
     public void write(TWord value) {
-        /*
-         * La interfaz TDevice trabaja con TWord.
-         *
-         * La interfaz Ethernet utilizará sendFrame()
-         * directamente para transmitir frames.
-         */
+        // Reservado para acceso por registros/I/O
     }
 
     @Override
     public TWord read() {
-        /*
-         * La interfaz de frames utiliza receiveFrame().
-         */
         return TWord.zero();
     }
 
     @Override
     public boolean hasInput() {
-        return hasPacket();
+        return backend.hasFrame();
     }
 }

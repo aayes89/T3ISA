@@ -28,6 +28,8 @@ import t3isa.KERNEL.TPCB;
 import t3isa.KERNEL.TKernel;
 import t3isa.Core.TCPU;
 import t3isa.Core.TWord;
+import t3isa.DEVICE.TNetworkDevice;
+import t3isa.DEVICE.TNetworkLinkBackend;
 import t3isa.Exceptions.TMemoryException;
 import t3isa.FS.TFileSystem;
 import t3isa.FS.TVFS;
@@ -239,12 +241,11 @@ public final class TShell {
         }
 
         String program = parts[1].toLowerCase();
-        String source;
+        String source = "";
 
         switch (program) {
             case "hello":
-                source
-                        = "MOVI R2, 0\n"
+                source = "MOVI R2, 0\n"
                         + "MOVI R3, 72\n"
                         + "MOVI R1, 6\n"
                         + "SYS\n"
@@ -267,7 +268,6 @@ public final class TShell {
                         + "SYS\n";
 
                 break;
-
             default:
                 console.writeLine("program not found: " + program);
                 return;

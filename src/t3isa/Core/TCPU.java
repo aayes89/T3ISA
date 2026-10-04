@@ -23,17 +23,17 @@
  */
 package t3isa.Core;
 
-import t3isa.Core.TALU;
-import t3isa.Core.TWord;
 import t3isa.Exceptions.TMemoryException;
 import t3isa.T3ISA;
 import t3isa.DEVICE.TDevice;
 import t3isa.DEVICE.TDeviceBus;
+import t3isa.DEVICE.TNetworkDevice;
 import t3isa.ISA.TInstruction;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TOpcode;
 import t3isa.ISA.TSyscall;
 import t3isa.ISA.TTrap;
+import t3isa.KERNEL.TKernel;
 
 /**
  *
@@ -47,7 +47,11 @@ import t3isa.ISA.TTrap;
     * 7..26  - Reserved
     * 27..   - T3OS / programs
     * 7..9   - interrupt vectors
-    * 10..26 - reservado
+    * 10..16 - reservados
+    * 17     - SYS_NET_STATUS
+    * 18     - SYS_NET_SEND
+    * 19     - SYS_NET_RECV
+    * 20..26 - reservados
     * 27...  - T3OS
     * 100    - DIVIDE_BY_ZERO
     * 110    - INVALID_MEMORY
@@ -126,6 +130,7 @@ public final class TCPU {
 
     //private TDevice device;   // Ya no es necesario
     private final TDeviceBus deviceBus;
+    private TKernel kernel;
 
     public TCPU() {
         registers = new TWord[REGISTER_COUNT];
@@ -866,6 +871,80 @@ public final class TCPU {
                 pendingProcessAction = TSyscall.EXEC;
                 break;
 
+            case TSyscall.NET_STATUS:
+                setRegister(7, TWord.fromLong(kernel.getNetworkDevice().hasPacket() ? 1 : 0));
+                incrementPC();
+                break;
+
+            case TSyscall.NET_SEND:
+                if (!kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
+                int sendAddress = checkedAddress(getRegister(2).toLong());
+                int sendLength = (int) getRegister(3).toLong();
+
+                if (sendLength < 0 || sendLength > 1518 || sendAddress > MEMORY_SIZE - sendLength) {
+                    raiseTrap(TTrap.INVALID_MEMORY);
+                    return;
+                }
+
+                byte[] sendFrame = new byte[sendLength];
+                for (int i = 0; i < sendLength; i++) {
+                    sendFrame[i] = (byte) memory[sendAddress + i].toLong();
+                }
+
+                try {
+                    kernel.getNetworkDevice().sendFrame(sendFrame);
+                    setRegister(7, TWord.fromLong(sendLength));
+                    incrementPC();
+                } catch (IllegalArgumentException | IllegalStateException e) {
+                    raiseTrap(TTrap.DEVICE_ERROR);
+                }
+                break;
+
+            case TSyscall.NET_RECV:
+
+                if (!kernelMode) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
+                int recvAddress = checkedAddress(getRegister(2).toLong());
+                int recvLength = (int) getRegister(3).toLong();
+                if (recvLength < 0 || recvLength > 1518 || recvAddress > MEMORY_SIZE - recvLength) {
+                    raiseTrap(TTrap.INVALID_MEMORY);
+                    return;
+                }
+
+                if (!kernel.getNetworkDevice().hasPacket()) {
+                    setRegister(7, TWord.fromLong(-1));
+                    incrementPC();
+                    break;
+                }
+
+                try {
+                    byte[] recvFrame = kernel.getNetworkDevice().receiveFrame();
+
+                    if (recvFrame == null) {
+                        setRegister(7, TWord.fromLong(-1));
+                        incrementPC();
+                        break;
+                    }
+
+                    int copyLength = Math.min(recvFrame.length, recvLength);
+                    for (int i = 0; i < copyLength; i++) {
+                        memory[recvAddress + i] = TWord.fromLong(recvFrame[i] & 0xFF);
+                    }
+
+                    setRegister(7, TWord.fromLong(copyLength));
+                    incrementPC();
+                } catch (IllegalArgumentException | IllegalStateException e) {
+                    raiseTrap(TTrap.DEVICE_ERROR);
+                }
+                break;
+
             default:
                 raiseTrap(TTrap.INVALID_SYSCALL);
                 break;
@@ -950,36 +1029,11 @@ public final class TCPU {
         pendingInterrupt = TInterrupt.DEVICE;
     }
 
-    private void switchToKernelStack() {
-        if (!kernelMode) {
-            userSP = sp;
-            kernelMode = true;
-            kernelSP = KERNEL_STACK_TOP;
-            sp = kernelSP;
-        }
-    }
-
-    private void switchToUserStack() {
-        kernelSP = sp;
-        sp = userSP;
-    }
-
-    private TWord pcWord() {
-        return TWord.fromLong(pc);
-    }
-
     private void incrementPC() {
         pc++;
         if (pc >= MEMORY_SIZE) {
             raiseTrap(TTrap.INVALID_MEMORY);
         }
-    }
-
-    private int getTrapVector(TTrap cause) {
-        if (cause == null) {
-            throw new IllegalArgumentException("Trap null");
-        }
-        return TRAP_VECTOR_BASE + cause.code;
     }
 
     private int checkedAddress(long address) {
@@ -1194,5 +1248,12 @@ public final class TCPU {
 
     public TDeviceBus getDeviceBus() {
         return deviceBus;
+    }
+
+    public void setKernel(TKernel kernel) {
+        if (kernel == null) {
+            throw new IllegalArgumentException("El kernel no puede ser null");
+        }
+        this.kernel = kernel;
     }
 }

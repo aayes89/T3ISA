@@ -33,6 +33,8 @@ import t3isa.ISA.TInstruction;
 import t3isa.ISA.TAssemblerText;
 import t3isa.Core.TCPU;
 import t3isa.Core.TWord;
+import t3isa.DEVICE.TNetworkDevice;
+import t3isa.DEVICE.TNetworkLinkBackend;
 import t3isa.FS.TFileSystem;
 import t3isa.FS.TVFS;
 import t3isa.T3ISA;
@@ -48,17 +50,27 @@ public class TKernel {
     private final TMemoryManager memoryManager;
     private final TFileSystem fileSystem;
     private final TVFS vfs;
+    private final TNetworkDevice networkDevice;
     private int timerTicks;
     private final int quantumTicks; // Cuántos pasos de CPU equivalen a 1 quántum/tic de temporizador
 
     public TKernel(TCPU cpu, int quantumTicks) {
+        this(cpu, quantumTicks, new TNetworkLinkBackend());
+    }
+
+    public TKernel(TCPU cpu, int quantumTicks, TNetworkLinkBackend networkBackend) {
         this.cpu = cpu;
         this.scheduler = new TScheduler();
         this.quantumTicks = quantumTicks;
         this.memoryManager = new TMemoryManager();
         this.timerTicks = 0;
+
         fileSystem = new TFileSystem();
         vfs = new TVFS(fileSystem);
+
+        this.networkDevice = new TNetworkDevice(networkBackend);
+
+        this.networkDevice.open();
     }
 
     // Configurar los vectores de interrupción/trap en TCPU
@@ -508,5 +520,9 @@ public class TKernel {
 
     public TVFS getVFS() {
         return vfs;
+    }
+
+    public TNetworkDevice getNetworkDevice() {
+        return networkDevice;
     }
 }
