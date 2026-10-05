@@ -58,7 +58,7 @@ public final class TGraphicsHostBackend {
         SwingUtilities.invokeLater(() -> {
 
             frame = new JFrame("T3ISA - Virtual Monitor");
-            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
             panel = new JPanel() {
 

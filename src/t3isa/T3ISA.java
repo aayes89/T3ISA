@@ -28,7 +28,7 @@ import t3isa.CORE.TCPU;
 import t3isa.DEVICE.TGraphicsDevice;
 import t3isa.HARDWARE.TMachine;
 import t3isa.HOST.TGraphicsHostBackend;
-import test.TNetworkSyscallTest;
+import test.TRenderizadorTexto;
 
 /**
  *
@@ -49,11 +49,8 @@ public class T3ISA {
         TCPU cpu = new TCPU();
         TGraphicsDevice graphicsDevice = cpu.getGraphicsDevice();
 
-        for (int y = 100; y < 300; y++) {
-            for (int x = 100; x < 400; x++) {
-                graphicsDevice.setPixel(x, y, 0xFFFFFF);
-            }
-        }
+        TRenderizadorTexto renderText = new TRenderizadorTexto();
+        renderText.renderizarTexto(graphicsDevice, "T3SO - A 3state computer\nMade by Slam 2026\n\nGithub: aayes89/t3isa", 10, 100, 2, 0x00FF0000, 0x000000);
 
         TGraphicsHostBackend graphics = new TGraphicsHostBackend(graphicsDevice);
 
