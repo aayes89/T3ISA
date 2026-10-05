@@ -33,14 +33,13 @@ import t3isa.ISA.TSyscall;
 import t3isa.ISA.TAssembler;
 import t3isa.ISA.TInstruction;
 import t3isa.ISA.TAssemblerText;
-import t3isa.Core.TCPU;
 import t3isa.Core.TWord;
 import t3isa.DEVICE.TNetworkBackend;
 import t3isa.DEVICE.TNetworkDevice;
 import t3isa.DEVICE.TNetworkHostBackend;
-import t3isa.DEVICE.TNetworkLinkBackend;
 import t3isa.FS.TFileSystem;
 import t3isa.FS.TVFS;
+import t3isa.HARDWARE.TMachine;
 import t3isa.NETWORKING.TARP;
 import t3isa.NETWORKING.TEthernet;
 import t3isa.NETWORKING.TICMP;
@@ -54,7 +53,7 @@ import t3isa.T3ISA;
  */
 public class TKernel {
 
-    private final TCPU cpu;
+    private final TMachine cpu;
     private final TScheduler scheduler;
     private final TMemoryManager memoryManager;
     private final TFileSystem fileSystem;
@@ -70,11 +69,11 @@ public class TKernel {
     private int networkTicks;
     private final int quantumTicks; // Cuántos pasos de CPU equivalen a 1 quántum/tic de temporizador
 
-    public TKernel(TCPU cpu, int quantumTicks) {
+    public TKernel(TMachine cpu, int quantumTicks) {
         this(cpu, quantumTicks, new TNetworkHostBackend("./t3bpf", "en0"), new byte[]{(byte) 10, (byte) 10, (byte) 10, (byte) 100});
     }
 
-    public TKernel(TCPU cpu, int quantumTicks, TNetworkBackend networkBackend, byte[] localIP) {
+    public TKernel(TMachine cpu, int quantumTicks, TNetworkBackend networkBackend, byte[] localIP) {
         this.cpu = cpu;
         this.scheduler = new TScheduler();
         this.quantumTicks = quantumTicks;
@@ -93,22 +92,14 @@ public class TKernel {
         byte[] gateway = {(byte) 10, (byte) 10, (byte) 10, (byte) 254};
 
         this.ethernet = new TEthernet(networkDevice);
-        System.out.println(
-                "TKernel localIP = "
-                + (localIP[0] & 0xFF) + "."
-                + (localIP[1] & 0xFF) + "."
-                + (localIP[2] & 0xFF) + "."
-                + (localIP[3] & 0xFF)
-        );
-
         this.arp = new TARP(ethernet, localMAC, localIP);
-        
+
         this.ipv4 = new TIPv4(ethernet, arp, localIP, netmask, gateway);
         this.icmp = new TICMP(ipv4);
         this.ttcp = new TTCP(ipv4);
     }
 
-    // Configurar los vectores de interrupción/trap en TCPU
+    // Configurar los vectores de interrupción/trap en TMachine
     public void initialize() {
         setupInterruptVectors();
         setupTrapHandlers();
@@ -116,23 +107,23 @@ public class TKernel {
     }
 
     private void setupInterruptVectors() {
-        cpu.loadInterruptVector(TInterrupt.TIMER, TCPU.INTERRUPT_HANDLER_TIMER);
-        cpu.loadInterruptVector(TInterrupt.DEVICE, TCPU.INTERRUPT_HANDLER_DEVICE);
+        cpu.loadInterruptVector(TInterrupt.TIMER, TMachine.INTERRUPT_HANDLER_TIMER);
+        cpu.loadInterruptVector(TInterrupt.DEVICE, TMachine.INTERRUPT_HANDLER_DEVICE);
 
-        cpu.loadTrapVector(TTrap.DIVIDE_BY_ZERO, TCPU.TRAP_HANDLER_DIV_ZERO);
-        cpu.loadTrapVector(TTrap.INVALID_MEMORY, TCPU.TRAP_HANDLER_MEMORY);
-        cpu.loadTrapVector(TTrap.INVALID_SYSCALL, TCPU.TRAP_HANDLER_SYSCALL);
-        cpu.loadTrapVector(TTrap.DEVICE_ERROR, TCPU.TRAP_HANDLER_DEVICE);
-        cpu.loadTrapVector(TTrap.INVALID_INSTRUCTION, TCPU.TRAP_HANDLER_INSTRUCTION);
-        cpu.loadTrapVector(TTrap.STACK_ERROR, TCPU.TRAP_HANDLER_STACK);
+        cpu.loadTrapVector(TTrap.DIVIDE_BY_ZERO, TMachine.TRAP_HANDLER_DIV_ZERO);
+        cpu.loadTrapVector(TTrap.INVALID_MEMORY, TMachine.TRAP_HANDLER_MEMORY);
+        cpu.loadTrapVector(TTrap.INVALID_SYSCALL, TMachine.TRAP_HANDLER_SYSCALL);
+        cpu.loadTrapVector(TTrap.DEVICE_ERROR, TMachine.TRAP_HANDLER_DEVICE);
+        cpu.loadTrapVector(TTrap.INVALID_INSTRUCTION, TMachine.TRAP_HANDLER_INSTRUCTION);
+        cpu.loadTrapVector(TTrap.STACK_ERROR, TMachine.TRAP_HANDLER_STACK);
     }
 
     private void setupInterruptHandlers() {
         TWord[] deviceHandler = TAssemblerText.assemble("IRET\n");
         TWord[] timerHandler = TAssemblerText.assemble("IRET\n");
 
-        cpu.loadProgram(TCPU.INTERRUPT_HANDLER_DEVICE, deviceHandler);
-        cpu.loadProgram(TCPU.INTERRUPT_HANDLER_TIMER, timerHandler);
+        cpu.loadProgram(TMachine.INTERRUPT_HANDLER_DEVICE, deviceHandler);
+        cpu.loadProgram(TMachine.INTERRUPT_HANDLER_TIMER, timerHandler);
     }
 
     /**
@@ -458,12 +449,12 @@ public class TKernel {
                 + "SYS\n"
         );
 
-        cpu.loadProgram(TCPU.TRAP_HANDLER_DIV_ZERO, fatalHandler);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_MEMORY, fatalHandler);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_INSTRUCTION, fatalHandler);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_SYSCALL, fatalHandler);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_DEVICE, fatalHandler);
-        cpu.loadProgram(TCPU.TRAP_HANDLER_STACK, fatalHandler);
+        cpu.loadProgram(TMachine.TRAP_HANDLER_DIV_ZERO, fatalHandler);
+        cpu.loadProgram(TMachine.TRAP_HANDLER_MEMORY, fatalHandler);
+        cpu.loadProgram(TMachine.TRAP_HANDLER_INSTRUCTION, fatalHandler);
+        cpu.loadProgram(TMachine.TRAP_HANDLER_SYSCALL, fatalHandler);
+        cpu.loadProgram(TMachine.TRAP_HANDLER_DEVICE, fatalHandler);
+        cpu.loadProgram(TMachine.TRAP_HANDLER_STACK, fatalHandler);
     }
 
     public TScheduler getScheduler() {
@@ -526,7 +517,7 @@ public class TKernel {
             child.setUserSP(childSP);
 
             // Copiar registros.
-            for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
+            for (int i = 0; i < TMachine.REGISTER_COUNT; i++) {
                 child.setRegister(i, cpu.getRegister(i));
             }
 
@@ -615,7 +606,7 @@ public class TKernel {
             process.setMemoryLimit(newBlock.getLimit());
             process.setPc(newBlock.getBase());
 
-            for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
+            for (int i = 0; i < TMachine.REGISTER_COUNT; i++) {
                 process.setRegister(i, TWord.zero());
             }
 

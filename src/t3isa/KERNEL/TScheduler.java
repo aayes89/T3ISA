@@ -23,7 +23,6 @@
  */
 package t3isa.KERNEL;
 
-import t3isa.Core.TCPU;
 import t3isa.Core.TWord;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -31,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Queue;
+import t3isa.HARDWARE.TMachine;
 
 /**
  *
@@ -70,7 +70,7 @@ public class TScheduler {
         return pcb;
     }
 
-    public TPCB createProcess(TWord[] binary, TCPU cpu) {
+    public TPCB createProcess(TWord[] binary, TMachine machine) {
         if (binary == null || binary.length == 0) {
             throw new IllegalArgumentException("El programa está vacío");
         }
@@ -81,13 +81,13 @@ public class TScheduler {
      * Realiza la conmutación de contexto (Context Switch) usando un algoritmo
      * Round-Robin.
      *
-     * @param cpu
+     * @param machine
      * @return
      */
-    public TPCB schedule(TCPU cpu) {
+    public TPCB schedule(TMachine machine) {
         // Respaldar el proceso que estaba corriendo
         if (currentProcess != null && currentProcess.getState() == TPCB.ProcessState.RUNNING) {
-            currentProcess.saveContext(cpu);
+            currentProcess.saveContext(machine);
             currentProcess.setState(TPCB.ProcessState.READY);
             readyQueue.add(currentProcess);
         }
@@ -97,8 +97,8 @@ public class TScheduler {
 
         if (currentProcess != null) {
             currentProcess.setState(TPCB.ProcessState.RUNNING);
-            cpu.setCurrentPid(currentProcess.getPid());
-            currentProcess.restoreContext(cpu);
+            machine.setCurrentPid(currentProcess.getPid());
+            currentProcess.restoreContext(machine);
         }
         return currentProcess;
     }
@@ -106,10 +106,10 @@ public class TScheduler {
     /**
      * Finaliza la ejecución del proceso actual y conmuta al siguiente.
      *
-     * @param cpu
+     * @param machine
      * @return
      */
-    public TPCB terminateCurrentProcess(TCPU cpu) {
+    public TPCB terminateCurrentProcess(TMachine machine) {
         TPCB terminated = currentProcess;
 
         if (terminated != null) {
@@ -126,40 +126,40 @@ public class TScheduler {
             }
         }
 
-        schedule(cpu);
+        schedule(machine);
         return terminated;
     }
 
     /**
      * Bloquea el proceso actual (por ejemplo, en espera de E/S).
      *
-     * @param cpu
+     * @param machine
      */
-    public void blockCurrentProcess(TCPU cpu) {
+    public void blockCurrentProcess(TMachine machine) {
         if (currentProcess != null) {
-            currentProcess.saveContext(cpu);
+            currentProcess.saveContext(machine);
             currentProcess.setState(TPCB.ProcessState.BLOCKED);
             currentProcess = null;
         }
 
-        schedule(cpu);
+        schedule(machine);
     }
 
     /**
      * Bloquea el proceso actual (por ejemplo, en espera de E/S).
      *
-     * @param cpu
+     * @param machine
      * @param devicePort
      */
-    public void blockCurrentProcess(TCPU cpu, int devicePort) {
+    public void blockCurrentProcess(TMachine machine, int devicePort) {
         if (currentProcess != null) {
-            currentProcess.saveContext(cpu);
+            currentProcess.saveContext(machine);
             currentProcess.setState(TPCB.ProcessState.BLOCKED);
 
             blockedByDevice.computeIfAbsent(devicePort, k -> new ArrayDeque<>()).add(currentProcess);
             currentProcess = null;
         }
-        schedule(cpu);
+        schedule(machine);
     }
 
     public void unblockDevice(int devicePort) {
@@ -196,7 +196,7 @@ public class TScheduler {
         }
     }
 
-    public TPCB scheduleAfterInterrupt(TCPU cpu) {
+    public TPCB scheduleAfterInterrupt(TMachine machine) {
         if (currentProcess != null && currentProcess.getState() == TPCB.ProcessState.RUNNING) {
             currentProcess.setState(TPCB.ProcessState.READY);
             readyQueue.add(currentProcess);
@@ -206,8 +206,8 @@ public class TScheduler {
 
         if (currentProcess != null) {
             currentProcess.setState(TPCB.ProcessState.RUNNING);
-            cpu.setCurrentPid(currentProcess.getPid());
-            currentProcess.restoreContext(cpu);
+            machine.setCurrentPid(currentProcess.getPid());
+            currentProcess.restoreContext(machine);
         }
 
         return currentProcess;

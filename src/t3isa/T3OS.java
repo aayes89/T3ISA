@@ -29,8 +29,8 @@ import t3isa.DEVICE.TConsoleDevice;
 import t3isa.KERNEL.TPCB;
 import t3isa.KERNEL.TKernel;
 import t3isa.BOOT.TBoot;
-import t3isa.Core.TCPU;
 import t3isa.FS.TFileSystem;
+import t3isa.HARDWARE.TMachine;
 
 /**
  *
@@ -40,23 +40,27 @@ import t3isa.FS.TFileSystem;
  */
 public final class T3OS {
 
-    private final TCPU cpu;
+    private final TMachine machine;
     private final TKernel kernel;
     private final TBoot boot;
     private final TConsoleDevice console;
     private final TGraphicsDevice graphics;
     private final TFileSystem fileSystem;
 
-    public T3OS() {
-        cpu = new TCPU();
-        boot = new TBoot(cpu);
-        kernel = new TKernel(cpu, 10);
-        cpu.setKernel(kernel);
+    public T3OS(TMachine machine) {
+        if (machine == null) {
+            throw new IllegalArgumentException("Machine no puede ser null");
+        }
+
+        this.machine = machine;
+        boot = new TBoot(machine);
+        kernel = new TKernel(machine, 10);
+        machine.setKernel(kernel);
         console = new TConsoleDevice();
         graphics = new TGraphicsDevice();
         fileSystem = new TFileSystem();
-        cpu.getDeviceBus().attach(0, console);
-        cpu.getDeviceBus().attach(1, graphics);
+        machine.getDeviceBus().attach(0, console);
+        machine.getDeviceBus().attach(1, graphics);
     }
 
     public void boot() {
@@ -66,28 +70,28 @@ public final class T3OS {
         // Después instalar el contenido del boot.
         boot.install();
 
-        // Configurar los vectores de interrupción/trap en TCPU
+        // Configurar los vectores de interrupción/trap en TMachine
         kernel.initialize();
 
         // El hardware arranca desde el reset vector.
         boot.resetVector();
-        System.out.println("T3OS BOOT PC=" + cpu.getPC());
+        System.out.println("T3OS BOOT PC=" + machine.getPC());
 
         // Ejecutar BOOT.
-        cpu.step();
-        System.out.println("T3OS KERNEL ENTRY PC=" + cpu.getPC());
+        machine.step();
+        System.out.println("T3OS KERNEL ENTRY PC=" + machine.getPC());
 
-        if (cpu.getPC() != TCPU.OS_START) {
+        if (machine.getPC() != TMachine.OS_START) {
             throw new IllegalStateException("BOOT no transfirió control a T3OS");
         }
     }
 
     public TPCB startInit(String source) {
-        if (cpu.getPC() != TCPU.OS_START) {
+        if (machine.getPC() != TMachine.OS_START) {
             throw new IllegalStateException("T3OS todavía no está en OS_START");
         }
 
-        if (!cpu.isKernelMode()) {
+        if (!machine.isKernelMode()) {
             throw new IllegalStateException("INIT debe crearse desde kernel mode");
         }
 
@@ -95,7 +99,7 @@ public final class T3OS {
         TPCB init = kernel.createProcess(source);
 
         // El scheduler selecciona INIT.
-        kernel.getScheduler().schedule(cpu);
+        kernel.getScheduler().schedule(machine);
 
         if (kernel.getScheduler().getCurrentProcess() != init) {
             throw new IllegalStateException("INIT no fue seleccionado");
@@ -105,7 +109,7 @@ public final class T3OS {
          * El contexto restaurado por el scheduler
          * coloca la CPU en USER MODE.
          */
-        if (cpu.isKernelMode()) {
+        if (machine.isKernelMode()) {
             throw new IllegalStateException("INIT no entró en USER MODE");
         }
 
@@ -113,16 +117,12 @@ public final class T3OS {
     }
 
     public void shell() {
-        TShell shell = new TShell(cpu, kernel, console);
+        TShell shell = new TShell(machine, kernel, console);
         shell.start();
     }
 
     public void run() {
         kernel.run();
-    }
-
-    public TCPU getCPU() {
-        return cpu;
     }
 
     public TKernel getKernel() {
@@ -135,5 +135,9 @@ public final class T3OS {
 
     public TFileSystem getFileSystem() {
         return fileSystem;
+    }
+
+    TMachine getMachine() {
+        return machine;
     }
 }

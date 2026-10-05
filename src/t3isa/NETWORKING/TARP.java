@@ -62,13 +62,6 @@ public final class TARP {
         this.localMAC = Arrays.copyOf(localMAC, 6);
         this.localIP = Arrays.copyOf(localIP, 4);
         this.cache = new HashMap<>();
-        System.out.println(
-                "TARP localIP = "
-                + (this.localIP[0] & 0xFF) + "."
-                + (this.localIP[1] & 0xFF) + "."
-                + (this.localIP[2] & 0xFF) + "."
-                + (this.localIP[3] & 0xFF)
-        );
     }
 
     public void request(byte[] targetIP) {

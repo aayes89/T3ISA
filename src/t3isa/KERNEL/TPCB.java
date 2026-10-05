@@ -23,8 +23,8 @@
  */
 package t3isa.KERNEL;
 
-import t3isa.Core.TCPU;
 import t3isa.Core.TWord;
+import t3isa.HARDWARE.TMachine;
 
 /**
  *
@@ -56,13 +56,7 @@ public class TPCB {
     private int waitingForPid = -1;
     private int parentPid = -1;
 
-    public TPCB(
-            int pid,
-            int entryPoint,
-            int memoryBase,
-            int memoryLimit,
-            int stackBase,
-            int stackLimit) {
+    public TPCB(int pid, int entryPoint, int memoryBase, int memoryLimit, int stackBase, int stackLimit) {
 
         this.pid = pid;
         this.state = ProcessState.NEW;
@@ -78,35 +72,33 @@ public class TPCB {
         this.userSP = stackLimit;
         this.compare = 0;
 
-        this.registers = new TWord[TCPU.REGISTER_COUNT];
+        this.registers = new TWord[TMachine.REGISTER_COUNT];
 
-        for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
+        for (int i = 0; i < TMachine.REGISTER_COUNT; i++) {
             this.registers[i] = TWord.zero();
         }
     }
 
-    public void restoreContext(TCPU cpu) {
-        cpu.restoreProcessContext(this.pc, this.registers, this.userSP, this.compare, this.stackBase, this.stackLimit);
-        cpu.setProcessMemoryRange(this.memoryBase, this.memoryLimit);
+    public void restoreContext(TMachine machine) {
+        machine.restoreProcessContext(this.pc, this.registers, this.userSP, this.compare, this.stackBase, this.stackLimit);
+        machine.setProcessMemoryRange(this.memoryBase, this.memoryLimit);
     }
 
     public void setUserSP(int userSP) {
         if (userSP < stackBase || userSP > stackLimit) {
-            throw new IllegalArgumentException(
-                    "User SP fuera del stack del proceso: " + userSP
-            );
+            throw new IllegalArgumentException("User SP fuera del stack del proceso: " + userSP);
         }
 
         this.userSP = userSP;
     }
 
-    public void saveContext(TCPU cpu) {
-        this.pc = cpu.isKernelMode() ? cpu.getInterruptedPC() : cpu.getPC();
-        this.userSP = cpu.getUserSP();
-        this.compare = cpu.getCompare();
+    public void saveContext(TMachine machine) {
+        this.pc = machine.isKernelMode() ? machine.getInterruptedPC() : machine.getPC();
+        this.userSP = machine.getUserSP();
+        this.compare = machine.getCompare();
 
-        for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
-            this.registers[i] = cpu.getRegister(i);
+        for (int i = 0; i < TMachine.REGISTER_COUNT; i++) {
+            this.registers[i] = machine.getRegister(i);
         }
     }
 
@@ -155,9 +147,9 @@ public class TPCB {
     }
 
     public TWord[] getRegisters() {
-        TWord[] copy = new TWord[TCPU.REGISTER_COUNT];
+        TWord[] copy = new TWord[TMachine.REGISTER_COUNT];
 
-        for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
+        for (int i = 0; i < TMachine.REGISTER_COUNT; i++) {
             copy[i] = registers[i].copy();
         }
 
@@ -165,7 +157,7 @@ public class TPCB {
     }
 
     public void setRegister(int index, TWord value) {
-        if (index < 0 || index >= TCPU.REGISTER_COUNT) {
+        if (index < 0 || index >= TMachine.REGISTER_COUNT) {
             throw new IllegalArgumentException("Registro inválido: " + index);
         }
 

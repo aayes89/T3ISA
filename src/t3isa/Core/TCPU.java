@@ -28,6 +28,7 @@ import t3isa.T3ISA;
 import t3isa.DEVICE.TDevice;
 import t3isa.DEVICE.TDeviceBus;
 import t3isa.DEVICE.TNetworkDevice;
+import t3isa.HARDWARE.TMachine;
 import t3isa.ISA.TInstruction;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TOpcode;
@@ -69,41 +70,10 @@ import t3isa.KERNEL.TKernel;
     *
     * Stack grows downward.
  */
-public final class TCPU {
+public final class TCPU implements TMachine {
 
-    public static final int REGISTER_COUNT = 27;
-    public static final int REGISTERS = REGISTER_COUNT;
-    public static final int MEMORY_SIZE = 19683;
-    public static final int KERNEL_MEMORY_END = 999;
-    public static final int USER_MEMORY_START = 1000;
-    public static final int KERNEL_STACK_TOP = 15999;
-    public static final int KERNEL_STACK_BOTTOM = 15000;
-
-    public static final int USER_STACK_TOP = 19682;
-    public static final int USER_STACK_BOTTOM = 16000;
     private int userSP;
     private int kernelSP;
-    public static final int TRAP_VECTOR_BASE = 1;
-    public static final int TRAP_VECTOR_COUNT = 6;
-    public static final int BOOT_START = 7;
-    public static final int BOOT_SIZE = 17;
-    public static final int OS_START = 27;
-    public static final int INTERRUPT_VECTOR_BASE = 24;
-    public static final int INTERRUPT_VECTOR_COUNT = 3;
-
-    public static final int INTERRUPT_HANDLER_TIMER = 160;
-    public static final int INTERRUPT_HANDLER_DEVICE = 170;
-    public static final int INTERRUPT_HANDLER_KEYBOARD = 180;
-
-    public static final int TRAP_HANDLER_DIV_ZERO = 100;
-    public static final int TRAP_HANDLER_MEMORY = 110;
-    public static final int TRAP_HANDLER_INSTRUCTION = 120;
-    public static final int TRAP_HANDLER_SYSCALL = 130;
-    public static final int TRAP_HANDLER_DEVICE = 140;
-    public static final int TRAP_HANDLER_STACK = 150;
-
-    public static final int STACK_TOP = MEMORY_SIZE - 1;
-    public static final int STACK_BOTTOM = 16000;
 
     private TInterrupt pendingInterrupt;
     private final TWord[] registers;
@@ -141,6 +111,7 @@ public final class TCPU {
         deviceBus = new TDeviceBus(16);
     }
 
+    @Override
     public void reset() {
         for (int i = 0; i < REGISTER_COUNT; i++) {
             registers[i] = TWord.zero();
@@ -169,34 +140,42 @@ public final class TCPU {
         halted = false;
     }
 
+    @Override
     public boolean wasInterruptReturned() {
         return interruptReturned;
     }
 
+    @Override
     public void clearInterruptReturned() {
         interruptReturned = false;
     }
 
+    @Override
     public int getCurrentPid() {
         return currentPid;
     }
 
+    @Override
     public void setCurrentPid(int pid) {
         currentPid = pid;
     }
 
+    @Override
     public int getPendingProcessAction() {
         return pendingProcessAction;
     }
 
+    @Override
     public void clearPendingProcessAction() {
         pendingProcessAction = -1;
     }
 
+    @Override
     public int getPendingDevicePort() {
         return pendingDevicePort;
     }
 
+    @Override
     public void clearPendingDevicePort() {
         pendingDevicePort = -1;
     }
@@ -205,6 +184,7 @@ public final class TCPU {
         return pendingInterrupt;
     }
 
+    @Override
     public void requestInterrupt(TInterrupt interrupt) {
         if (interrupt == null) {
             throw new IllegalArgumentException("Interrupt null");
@@ -212,6 +192,7 @@ public final class TCPU {
         pendingInterrupt = interrupt;
     }
 
+    @Override
     public void loadInterruptVector(TInterrupt interrupt, int handlerAddress) {
         if (interrupt == null) {
             throw new IllegalArgumentException("Interrupt null");
@@ -223,11 +204,13 @@ public final class TCPU {
         memory[vectorAddress] = TWord.fromLong(handlerAddress);
     }
 
+    @Override
     public TWord getRegister(int index) {
         checkRegister(index);
         return registers[index].copy();
     }
 
+    @Override
     public void setRegister(int index, TWord value) {
         checkRegister(index);
 
@@ -247,19 +230,23 @@ public final class TCPU {
         compare = value;
     }
 
+    @Override
     public int getPC() {
         return pc;
     }
 
+    @Override
     public void setPC(int value) {
         checkAddress(value);
         pc = value;
     }
 
+    @Override
     public int getSP() {
         return sp;
     }
 
+    @Override
     public String getTrap() {
         return trap == null ? null : trap.toString();
     }
@@ -268,14 +255,17 @@ public final class TCPU {
         return trap;
     }
 
+    @Override
     public boolean isHalted() {
         return halted;
     }
 
+    @Override
     public int getCompare() {
         return compare;
     }
 
+    @Override
     public void setProcessMemoryRange(int base, int limit) {
         checkAddress(base);
         checkAddress(limit);
@@ -311,6 +301,7 @@ public final class TCPU {
         loadProgram(BOOT_START, boot);
     }
 
+    @Override
     public void loadProgram(int startAddress, TWord[] program) {
         if (program == null) {
             throw new IllegalArgumentException("Programa null");
@@ -332,6 +323,7 @@ public final class TCPU {
 
     }
 
+    @Override
     public void loadTrapVector(TTrap trap, int handlerAddress) {
         if (trap == null) {
             throw new IllegalArgumentException("Trap null");
@@ -343,6 +335,7 @@ public final class TCPU {
         memory[vectorAddress] = TWord.fromLong(handlerAddress);
     }
 
+    @Override
     public void step() {
 
         if (halted) {
@@ -1098,10 +1091,12 @@ public final class TCPU {
         return address;
     }
 
+    @Override
     public boolean isKernelMode() {
         return kernelMode;
     }
 
+    @Override
     public int getUserSP() {
         return userSP;
     }
@@ -1144,6 +1139,7 @@ public final class TCPU {
         pc = handler;
     }
 
+    @Override
     public int getInterruptedPC() {
         return interruptedPC;
     }
@@ -1157,10 +1153,12 @@ public final class TCPU {
         sp = value;
     }
 
+    @Override
     public void halt() {
         halted = true;
     }
 
+    @Override
     public void restoreProcessContext(int pc, TWord[] registers, int userSP, int compare, int stackBase, int stackLimit) {
         this.pc = pc;
 
@@ -1195,11 +1193,13 @@ public final class TCPU {
         return currentStackLimit;
     }
 
+    @Override
     public TWord readMemory(int address) {
         checkAddress(address);
         return memory[address].copy();
     }
 
+    @Override
     public void writeMemory(int address, TWord value) {
         checkAddress(address);
 
@@ -1226,6 +1226,7 @@ public final class TCPU {
         }
     }
 
+    @Override
     public void copyProcessStack(int sourceBase, int sourceLimit, int destinationBase) {
         if (sourceBase < 0 || sourceLimit >= MEMORY_SIZE || sourceBase > sourceLimit) {
             throw new IllegalArgumentException("Stack origen inválido");
@@ -1246,14 +1247,17 @@ public final class TCPU {
         halted = false;
     }
 
+    @Override
     public TDeviceBus getDeviceBus() {
         return deviceBus;
     }
 
+    @Override
     public void setKernel(TKernel kernel) {
         if (kernel == null) {
             throw new IllegalArgumentException("El kernel no puede ser null");
         }
         this.kernel = kernel;
     }
+
 }

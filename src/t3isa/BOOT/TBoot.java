@@ -24,8 +24,8 @@
 package t3isa.BOOT;
 
 import t3isa.ISA.TAssemblerText;
-import t3isa.Core.TCPU;
 import t3isa.Core.TWord;
+import t3isa.HARDWARE.TMachine;
 
 /**
  * Boot loader de T3OS.
@@ -36,14 +36,14 @@ import t3isa.Core.TWord;
  */
 public final class TBoot {
 
-    private final TCPU cpu;
+    private final TMachine machine;
 
-    public TBoot(TCPU cpu) {
-        if (cpu == null) {
+    public TBoot(TMachine machine) {
+        if (machine == null) {
             throw new IllegalArgumentException("CPU no puede ser null");
         }
 
-        this.cpu = cpu;
+        this.machine = machine;
     }
 
     public void install() {
@@ -53,7 +53,7 @@ public final class TBoot {
          *
          * La dirección 0 contiene la entrada del boot.
          */
-        cpu.writeMemory(0, TWord.fromLong(TCPU.BOOT_START));
+        machine.writeMemory(0, TWord.fromLong(TMachine.BOOT_START));
 
         /*
          * BOOT
@@ -65,22 +65,22 @@ public final class TBoot {
          * Esto permite probar la transferencia real
          * de control antes de cargar un kernel binario.
          */
-        TWord[] boot = TAssemblerText.assemble("JMP " + TCPU.OS_START + "\n");
-        cpu.loadProgram(TCPU.BOOT_START, boot);
+        TWord[] boot = TAssemblerText.assemble("JMP " + TMachine.OS_START + "\n");
+        machine.loadProgram(TMachine.BOOT_START, boot);
 
         // El resto del área BOOT queda en cero.
-        for (int i = TCPU.BOOT_START + boot.length; i < TCPU.BOOT_START + TCPU.BOOT_SIZE; i++) {
-            cpu.writeMemory(i, TWord.zero());
+        for (int i = TMachine.BOOT_START + boot.length; i < TMachine.BOOT_START + TMachine.BOOT_SIZE; i++) {
+            machine.writeMemory(i, TWord.zero());
         }
     }
 
     public void reset() {
-        cpu.reset();
+        machine.reset();
         // El hardware arranca leyendo el reset vector.
-        cpu.setPC((int) cpu.readMemory(0).toLong());
+        machine.setPC((int) machine.readMemory(0).toLong());
     }
 
     public void resetVector() {
-        cpu.setPC((int) cpu.readMemory(0).toLong());
+        machine.setPC((int) machine.readMemory(0).toLong());
     }
 }

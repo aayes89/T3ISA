@@ -33,12 +33,12 @@ import java.util.Map;
 import t3isa.DEVICE.TConsoleDevice;
 import t3isa.KERNEL.TPCB;
 import t3isa.KERNEL.TKernel;
-import t3isa.Core.TCPU;
 import t3isa.Core.TWord;
 import t3isa.DEVICE.TNetworkDevice;
 import t3isa.Exceptions.TMemoryException;
 import t3isa.FS.TFileSystem;
 import t3isa.FS.TVFS;
+import t3isa.HARDWARE.TMachine;
 import t3isa.NETWORKING.TARP;
 import t3isa.NETWORKING.THostNetwork;
 import t3isa.NETWORKING.TICMP;
@@ -51,13 +51,13 @@ import t3isa.NETWORKING.TTCP;
  */
 public final class TShell {
 
-    private final TCPU cpu;
+    private final TMachine machine;
     private final TKernel kernel;
     private final TConsoleDevice console;
     private String currentDirectory = "/";
 
-    public TShell(TCPU cpu, TKernel kernel, TConsoleDevice console) {
-        this.cpu = cpu;
+    public TShell(TMachine machine, TKernel kernel, TConsoleDevice console) {
+        this.machine = machine;
         this.kernel = kernel;
         this.console = console;
     }
@@ -70,7 +70,7 @@ public final class TShell {
         console.writeLine("Kernel initialized.");
         console.writeLine("");
 
-        while (!cpu.isHalted()) {
+        while (!machine.isHalted()) {
             console.writeText("t3os> ");
             String line = console.readLine();
             if (line == null) {
@@ -122,8 +122,8 @@ public final class TShell {
                 regs();
                 return true;
 
-            case "cpu":
-                cpu();
+            case "machine":
+                machine();
                 return true;
 
             case "ls":
@@ -200,7 +200,7 @@ public final class TShell {
 
             case "exit":
                 console.writeLine("shutdown");
-                cpu.halt();
+                machine.halt();
                 return false;
 
             default:
@@ -218,7 +218,7 @@ public final class TShell {
         console.writeLine("  peek <address>");
         console.writeLine("  poke <address> <value>");
         console.writeLine("  regs");
-        console.writeLine("  cpu");
+        console.writeLine("  machine");
         console.writeLine("  echo <text>");
         console.writeLine("  run <program>");
         console.writeLine("  mkdir <directory>");
@@ -258,10 +258,10 @@ public final class TShell {
     private void mem() {
         console.writeLine("");
         console.writeLine("MEMORY MAP");
-        console.writeLine("KERNEL    0.." + TCPU.KERNEL_MEMORY_END);
-        console.writeLine("USER      " + TCPU.USER_MEMORY_START + ".." + (TCPU.KERNEL_STACK_TOP - 1));
-        console.writeLine("KERNEL STACK    " + TCPU.KERNEL_STACK_BOTTOM + ".." + TCPU.KERNEL_STACK_TOP);
-        console.writeLine("USER STACK    " + TCPU.USER_STACK_BOTTOM + ".." + TCPU.USER_STACK_TOP);
+        console.writeLine("KERNEL    0.." + TMachine.KERNEL_MEMORY_END);
+        console.writeLine("USER      " + TMachine.USER_MEMORY_START + ".." + (TMachine.KERNEL_STACK_TOP - 1));
+        console.writeLine("KERNEL STACK    " + TMachine.KERNEL_STACK_BOTTOM + ".." + TMachine.KERNEL_STACK_TOP);
+        console.writeLine("USER STACK    " + TMachine.USER_STACK_BOTTOM + ".." + TMachine.USER_STACK_TOP);
         console.writeLine("");
     }
 
@@ -325,10 +325,10 @@ public final class TShell {
         console.writeLine("program '" + program + "' started");
 
         if (kernel.getScheduler().getCurrentProcess() == null) {
-            kernel.getScheduler().schedule(cpu);
+            kernel.getScheduler().schedule(machine);
         }
 
-        while (!cpu.isHalted() && kernel.getScheduler().hasReadyProcesses()) {
+        while (!machine.isHalted() && kernel.getScheduler().hasReadyProcesses()) {
             kernel.step();
         }
 
@@ -343,7 +343,7 @@ public final class TShell {
 
         try {
             int address = Integer.parseInt(parts[1]);
-            TWord value = cpu.readMemory(address);
+            TWord value = machine.readMemory(address);
             console.writeLine("[" + address + "] = " + value.toLong());
         } catch (NumberFormatException e) {
             console.writeLine("invalid address");
@@ -361,7 +361,7 @@ public final class TShell {
         try {
             int address = Integer.parseInt(parts[1]);
             long value = Long.parseLong(parts[2]);
-            cpu.writeMemory(address, TWord.fromLong(value));
+            machine.writeMemory(address, TWord.fromLong(value));
             console.writeLine("[" + address + "] <- " + value);
 
         } catch (NumberFormatException e) {
@@ -375,22 +375,22 @@ public final class TShell {
         console.writeLine("");
         console.writeLine("REGISTERS");
 
-        for (int i = 0; i < TCPU.REGISTER_COUNT; i++) {
-            console.writeLine("R" + i + " = " + cpu.getRegister(i).toLong());
+        for (int i = 0; i < TMachine.REGISTER_COUNT; i++) {
+            console.writeLine("R" + i + " = " + machine.getRegister(i).toLong());
         }
 
         console.writeLine("");
     }
 
-    private void cpu() {
+    private void machine() {
         console.writeLine("");
         console.writeLine("CPU");
-        console.writeLine("PC      = " + cpu.getPC());
-        console.writeLine("SP      = " + cpu.getSP());
-        console.writeLine("PID     = " + cpu.getCurrentPid());
-        console.writeLine("KERNEL  = " + cpu.isKernelMode());
-        console.writeLine("TRAP    = " + cpu.getTrap());
-        console.writeLine("HALTED  = " + cpu.isHalted());
+        console.writeLine("PC      = " + machine.getPC());
+        console.writeLine("SP      = " + machine.getSP());
+        console.writeLine("PID     = " + machine.getCurrentPid());
+        console.writeLine("KERNEL  = " + machine.isKernelMode());
+        console.writeLine("TRAP    = " + machine.getTrap());
+        console.writeLine("HALTED  = " + machine.isHalted());
         console.writeLine("");
     }
 
