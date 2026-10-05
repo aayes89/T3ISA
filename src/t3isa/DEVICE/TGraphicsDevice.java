@@ -32,21 +32,57 @@ import t3isa.CORE.TWord;
  */
 public final class TGraphicsDevice implements TDevice {
 
-    public static final int WIDTH = 640;
-    public static final int HEIGHT = 480;
+    private final int width;
+    private final int height;
+    private final int refreshRate;
+    private final int colorDepth;
 
     private final int[] framebuffer;
 
     private int cursor;
 
-    public TGraphicsDevice() {
-        framebuffer = new int[WIDTH * HEIGHT];
+    public TGraphicsDevice(int width, int height, int refreshRate, int colorDepth) {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Resolución inválida");
+        }
+
+        if (refreshRate <= 0) {
+            throw new IllegalArgumentException("Tasa de refrescado inválida");
+        }
+
+        if (colorDepth <= 0) {
+            throw new IllegalArgumentException("Profundidad de color inválida");
+        }
+
+        this.width = width;
+        this.height = height;
+        this.refreshRate = refreshRate;
+        this.colorDepth = colorDepth;
+
+        framebuffer = new int[width * height];
         cursor = 0;
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
+
+    public int getRefreshRate() {
+        return refreshRate;
+    }
+
+    public int getColorDepth() {
+        return colorDepth;
     }
 
     @Override
     public void write(TWord value) {
         int index = cursor;
+
         if (index >= framebuffer.length) {
             return;
         }
@@ -71,25 +107,26 @@ public final class TGraphicsDevice implements TDevice {
 
     public void reset() {
         cursor = 0;
+
         for (int i = 0; i < framebuffer.length; i++) {
             framebuffer[i] = 0;
         }
     }
 
     public void setPixel(int x, int y, int value) {
-        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) {
+        if (x < 0 || x >= width || y < 0 || y >= height) {
             return;
         }
 
-        framebuffer[y * WIDTH + x] = value;
+        framebuffer[y * width + x] = value;
     }
 
     public int getPixel(int x, int y) {
-        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) {
+        if (x < 0 || x >= width || y < 0 || y >= height) {
             return 0;
         }
 
-        return framebuffer[y * WIDTH + x];
+        return framebuffer[y * width + x];
     }
 
     public int[] getFramebuffer() {

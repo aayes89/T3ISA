@@ -24,7 +24,6 @@
 package t3os;
 
 import t3os.SHELL.TShell;
-import t3isa.DEVICE.TGraphicsDevice;
 import t3isa.DEVICE.TConsoleDevice;
 import t3os.KERNEL.TPCB;
 import t3os.KERNEL.TKernel;
@@ -44,7 +43,6 @@ public final class T3OS {
     private final TKernel kernel;
     private final TBoot boot;
     private final TConsoleDevice console;
-    private final TGraphicsDevice graphics;
     private final TFileSystem fileSystem;
 
     public T3OS(TMachine machine) {
@@ -57,10 +55,8 @@ public final class T3OS {
         kernel = new TKernel(machine, 10);
         machine.setKernel(kernel);
         console = new TConsoleDevice();
-        graphics = new TGraphicsDevice();
         fileSystem = new TFileSystem();
         machine.getDeviceBus().attach(0, console);
-        machine.getDeviceBus().attach(1, graphics);
     }
 
     public void boot() {

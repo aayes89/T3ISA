@@ -23,11 +23,11 @@
  */
 package t3isa.CORE;
 
+import t3isa.DEVICE.TGraphicsDevice;
 import t3isa.Exceptions.TMemoryException;
 import t3isa.T3ISA;
 import t3isa.HARDWARE.TDevice;
 import t3isa.HARDWARE.TDeviceBus;
-import t3isa.DEVICE.TNetworkDevice;
 import t3isa.HARDWARE.TMachine;
 import t3isa.ISA.TInstruction;
 import t3isa.ISA.TInterrupt;
@@ -100,6 +100,7 @@ public final class TCPU implements TMachine {
 
     //private TDevice device;   // Ya no es necesario
     private final TDeviceBus deviceBus;
+    private final TGraphicsDevice graphicsDevice;
     private TKernel kernel;
 
     public TCPU() {
@@ -107,8 +108,10 @@ public final class TCPU implements TMachine {
         memory = new TWord[MEMORY_SIZE];
         currentPid = 0;
         pendingProcessAction = -1;
-        reset();
+
         deviceBus = new TDeviceBus(16);
+        graphicsDevice = new TGraphicsDevice(1024, 768, 60, 32);
+        reset();
     }
 
     @Override
@@ -1260,4 +1263,7 @@ public final class TCPU implements TMachine {
         this.kernel = kernel;
     }
 
+    public TGraphicsDevice getGraphicsDevice() {
+        return graphicsDevice;
+    }
 }

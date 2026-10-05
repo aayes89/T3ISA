@@ -25,7 +25,9 @@ package t3isa;
 
 import t3os.T3OS;
 import t3isa.CORE.TCPU;
+import t3isa.DEVICE.TGraphicsDevice;
 import t3isa.HARDWARE.TMachine;
+import t3isa.HOST.TGraphicsHostBackend;
 import test.TNetworkSyscallTest;
 
 /**
@@ -44,7 +46,19 @@ public class T3ISA {
         System.out.println(" T3OS");
         System.out.println("========================================");
 
-        T3OS os = new T3OS(new TCPU());
+        TCPU cpu = new TCPU();
+        TGraphicsDevice graphicsDevice = cpu.getGraphicsDevice();
+
+        for (int y = 100; y < 300; y++) {
+            for (int x = 100; x < 400; x++) {
+                graphicsDevice.setPixel(x, y, 0xFFFFFF);
+            }
+        }
+
+        TGraphicsHostBackend graphics = new TGraphicsHostBackend(graphicsDevice);
+
+        graphics.open();
+        T3OS os = new T3OS(cpu);
 
         // RESET -> BOOT -> KERNEL
         os.boot();
