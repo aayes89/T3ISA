@@ -18,12 +18,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa.MEMORY;
+package t3os.MEMORY;
 
-import t3isa.Core.TCPU;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import t3isa.HARDWARE.TMachine;
 
 /**
  *
@@ -65,19 +65,19 @@ public class TMemoryManager {
 
     public TMemoryManager() {
         this(
-                TCPU.USER_MEMORY_START,
-                TCPU.KERNEL_STACK_BOTTOM - 1,
-                TCPU.USER_STACK_BOTTOM,
-                TCPU.USER_STACK_TOP
+                TMachine.USER_MEMORY_START,
+                TMachine.KERNEL_STACK_BOTTOM - 1,
+                TMachine.USER_STACK_BOTTOM,
+                TMachine.USER_STACK_TOP
         );
     }
 
     public TMemoryManager(int memoryStart, int memoryEnd, int stackStart, int stackEnd) {
-        if (memoryStart < 0 || memoryEnd >= TCPU.MEMORY_SIZE || memoryStart > memoryEnd) {
+        if (memoryStart < 0 || memoryEnd >= TMachine.MEMORY_SIZE || memoryStart > memoryEnd) {
             throw new IllegalArgumentException("Rango de memoria inválido");
         }
 
-        if (stackStart < 0 || stackEnd >= TCPU.MEMORY_SIZE || stackStart > stackEnd) {
+        if (stackStart < 0 || stackEnd >= TMachine.MEMORY_SIZE || stackStart > stackEnd) {
             throw new IllegalArgumentException("Rango de stack inválido");
         }
 
@@ -96,6 +96,8 @@ public class TMemoryManager {
 
     /**
      * Reserva memoria para código/datos.
+     * @param size
+     * @return 
      */
     public MemoryBlock allocate(int size) {
         return allocate(size, memoryStart, memoryEnd, allocatedBlocks);
@@ -103,6 +105,8 @@ public class TMemoryManager {
 
     /**
      * Reserva memoria para el stack de un proceso.
+     * @param size
+     * @return 
      */
     public MemoryBlock allocateStack(int size) {
         return allocate(size, stackStart, stackEnd, allocatedStacks);
@@ -141,6 +145,7 @@ public class TMemoryManager {
 
     /**
      * Libera un bloque de código/datos.
+     * @param base
      */
     public void free(int base) {
         free(base, allocatedBlocks);
@@ -148,6 +153,7 @@ public class TMemoryManager {
 
     /**
      * Libera un bloque de stack.
+     * @param base
      */
     public void freeStack(int base) {
         free(base, allocatedStacks);

@@ -27,7 +27,7 @@ package t3isa.DEVICE;
  *
  * @author Slam
  */
-import t3isa.Core.TWord;
+import t3isa.CORE.TWord;
 import java.util.Arrays;
 
 public final class TNetworkDevice implements TDevice {

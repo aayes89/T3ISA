@@ -21,15 +21,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa;
+package t3os;
 
-import t3isa.SHELL.TShell;
+import t3os.SHELL.TShell;
 import t3isa.DEVICE.TGraphicsDevice;
 import t3isa.DEVICE.TConsoleDevice;
-import t3isa.KERNEL.TPCB;
-import t3isa.KERNEL.TKernel;
-import t3isa.BOOT.TBoot;
-import t3isa.FS.TFileSystem;
+import t3os.KERNEL.TPCB;
+import t3os.KERNEL.TKernel;
+import t3os.BOOT.TBoot;
+import t3os.FS.TFileSystem;
 import t3isa.HARDWARE.TMachine;
 
 /**
@@ -137,7 +137,7 @@ public final class T3OS {
         return fileSystem;
     }
 
-    TMachine getMachine() {
+    public TMachine getMachine() {
         return machine;
     }
 }

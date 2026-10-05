@@ -23,9 +23,9 @@
  */
 package t3isa.ISA;
 
-import t3isa.Core.TCPU;
-import t3isa.Core.TWord;
-import t3isa.Core.Trit;
+import t3isa.CORE.TWord;
+import t3isa.CORE.Trit;
+import t3isa.HARDWARE.TMachine;
 
 /**
  *
@@ -56,7 +56,7 @@ public final class TAssembler {
          * dirección absoluta unsigned.
          */
         if (isJump(opcode)) {
-            if (immediate < 0 || immediate >= TCPU.MEMORY_SIZE) {
+            if (immediate < 0 || immediate >= TMachine.MEMORY_SIZE) {
                 throw new IllegalArgumentException("Dirección fuera de rango: " + immediate);
             }
             writeUnsigned(word, immediate, 18, 9);
@@ -186,7 +186,7 @@ public final class TAssembler {
     }
 
     private static void validateRegister(int register) {
-        if (register < 0 || register >= TCPU.REGISTERS) {
+        if (register < 0 || register >= TMachine.REGISTERS) {
             throw new IllegalArgumentException("Registro inválido: R" + register);
         }
     }

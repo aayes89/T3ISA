@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa.FS;
+package t3os.FS;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;

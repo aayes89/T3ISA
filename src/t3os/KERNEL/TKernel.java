@@ -21,11 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa.KERNEL;
+package t3os.KERNEL;
 
 import java.util.ArrayDeque;
 import java.util.Queue;
-import t3isa.MEMORY.TMemoryManager;
+import t3os.MEMORY.TMemoryManager;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TTrap;
 import t3isa.ISA.TOpcode;
@@ -33,12 +33,12 @@ import t3isa.ISA.TSyscall;
 import t3isa.ISA.TAssembler;
 import t3isa.ISA.TInstruction;
 import t3isa.ISA.TAssemblerText;
-import t3isa.Core.TWord;
+import t3isa.CORE.TWord;
 import t3isa.DEVICE.TNetworkBackend;
 import t3isa.DEVICE.TNetworkDevice;
 import t3isa.DEVICE.TNetworkHostBackend;
-import t3isa.FS.TFileSystem;
-import t3isa.FS.TVFS;
+import t3os.FS.TFileSystem;
+import t3os.FS.TVFS;
 import t3isa.HARDWARE.TMachine;
 import t3isa.NETWORKING.TARP;
 import t3isa.NETWORKING.TEthernet;

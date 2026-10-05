@@ -23,7 +23,8 @@
  */
 package t3isa;
 
-import t3isa.Core.TCPU;
+import t3os.T3OS;
+import t3isa.CORE.TCPU;
 import t3isa.HARDWARE.TMachine;
 import test.TNetworkSyscallTest;
 

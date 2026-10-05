@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa.Core;
+package t3isa.CORE;
 
 import t3isa.Exceptions.TMemoryException;
 import t3isa.T3ISA;
@@ -34,7 +34,7 @@ import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TOpcode;
 import t3isa.ISA.TSyscall;
 import t3isa.ISA.TTrap;
-import t3isa.KERNEL.TKernel;
+import t3os.KERNEL.TKernel;
 
 /**
  *

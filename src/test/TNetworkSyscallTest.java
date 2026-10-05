@@ -27,13 +27,13 @@ package test;
  *
  * @author Slam
  */
-import t3isa.Core.TCPU;
-import t3isa.Core.TWord;
+import t3isa.CORE.TCPU;
+import t3isa.CORE.TWord;
 import t3isa.DEVICE.TNetworkLinkBackend;
 import t3isa.ISA.TAssemblerText;
 import t3isa.ISA.TSyscall;
 
-import t3isa.KERNEL.TKernel;
+import t3os.KERNEL.TKernel;
 
 public final class TNetworkSyscallTest {
 

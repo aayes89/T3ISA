@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa.SHELL;
+package t3os.SHELL;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -31,13 +31,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import t3isa.DEVICE.TConsoleDevice;
-import t3isa.KERNEL.TPCB;
-import t3isa.KERNEL.TKernel;
-import t3isa.Core.TWord;
+import t3os.KERNEL.TPCB;
+import t3os.KERNEL.TKernel;
+import t3isa.CORE.TWord;
 import t3isa.DEVICE.TNetworkDevice;
 import t3isa.Exceptions.TMemoryException;
-import t3isa.FS.TFileSystem;
-import t3isa.FS.TVFS;
+import t3os.FS.TFileSystem;
+import t3os.FS.TVFS;
 import t3isa.HARDWARE.TMachine;
 import t3isa.NETWORKING.TARP;
 import t3isa.NETWORKING.THostNetwork;
@@ -239,7 +239,7 @@ public final class TShell {
         console.writeLine("  whois <domain>");
         console.writeLine("  wget <url>");
         console.writeLine("  nc <host> <port>");
-        console.writeLine("  nc -l <port>");
+        console.writeLine("  nc -l -lp -lv -lpv -v -r <port>");
         console.writeLine("  exit");
         console.writeLine("");
     }
