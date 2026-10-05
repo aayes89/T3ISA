@@ -23,6 +23,7 @@
  */
 package t3isa.DEVICE;
 
+import t3isa.HARDWARE.TDevice;
 import t3isa.CORE.TWord;
 
 /**

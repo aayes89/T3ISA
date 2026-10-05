@@ -25,8 +25,8 @@ package t3isa.CORE;
 
 import t3isa.Exceptions.TMemoryException;
 import t3isa.T3ISA;
-import t3isa.DEVICE.TDevice;
-import t3isa.DEVICE.TDeviceBus;
+import t3isa.HARDWARE.TDevice;
+import t3isa.HARDWARE.TDeviceBus;
 import t3isa.DEVICE.TNetworkDevice;
 import t3isa.HARDWARE.TMachine;
 import t3isa.ISA.TInstruction;

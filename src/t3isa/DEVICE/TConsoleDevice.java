@@ -27,6 +27,7 @@ package t3isa.DEVICE;
  *
  * @author Slam
  */
+import t3isa.HARDWARE.TDevice;
 import t3isa.CORE.TWord;
 import java.io.BufferedReader;
 import java.io.IOException;

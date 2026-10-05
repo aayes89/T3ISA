@@ -28,7 +28,6 @@ package t3isa.HARDWARE;
  * @author Slam
  */
 import t3isa.CORE.TWord;
-import t3isa.DEVICE.TDeviceBus;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TTrap;
 import t3os.KERNEL.TKernel;
