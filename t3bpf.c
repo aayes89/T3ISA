@@ -16,68 +16,33 @@
 #define BPF_BUFFER_SIZE 4096
 #define IO_BUFFER_SIZE 4096
 
-static int bpf_buffer_length = 0;
-
-static int write_all(int fd, const unsigned char *data, size_t length)
+static int write_all(int fd,
+                     const unsigned char *data,
+                     size_t length)
 {
     size_t offset = 0;
 
     while (offset < length) {
-
-        ssize_t n = write(
-            fd,
-            data + offset,
-            length - offset
-        );
+        ssize_t n = write(fd,
+                          data + offset,
+                          length - offset);
 
         if (n < 0) {
-
-            if (errno == EINTR)
+            if (errno == EINTR) {
                 continue;
+            }
 
             return -1;
         }
 
-        if (n == 0)
+        if (n == 0) {
             return -1;
+        }
 
         offset += (size_t)n;
     }
 
     return 0;
-}
-
-static int read_all_nonblocking(
-    int fd,
-    unsigned char *buffer,
-    size_t capacity,
-    size_t *length
-)
-{
-    ssize_t n = read(
-        fd,
-        buffer + *length,
-        capacity - *length
-    );
-
-    if (n < 0) {
-
-        if (errno == EINTR)
-            return 0;
-
-        if (errno == EAGAIN ||
-            errno == EWOULDBLOCK)
-            return 0;
-
-        return -1;
-    }
-
-    if (n == 0)
-        return -1;
-
-    *length += (size_t)n;
-
-    return 1;
 }
 
 static int open_bpf(const char *interface)
@@ -87,139 +52,150 @@ static int open_bpf(const char *interface)
 
     int fd = -1;
     int dlt;
-    int i;
 
     u_int enable = 1;
     u_int disable = 0;
     u_int buffer_length = BPF_BUFFER_SIZE;
 
-    for (i = 0; i < 256; i++) {
+    for (int i = 0; i < 256; i++) {
 
-        snprintf(
-            name,
-            sizeof(name),
-            "/dev/bpf%d",
-            i
-        );
+        snprintf(name,
+                 sizeof(name),
+                 "/dev/bpf%d",
+                 i);
 
         fd = open(name, O_RDWR);
 
-        if (fd >= 0)
+        if (fd >= 0) {
             break;
+        }
 
-        if (errno != EBUSY)
+        if (errno != EBUSY) {
             return -1;
+        }
     }
 
-    if (fd < 0)
+    if (fd < 0) {
         return -1;
+    }
 
-    if (ioctl(fd, BIOCSBLEN, &buffer_length) < 0) {
+    /*
+     * En macOS es importante configurar el buffer
+     * antes de BIOCSETIF.
+     */
+    if (ioctl(fd,
+              BIOCSBLEN,
+              &buffer_length) < 0) {
 
         perror("BIOCSBLEN");
-
         close(fd);
-
         return -1;
     }
 
-    bpf_buffer_length = (int)buffer_length;
-
-    fprintf(
-        stderr,
-        "BPF buffer configurado=%u\n",
-        buffer_length
-    );
+    fprintf(stderr,
+            "BPF buffer configurado=%u\n",
+            buffer_length);
 
     memset(&ifr, 0, sizeof(ifr));
 
-    strncpy(
-        ifr.ifr_name,
-        interface,
-        sizeof(ifr.ifr_name) - 1
-    );
+    strncpy(ifr.ifr_name,
+            interface,
+            sizeof(ifr.ifr_name) - 1);
 
-    if (ioctl(fd, BIOCSETIF, &ifr) < 0) {
+    if (ioctl(fd,
+              BIOCSETIF,
+              &ifr) < 0) {
 
         perror("BIOCSETIF");
-
         close(fd);
-
         return -1;
     }
 
-    if (ioctl(fd, BIOCGBLEN, &buffer_length) < 0) {
+    if (ioctl(fd,
+              BIOCGBLEN,
+              &buffer_length) < 0) {
 
         perror("BIOCGBLEN");
-
         close(fd);
-
         return -1;
     }
 
-    bpf_buffer_length = (int)buffer_length;
+    fprintf(stderr,
+            "BPF buffer real=%u\n",
+            buffer_length);
 
-    fprintf(
-        stderr,
-        "BPF buffer real=%d\n",
-        bpf_buffer_length
-    );
-
-    if (ioctl(fd, BIOCGDLT, &dlt) < 0) {
+    if (ioctl(fd,
+              BIOCGDLT,
+              &dlt) < 0) {
 
         perror("BIOCGDLT");
-
         close(fd);
-
         return -1;
     }
 
-    fprintf(
-        stderr,
-        "BPF DLT=%d\n",
-        dlt
-    );
+    fprintf(stderr,
+            "BPF DLT=%d\n",
+            dlt);
 
-    if (ioctl(fd, BIOCIMMEDIATE, &enable) < 0) {
+    /*
+     * Entrega los paquetes inmediatamente.
+     */
+    if (ioctl(fd,
+              BIOCIMMEDIATE,
+              &enable) < 0) {
 
         perror("BIOCIMMEDIATE");
-
         close(fd);
-
         return -1;
     }
 
-    if (ioctl(fd, BIOCSSEESENT, &disable) < 0) {
+    /*
+     * No queremos recibir nuevamente los frames
+     * que nosotros mismos transmitimos.
+     */
+    if (ioctl(fd,
+              BIOCSSEESENT,
+              &disable) < 0) {
 
         perror("BIOCSSEESENT");
-
         close(fd);
-
         return -1;
     }
 
-    if (ioctl(fd, BIOCPROMISC, &enable) < 0) {
+    /*
+     * Permite recibir tráfico Ethernet que no esté
+     * destinado directamente al host.
+     */
+    if (ioctl(fd,
+              BIOCPROMISC,
+              &enable) < 0) {
 
         perror("BIOCPROMISC");
-
         close(fd);
-
         return -1;
     }
 
     return fd;
 }
 
-static int send_frame(int fd, const unsigned char *frame, size_t length)
+static int send_frame(int fd,
+                      const unsigned char *frame,
+                      size_t length)
 {
-    if (length < 14 || length > MAX_FRAME)
-        return -1;
+    if (length < 14 ||
+        length > MAX_FRAME) {
 
-    ssize_t n = write(
-        fd,
-        frame,
-        length
-    );
+        fprintf(stderr,
+                "TX: longitud inválida: %zu\n",
+                length);
+
+        return -1;
+    }
+
+    ssize_t n =
+        write(fd,
+              frame,
+              length);
 
     if (n < 0) {
         perror("BPF write");
@@ -227,12 +203,11 @@ static int send_frame(int fd, const unsigned char *frame, size_t length)
     }
 
     if ((size_t)n != length) {
-        fprintf(
-            stderr,
-            "BPF write incompleto: %zd/%zu\n",
-            n,
-            length
-        );
+
+        fprintf(stderr,
+                "BPF write incompleto: %zd/%zu\n",
+                n,
+                length);
 
         return -1;
     }
@@ -240,49 +215,61 @@ static int send_frame(int fd, const unsigned char *frame, size_t length)
     return 0;
 }
 
-static int emit_frame(
-    const unsigned char *frame,
-    size_t length
-)
+static int emit_frame(const unsigned char *frame,
+                      size_t length)
 {
-    if (length == 0 || length > MAX_FRAME)
-        return -1;
+    if (length == 0 ||
+        length > MAX_FRAME) {
 
+        return -1;
+    }
+
+    /*
+     * Protocolo:
+     *
+     *   2 bytes: longitud big-endian
+     *   N bytes: Ethernet frame
+     */
     unsigned char header[2];
 
-    header[0] = (unsigned char)((length >> 8) & 0xFF);
-    header[1] = (unsigned char)(length & 0xFF);
+    header[0] =
+        (unsigned char)((length >> 8) & 0xFF);
 
-    if (write_all(
-            STDOUT_FILENO,
-            header,
-            2) < 0)
-        return -1;
+    header[1] =
+        (unsigned char)(length & 0xFF);
 
-    if (write_all(
-            STDOUT_FILENO,
-            frame,
-            length) < 0)
+    if (write_all(STDOUT_FILENO,
+                  header,
+                  sizeof(header)) < 0) {
+
         return -1;
+    }
+
+    if (write_all(STDOUT_FILENO,
+                  frame,
+                  length) < 0) {
+
+        return -1;
+    }
 
     return 0;
 }
 
-static int process_bpf_buffer(
-    unsigned char *buffer,
-    size_t length
-)
+static int process_bpf_buffer(unsigned char *buffer,
+                              size_t length)
 {
     size_t offset = 0;
 
     while (offset < length) {
 
+        /*
+         * bpf_hdr mínimo válido en macOS:
+         * 18 bytes.
+         */
         if (length - offset < 18) {
 
-            fprintf(
-                stderr,
-                "BPF: encabezado incompleto\n"
-            );
+            fprintf(stderr,
+                    "BPF: encabezado incompleto\n");
 
             return -1;
         }
@@ -292,32 +279,26 @@ static int process_bpf_buffer(
 
         if (hdr->bh_hdrlen < 18) {
 
-            fprintf(
-                stderr,
-                "BPF: bh_hdrlen inválido: %u\n",
-                hdr->bh_hdrlen
-            );
+            fprintf(stderr,
+                    "BPF: bh_hdrlen inválido: %u\n",
+                    hdr->bh_hdrlen);
 
             return -1;
         }
 
         if (hdr->bh_caplen == 0) {
 
-            fprintf(
-                stderr,
-                "BPF: bh_caplen=0\n"
-            );
+            fprintf(stderr,
+                    "BPF: bh_caplen=0\n");
 
             return -1;
         }
 
         if (hdr->bh_caplen > MAX_FRAME) {
 
-            fprintf(
-                stderr,
-                "BPF: frame demasiado grande: %u\n",
-                hdr->bh_caplen
-            );
+            fprintf(stderr,
+                    "BPF: frame demasiado grande: %u\n",
+                    hdr->bh_caplen);
 
             return -1;
         }
@@ -330,26 +311,28 @@ static int process_bpf_buffer(
 
         if (frame_end > length) {
 
-            fprintf(
-                stderr,
-                "BPF: frame fuera del buffer\n"
-            );
+            fprintf(stderr,
+                    "BPF: frame fuera del buffer\n");
 
             return -1;
         }
 
         if (emit_frame(
                 buffer + frame_start,
-                hdr->bh_caplen) < 0)
+                hdr->bh_caplen) < 0) {
+
             return -1;
+        }
 
         /*
-         * BPF puede entregar múltiples registros
-         * en un solo read().
+         * Los registros BPF están alineados con
+         * BPF_WORDALIGN().
          */
-        offset += BPF_WORDALIGN(
-            hdr->bh_hdrlen + hdr->bh_caplen
-        );
+        offset +=
+            BPF_WORDALIGN(
+                hdr->bh_hdrlen +
+                hdr->bh_caplen
+            );
     }
 
     return 0;
@@ -359,46 +342,38 @@ int main(int argc, char **argv)
 {
     if (argc != 2) {
 
-        fprintf(
-            stderr,
-            "usage: %s <interface>\n",
-            argv[0]
-        );
+        fprintf(stderr,
+                "usage: %s <interface>\n",
+                argv[0]);
 
         return 1;
     }
 
-    int bpf_fd = open_bpf(argv[1]);
+    /*
+     * stdout contiene exclusivamente el protocolo
+     * binario hacia Java.
+     *
+     * Todos los mensajes de diagnóstico van por stderr.
+     */
+    setvbuf(stdout,
+            NULL,
+            _IONBF,
+            0);
+
+    int bpf_fd =
+        open_bpf(argv[1]);
 
     if (bpf_fd < 0) {
 
         perror("BPF");
-
         return 1;
     }
 
-    /*
-     * stdout = protocolo binario hacia Java.
-     * stderr = diagnóstico.
-     */
-    setvbuf(
-        stdout,
-        NULL,
-        _IONBF,
-        0
-    );
-
-    fprintf(
-        stderr,
-        "BPF abierto en %s\n",
-        argv[1]
-    );
+    fprintf(stderr,
+            "BPF abierto en %s\n",
+            argv[1]);
 
     unsigned char bpf_buffer[BPF_BUFFER_SIZE];
-
-    /*
-     * Buffer de entrada procedente de Java.
-     */
     unsigned char input_buffer[IO_BUFFER_SIZE];
 
     size_t input_length = 0;
@@ -411,69 +386,98 @@ int main(int argc, char **argv)
     fds[1].fd = STDIN_FILENO;
     fds[1].events = POLLIN;
 
+    /*
+     * Bucle permanente.
+     *
+     * RX:
+     *   en0 -> BPF -> stdout -> Java
+     *
+     * TX:
+     *   Java -> stdin -> BPF -> en0
+     */
     for (;;) {
 
-        int result = poll(
-            fds,
-            2,
-            -1
-        );
+        int result =
+            poll(fds,
+                 2,
+                 -1);
 
         if (result < 0) {
 
-            if (errno == EINTR)
+            if (errno == EINTR) {
                 continue;
+            }
 
             perror("poll");
-
             break;
         }
 
         /*
-         * Frames recibidos desde en0.
+         * ============================
+         * RX: Ethernet -> Java
+         * ============================
          */
         if (fds[0].revents & POLLIN) {
 
-            ssize_t n = read(
-                bpf_fd,
-                bpf_buffer,
-                sizeof(bpf_buffer)
-            );
+            ssize_t n =
+                read(bpf_fd,
+                     bpf_buffer,
+                     sizeof(bpf_buffer));
 
             if (n < 0) {
 
-                if (errno != EINTR) {
-                    perror("BPF read");
-                    break;
+                if (errno == EINTR) {
+                    continue;
                 }
 
-            } else if (n > 0) {
+                perror("BPF read");
+                break;
+            }
+
+            if (n > 0) {
 
                 if (process_bpf_buffer(
                         bpf_buffer,
-                        (size_t)n) < 0)
+                        (size_t)n) < 0) {
+
                     break;
+                }
             }
         }
 
         /*
-         * Frames enviados desde Java.
+         * ============================
+         * TX: Java -> Ethernet
+         * ============================
          */
         if (fds[1].revents & POLLIN) {
 
-            int status = read_all_nonblocking(
-                STDIN_FILENO,
-                input_buffer,
-                sizeof(input_buffer),
-                &input_length
-            );
+            ssize_t n =
+                read(STDIN_FILENO,
+                     input_buffer + input_length,
+                     sizeof(input_buffer) -
+                     input_length);
 
-            if (status < 0)
+            if (n < 0) {
+
+                if (errno == EINTR) {
+                    continue;
+                }
+
+                perror("stdin");
                 break;
+            }
+
+            if (n == 0) {
+                break;
+            }
+
+            input_length +=
+                (size_t)n;
 
             /*
-             * Procesar todos los frames completos
-             * disponibles.
+             * Puede haber uno o varios frames
+             * completos dentro del buffer.
              */
             while (input_length >= 2) {
 
@@ -484,22 +488,20 @@ int main(int argc, char **argv)
                 if (frame_length < 14 ||
                     frame_length > MAX_FRAME) {
 
-                    fprintf(
-                        stderr,
-                        "Entrada: longitud inválida: %zu\n",
-                        frame_length
-                    );
+                    fprintf(stderr,
+                            "Entrada: longitud inválida: %zu\n",
+                            frame_length);
 
                     close(bpf_fd);
-
                     return 1;
                 }
 
                 size_t total =
                     2 + frame_length;
 
-                if (input_length < total)
+                if (input_length < total) {
                     break;
+                }
 
                 if (send_frame(
                         bpf_fd,
@@ -507,13 +509,9 @@ int main(int argc, char **argv)
                         frame_length) < 0) {
 
                     close(bpf_fd);
-
                     return 1;
                 }
 
-                /*
-                 * Eliminar frame procesado.
-                 */
                 memmove(
                     input_buffer,
                     input_buffer + total,
@@ -522,27 +520,19 @@ int main(int argc, char **argv)
 
                 input_length -= total;
             }
-
-            /*
-             * Si el buffer está lleno y todavía no tenemos
-             * un frame completo, el protocolo está corrupto.
-             */
-            if (input_length == sizeof(input_buffer)) {
-
-                fprintf(
-                    stderr,
-                    "Entrada: buffer saturado\n"
-                );
-
-                break;
-            }
         }
 
-        if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))
-            break;
+        if (fds[0].revents &
+            (POLLERR | POLLHUP | POLLNVAL)) {
 
-        if (fds[1].revents & (POLLERR | POLLHUP | POLLNVAL))
             break;
+        }
+
+        if (fds[1].revents &
+            (POLLERR | POLLHUP | POLLNVAL)) {
+
+            break;
+        }
     }
 
     close(bpf_fd);

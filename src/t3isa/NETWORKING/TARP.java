@@ -62,6 +62,13 @@ public final class TARP {
         this.localMAC = Arrays.copyOf(localMAC, 6);
         this.localIP = Arrays.copyOf(localIP, 4);
         this.cache = new HashMap<>();
+        System.out.println(
+                "TARP localIP = "
+                + (this.localIP[0] & 0xFF) + "."
+                + (this.localIP[1] & 0xFF) + "."
+                + (this.localIP[2] & 0xFF) + "."
+                + (this.localIP[3] & 0xFF)
+        );
     }
 
     public void request(byte[] targetIP) {
@@ -136,6 +143,13 @@ public final class TARP {
         byte[] senderIP = Arrays.copyOfRange(packet, 14, 18);
         byte[] targetMAC = Arrays.copyOfRange(packet, 18, 24);
         byte[] targetIP = Arrays.copyOfRange(packet, 24, 28);
+        System.out.println(
+                "ARP RX: op=" + operation
+                + " sender=" + intToIP(ipToInt(senderIP))
+                + " target=" + intToIP(ipToInt(targetIP))
+                + " senderMAC=" + macToString(senderMAC)
+                + " ethernetSource=" + macToString(ethernetSource)
+        );
 
         // Aprender siempre la asociación del emisor.
         cache.put(ipToInt(senderIP), senderMAC);
@@ -144,6 +158,22 @@ public final class TARP {
             byte[] reply = buildPacket(REPLY, localMAC, localIP, senderMAC, senderIP);
             ethernet.send(ethernetSource, TEthernet.TYPE_ARP, reply);
         }
+    }
+
+    private static String macToString(byte[] mac) {
+        if (mac == null || mac.length != 6) {
+            return "N/A";
+        }
+
+        return String.format(
+                "%02X:%02X:%02X:%02X:%02X:%02X",
+                mac[0] & 0xFF,
+                mac[1] & 0xFF,
+                mac[2] & 0xFF,
+                mac[3] & 0xFF,
+                mac[4] & 0xFF,
+                mac[5] & 0xFF
+        );
     }
 
     private static byte[] buildPacket(int operation, byte[] senderMAC, byte[] senderIP, byte[] targetMAC, byte[] targetIP) {

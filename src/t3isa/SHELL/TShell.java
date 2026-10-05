@@ -26,6 +26,8 @@ package t3isa.SHELL;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import t3isa.DEVICE.TConsoleDevice;
@@ -41,6 +43,7 @@ import t3isa.NETWORKING.TARP;
 import t3isa.NETWORKING.THostNetwork;
 import t3isa.NETWORKING.TICMP;
 import t3isa.NETWORKING.TIPv4;
+import t3isa.NETWORKING.TTCP;
 
 /**
  *
@@ -191,6 +194,10 @@ public final class TShell {
                 arp(parts);
                 return true;
 
+            case "nc":
+                nc(parts);
+                return true;
+
             case "exit":
                 console.writeLine("shutdown");
                 cpu.halt();
@@ -231,6 +238,8 @@ public final class TShell {
         console.writeLine("  nslookup <host>");
         console.writeLine("  whois <domain>");
         console.writeLine("  wget <url>");
+        console.writeLine("  nc <host> <port>");
+        console.writeLine("  nc -l <port>");
         console.writeLine("  exit");
         console.writeLine("");
     }
@@ -745,6 +754,314 @@ public final class TShell {
             console.writeLine(result);
         } catch (Exception e) {
             console.writeLine("wget: " + e.getMessage());
+        }
+    }
+
+    private void nc(String[] parts) {
+
+        boolean listen = false;
+        boolean verbose = false;
+        boolean reverse = false;
+
+        int port = -1;
+        String host = null;
+        String inputFile = null;
+        String outputFile = null;
+
+        for (int i = 1; i < parts.length; i++) {
+            String arg = parts[i];
+            if ("-l".equals(arg)) {
+                listen = true;
+                continue;
+            }
+
+            if ("-p".equals(arg)) {
+                if (++i >= parts.length) {
+                    console.writeLine("nc: missing port");
+                    return;
+                }
+
+                try {
+                    port = Integer.parseInt(parts[i]);
+                } catch (NumberFormatException e) {
+                    console.writeLine("nc: invalid port");
+                    return;
+                }
+                continue;
+            }
+
+            if ("-v".equals(arg)) {
+                verbose = true;
+                continue;
+            }
+
+            if ("-r".equals(arg)) {
+                reverse = true;
+                continue;
+            }
+
+            if ("<".equals(arg)) {
+                if (++i >= parts.length) {
+                    console.writeLine("nc: missing input file");
+                    return;
+                }
+                inputFile = resolvePath(parts[i]);
+                continue;
+            }
+
+            if (">".equals(arg)) {
+                if (++i >= parts.length) {
+                    console.writeLine("nc: missing output file");
+                    return;
+                }
+                outputFile = resolvePath(parts[i]);
+                continue;
+            }
+
+            // Opciones agrupadas: -l -lp -lv -lpv -v -r
+            if (arg.startsWith("-") && !"-".equals(arg)) {
+                if (arg.length() > 2 && !arg.startsWith("-p")) {
+                    boolean valid = true;
+
+                    for (int j = 1; j < arg.length(); j++) {
+                        char option = arg.charAt(j);
+                        switch (option) {
+
+                            case 'l':
+                                listen = true;
+                                break;
+
+                            case 'v':
+                                verbose = true;
+                                break;
+
+                            case 'r':
+                                reverse = true;
+                                break;
+
+                            case 'p':
+                                //-lpv no puede contener -p sin valor dentro del mismo argumento.
+                                if (j + 1 < arg.length()) {
+                                    try {
+                                        port = Integer.parseInt(arg.substring(j + 1));
+                                    } catch (NumberFormatException e) {
+                                        console.writeLine("nc: invalid port");
+                                        return;
+                                    }
+
+                                    j = arg.length();
+                                } else {
+                                    if (++i >= parts.length) {
+                                        console.writeLine("nc: missing port");
+                                        return;
+                                    }
+
+                                    try {
+                                        port = Integer.parseInt(parts[i]);
+                                    } catch (NumberFormatException e) {
+                                        console.writeLine("nc: invalid port");
+                                        return;
+                                    }
+                                }
+                                break;
+
+                            default:
+                                valid = false;
+                                break;
+                        }
+
+                        if (!valid) {
+                            break;
+                        }
+                    }
+
+                    if (valid) {
+                        continue;
+                    }
+                }
+
+                console.writeLine("nc: unknown option " + arg);
+                return;
+            }
+
+            if (host == null) {
+                host = arg;
+                continue;
+            }
+
+            if (port == -1) {
+                try {
+                    port = Integer.parseInt(arg);
+                } catch (NumberFormatException e) {
+                    console.writeLine("nc: invalid port");
+                    return;
+                }
+                continue;
+            }
+            console.writeLine("nc: too many arguments");
+            return;
+        }
+
+        if (reverse) {
+            console.writeLine("nc: -r not implemented");
+            return;
+        }
+
+        if (port < 1 || port > 65535) {
+            console.writeLine("nc: invalid port");
+            return;
+        }
+
+        if (listen) {
+            if (host != null) {
+                console.writeLine("nc: host not valid in listen mode");
+                return;
+            }
+
+            ncListen(port, verbose, outputFile);
+            return;
+        }
+
+        if (host == null) {
+            console.writeLine("nc: missing host");
+            return;
+        }
+
+        ncConnect(host, port, verbose, inputFile, outputFile);
+    }
+
+    private void ncTransfer(TTCP.Connection connection, String inputFile, String outputFile) {
+        byte[] inputData = null;
+        if (inputFile != null) {
+            try {
+                String content = kernel.getVFS().read(inputFile);
+                inputData = content.getBytes(StandardCharsets.UTF_8);
+            } catch (RuntimeException e) {
+                console.writeLine("nc: " + e.getMessage());
+                connection.close();
+                return;
+            }
+        }
+
+        if (outputFile != null) {
+            try {
+                touch(new String[]{"touch", outputFile});
+            } catch (RuntimeException e) {
+                console.writeLine("nc: " + e.getMessage());
+                connection.close();
+                return;
+            }
+        }
+
+        StringBuilder outputContent = new StringBuilder();
+
+        int offset = 0;
+        boolean inputFinished = inputData == null;
+
+        while (!connection.isClosed()) {
+            kernel.step();
+
+            if (inputData != null && offset < inputData.length) {
+                int length = Math.min(1024, inputData.length - offset);
+                byte[] block = new byte[length];
+
+                System.arraycopy(inputData, offset, block, 0, length);
+
+                connection.send(block);
+
+                offset += length;
+
+                if (offset >= inputData.length) {
+                    inputData = null;
+                    inputFinished = true;
+                }
+            }
+
+            while (connection.hasData()) {
+                byte[] data = connection.receive();
+                if (data == null) {
+                    break;
+                }
+
+                if (outputFile != null) {
+                    outputContent.append(new String(data, StandardCharsets.UTF_8));
+                } else {
+                    console.writeText(new String(data, StandardCharsets.UTF_8));
+                }
+            }
+
+            // Cerrar cuando terminó de enviarlo.
+            if (inputFinished && inputFile != null) {
+                connection.close();
+                inputFile = null;
+            }
+        }
+
+        if (outputFile != null) {
+            try {
+                kernel.getVFS().write(outputFile, outputContent.toString());
+            } catch (RuntimeException e) {
+                console.writeLine("nc: " + e.getMessage());
+            }
+        }
+    }
+
+    private void ncConnect(String host, int port, boolean verbose, String inputFile, String outputFile) {
+        try {
+            byte[] ip = InetAddress.getByName(host).getAddress();
+            if (ip.length != 4) {
+                console.writeLine("nc: IPv4 requerida");
+                return;
+            }
+
+            TTCP tcp = kernel.getTCP();
+            TTCP.Connection connection = tcp.connect(ip, port);
+
+            if (verbose) {
+                console.writeLine("Connection to " + host + " " + port + " initiated.");
+            }
+
+            while (!connection.isEstablished() && !connection.isClosed()) {
+                kernel.step();
+            }
+
+            if (!connection.isEstablished()) {
+                console.writeLine("nc: connection failed");
+                return;
+            }
+
+            if (verbose) {
+                console.writeLine("Connection to " + host + " " + port + " established.");
+            }
+
+            ncTransfer(connection, inputFile, outputFile);
+        } catch (UnknownHostException e) {
+            console.writeLine("nc: " + e.getMessage());
+        }
+    }
+
+    private void ncListen(int port, boolean verbose, String outputFile) {
+
+        try {
+            TTCP tcp = kernel.getTCP();
+            TTCP.Listener listener = tcp.listen(port);
+
+            if (verbose) {
+                console.writeLine("Listening on port " + port + "...");
+            }
+
+            TTCP.Connection connection;
+            while ((connection = listener.accept()) == null) {
+                kernel.step();
+            }
+
+            if (verbose) {
+                console.writeLine("Connection accepted from " + TIPv4.ipToString(connection.getRemoteIP()) + ":" + connection.getRemotePort());
+            }
+
+            ncTransfer(connection, null, outputFile);
+        } catch (Exception e) {
+            console.writeLine("nc: " + e.getMessage());
         }
     }
 

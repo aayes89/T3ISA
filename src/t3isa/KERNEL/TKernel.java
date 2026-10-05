@@ -45,6 +45,7 @@ import t3isa.NETWORKING.TARP;
 import t3isa.NETWORKING.TEthernet;
 import t3isa.NETWORKING.TICMP;
 import t3isa.NETWORKING.TIPv4;
+import t3isa.NETWORKING.TTCP;
 import t3isa.T3ISA;
 
 /**
@@ -63,6 +64,7 @@ public class TKernel {
     private final TARP arp;
     private final TIPv4 ipv4;
     private final TICMP icmp;
+    private final TTCP ttcp;
     private final Queue<byte[]> networkRxQueue = new ArrayDeque<>();
     private int timerTicks;
     private int networkTicks;
@@ -91,9 +93,19 @@ public class TKernel {
         byte[] gateway = {(byte) 10, (byte) 10, (byte) 10, (byte) 254};
 
         this.ethernet = new TEthernet(networkDevice);
+        System.out.println(
+                "TKernel localIP = "
+                + (localIP[0] & 0xFF) + "."
+                + (localIP[1] & 0xFF) + "."
+                + (localIP[2] & 0xFF) + "."
+                + (localIP[3] & 0xFF)
+        );
+
         this.arp = new TARP(ethernet, localMAC, localIP);
+        
         this.ipv4 = new TIPv4(ethernet, arp, localIP, netmask, gateway);
         this.icmp = new TICMP(ipv4);
+        this.ttcp = new TTCP(ipv4);
     }
 
     // Configurar los vectores de interrupción/trap en TCPU
@@ -239,6 +251,7 @@ public class TKernel {
 
                 TEthernet.Frame ipv4Frame = ethernet.receive(frame);
                 ipv4.receive(ipv4Frame);
+                //ttcp.receive();
                 break;
             case TEthernet.TYPE_IPV6:
                 // Ignorar paquetes IPv6
@@ -649,5 +662,9 @@ public class TKernel {
 
     public byte[] receiveNetworkFrame() {
         return networkRxQueue.poll();
+    }
+
+    public TTCP getTCP() {
+        return ttcp;
     }
 }
