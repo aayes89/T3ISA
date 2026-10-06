@@ -33,7 +33,7 @@ import t3isa.ISA.TSyscall;
 import t3isa.ISA.TAssembler;
 import t3isa.ISA.TInstruction;
 import t3isa.ISA.TAssemblerText;
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
 import t3isa.HOST.TNetworkBackend;
 import t3isa.DEVICE.TNetworkDevice;
 import t3isa.HOST.TNetworkHostBackend;

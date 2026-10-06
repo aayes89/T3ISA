@@ -24,13 +24,14 @@
 package t3isa.DEVICE;
 
 import t3isa.HARDWARE.TDevice;
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
+import t3isa.HARDWARE.TMMIODevice;
 
 /**
  *
  * @author Slam
  */
-public final class TGraphicsDevice implements TDevice {
+public final class TGraphicsDevice implements TDevice, TMMIODevice {
 
     private final int width;
     private final int height;
@@ -38,6 +39,9 @@ public final class TGraphicsDevice implements TDevice {
     private final int colorDepth;
 
     private final int[] framebuffer;
+    private int mmioX;
+    private int mmioY;
+    private int mmioColor;
 
     private int cursor;
 
@@ -60,6 +64,9 @@ public final class TGraphicsDevice implements TDevice {
         this.colorDepth = colorDepth;
 
         framebuffer = new int[width * height];
+        mmioX = 0;
+        mmioY = 0;
+        mmioColor = 0;
         cursor = 0;
     }
 
@@ -131,5 +138,54 @@ public final class TGraphicsDevice implements TDevice {
 
     public int[] getFramebuffer() {
         return framebuffer;
+    }
+
+    @Override
+    public TWord read(int offset) {
+        switch (offset) {
+            case 0:
+                return TWord.fromLong(mmioX);
+
+            case 1:
+                return TWord.fromLong(mmioY);
+
+            case 2:
+                return TWord.fromLong(mmioColor);
+
+            case 3:
+                return TWord.zero();
+
+            default:
+                return TWord.zero();
+        }
+    }
+
+    @Override
+    public void write(int offset, TWord value) {
+        int v = (int) value.toLong();
+
+        switch (offset) {
+
+            case 0:
+                mmioX = v;
+                break;
+
+            case 1:
+                mmioY = v;
+                break;
+
+            case 2:
+                mmioColor = v;
+                break;
+
+            case 3:
+                if (v == 1) {
+                    setPixel(mmioX, mmioY, mmioColor);
+                }
+                if (v == 2) {
+                    reset();
+                }
+                break;
+        }
     }
 }

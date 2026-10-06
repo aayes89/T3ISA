@@ -27,8 +27,8 @@ package test;
  *
  * @author Slam
  */
-import t3isa.CORE.TCPU;
-import t3isa.CORE.TWord;
+import t3isa.Core.TCPU;
+import t3isa.Core.TWord;
 import t3isa.HOST.TNetworkLinkBackend;
 import t3isa.ISA.TAssemblerText;
 import t3isa.ISA.TSyscall;

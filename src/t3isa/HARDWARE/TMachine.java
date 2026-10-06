@@ -27,7 +27,7 @@ package t3isa.HARDWARE;
  *
  * @author Slam
  */
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TTrap;
 import t3os.KERNEL.TKernel;
@@ -65,6 +65,13 @@ public interface TMachine {
     int INTERRUPT_HANDLER_KEYBOARD = 180;
 
     int STACK_BOTTOM = 16000;
+
+    int MMIO_BASE = MEMORY_SIZE;
+
+    int MMIO_GRAPHICS_X = MMIO_BASE;
+    int MMIO_GRAPHICS_Y = MMIO_BASE + 1;
+    int MMIO_GRAPHICS_COLOR = MMIO_BASE + 2;
+    int MMIO_GRAPHICS_COMMAND = MMIO_BASE + 3;
 
     void loadProgram(int address, TWord[] program);
 

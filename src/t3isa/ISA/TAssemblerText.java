@@ -27,7 +27,7 @@ package t3isa.ISA;
  *
  * @author Slam
  */
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
 import java.util.ArrayList;
 import java.util.List;
 

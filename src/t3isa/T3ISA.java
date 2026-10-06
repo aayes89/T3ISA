@@ -24,7 +24,8 @@
 package t3isa;
 
 import t3os.T3OS;
-import t3isa.CORE.TCPU;
+import t3isa.Core.TCPU;
+import t3isa.Core.TWord;
 import t3isa.DEVICE.TGraphicsDevice;
 import t3isa.HARDWARE.TMachine;
 import t3isa.HOST.TGraphicsHostBackend;
@@ -48,10 +49,32 @@ public class T3ISA {
 
         TCPU cpu = new TCPU();
         TGraphicsDevice graphicsDevice = cpu.getGraphicsDevice();
+        cpu.setKernelMode(true);
 
-        TRenderizadorTexto renderText = new TRenderizadorTexto();
-        renderText.renderizarTexto(graphicsDevice, "T3SO - A 3state computer\nMade by Slam 2026\n\nGithub: aayes89/t3isa", 10, 100, 2, 0x00FF0000, 0x000000);
+        cpu.getMMIOBus().write(
+                TCPU.MMIO_GRAPHICS_X,
+                TWord.fromLong(100)
+        );
 
+        cpu.getMMIOBus().write(
+                TCPU.MMIO_GRAPHICS_Y,
+                TWord.fromLong(100)
+        );
+
+        cpu.getMMIOBus().write(
+                TCPU.MMIO_GRAPHICS_COLOR,
+                TWord.fromLong(0xFFFFFF)
+        );
+
+        cpu.getMMIOBus().write(
+                TCPU.MMIO_GRAPHICS_COMMAND,
+                TWord.fromLong(1)
+        );
+
+        cpu.setKernelMode(true);
+
+        //TRenderizadorTexto renderText = new TRenderizadorTexto();
+        //renderText.renderizarTexto(graphicsDevice, "T3SO - A 3state computer\nMade by Slam 2026\n\nGithub: aayes89/t3isa", 10, 100, 2, 0x00FF0000, 0x000000);
         TGraphicsHostBackend graphics = new TGraphicsHostBackend(graphicsDevice);
 
         graphics.open();

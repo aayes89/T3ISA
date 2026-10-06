@@ -23,7 +23,7 @@
  */
 package t3os.KERNEL;
 
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;

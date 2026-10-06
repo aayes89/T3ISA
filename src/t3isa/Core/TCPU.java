@@ -21,13 +21,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3isa.CORE;
+package t3isa.Core;
 
 import t3isa.DEVICE.TGraphicsDevice;
 import t3isa.Exceptions.TMemoryException;
 import t3isa.T3ISA;
 import t3isa.HARDWARE.TDevice;
 import t3isa.HARDWARE.TDeviceBus;
+import t3isa.HARDWARE.TMMIOBus;
 import t3isa.HARDWARE.TMachine;
 import t3isa.ISA.TInstruction;
 import t3isa.ISA.TInterrupt;
@@ -67,6 +68,10 @@ import t3os.KERNEL.TKernel;
     * 0..999       KERNEL
     * 1000..15999  USER
     * 16000..19682 STACK
+    * 19683  MMIO_GRAPHICS_X
+    * 19684  MMIO_GRAPHICS_Y
+    * 19685  MMIO_GRAPHICS_COLOR
+    * 19686  MMIO_GRAPHICS_COMMAND
     *
     * Stack grows downward.
  */
@@ -100,6 +105,7 @@ public final class TCPU implements TMachine {
 
     //private TDevice device;   // Ya no es necesario
     private final TDeviceBus deviceBus;
+    private final TMMIOBus mmioBus;
     private final TGraphicsDevice graphicsDevice;
     private TKernel kernel;
 
@@ -111,6 +117,9 @@ public final class TCPU implements TMachine {
 
         deviceBus = new TDeviceBus(16);
         graphicsDevice = new TGraphicsDevice(1024, 768, 60, 32);
+        mmioBus = new TMMIOBus(8);
+        mmioBus.map(MMIO_BASE, 4, graphicsDevice);
+
         reset();
     }
 
@@ -620,20 +629,49 @@ public final class TCPU implements TMachine {
     }
 
     private void executeLoad(TInstruction instruction) {
-        int address = checkedUserAddress(getRegister(instruction.getSrc1()).toLong());
+        long base = getRegister(instruction.getSrc1()).toLong();
+        long rawAddress = base + instruction.getImmediate();
+
+        if (rawAddress >= MMIO_BASE) {
+            if (!kernelMode) {
+                raiseTrap(TTrap.INVALID_MEMORY);
+                return;
+            }
+            setRegister(instruction.getDst(), mmioBus.read((int) rawAddress));
+            incrementPC();
+            return;
+        }
+
+        int address = checkedUserAddress(rawAddress);
         if (address < 0) {
             return;
         }
+
         setRegister(instruction.getDst(), memory[address]);
         incrementPC();
     }
 
     private void executeStore(TInstruction instruction) {
-        int address = checkedUserAddress(getRegister(instruction.getDst()).toLong());
+        long base = getRegister(instruction.getSrc1()).toLong();
+        long rawAddress = base + instruction.getImmediate();
+
+        if (rawAddress >= MMIO_BASE) {
+            if (!kernelMode) {
+                raiseTrap(TTrap.INVALID_MEMORY);
+                return;
+            }
+
+            mmioBus.write((int) rawAddress, getRegister(instruction.getDst()));
+            incrementPC();
+            return;
+        }
+
+        int address = checkedUserAddress(rawAddress);
         if (address < 0) {
             return;
         }
-        memory[address] = getRegister(instruction.getSrc1()).copy();
+
+        memory[address] = getRegister(instruction.getDst()).copy();
         incrementPC();
     }
 
@@ -1261,6 +1299,10 @@ public final class TCPU implements TMachine {
             throw new IllegalArgumentException("El kernel no puede ser null");
         }
         this.kernel = kernel;
+    }
+
+    public TMMIOBus getMMIOBus() {
+        return mmioBus;
     }
 
     public TGraphicsDevice getGraphicsDevice() {

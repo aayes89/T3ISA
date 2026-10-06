@@ -27,7 +27,7 @@ package t3isa.HARDWARE;
  *
  * @author Slam
  */
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
 
 public interface TMMIODevice {
 

@@ -23,7 +23,7 @@
  */
 package t3isa.HARDWARE;
 
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
 
 /**
  *

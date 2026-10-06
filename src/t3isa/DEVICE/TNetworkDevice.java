@@ -29,7 +29,7 @@ package t3isa.DEVICE;
  */
 import t3isa.HOST.TNetworkBackend;
 import t3isa.HARDWARE.TDevice;
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
 import java.util.Arrays;
 
 public final class TNetworkDevice implements TDevice {

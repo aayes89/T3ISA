@@ -24,7 +24,7 @@
 package t3os.BOOT;
 
 import t3isa.ISA.TAssemblerText;
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
 import t3isa.HARDWARE.TMachine;
 
 /**

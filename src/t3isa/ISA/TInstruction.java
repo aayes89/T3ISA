@@ -23,8 +23,8 @@
  */
 package t3isa.ISA;
 
-import t3isa.CORE.TWord;
-import t3isa.CORE.Trit;
+import t3isa.Core.TWord;
+import t3isa.Core.Trit;
 
 /**
  *

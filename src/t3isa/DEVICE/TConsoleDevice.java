@@ -28,7 +28,7 @@ package t3isa.DEVICE;
  * @author Slam
  */
 import t3isa.HARDWARE.TDevice;
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;

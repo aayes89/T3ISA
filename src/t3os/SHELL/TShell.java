@@ -33,7 +33,7 @@ import java.util.Map;
 import t3isa.DEVICE.TConsoleDevice;
 import t3os.KERNEL.TPCB;
 import t3os.KERNEL.TKernel;
-import t3isa.CORE.TWord;
+import t3isa.Core.TWord;
 import t3isa.DEVICE.TNetworkDevice;
 import t3isa.Exceptions.TMemoryException;
 import t3os.FS.TFileSystem;
