@@ -412,6 +412,7 @@ public final class TCPU implements TMachine {
             if (T3ISA.isDEBUG) {
                 System.out.println("MEMORY EXCEPTION PC=" + pc);
             }
+            e.printStackTrace();
             raiseTrap(TTrap.INVALID_MEMORY);
         } catch (ArithmeticException e) {
             if (T3ISA.isDEBUG) {
@@ -654,13 +655,25 @@ public final class TCPU implements TMachine {
     private void executeStore(TInstruction instruction) {
         long base = getRegister(instruction.getSrc1()).toLong();
         long rawAddress = base + instruction.getImmediate();
+        if (T3ISA.isDEBUG) {
+            System.out.println(
+                    "STORE dst=R" + instruction.getDst()
+                    + " src1=R" + instruction.getSrc1()
+                    + " base=" + base
+                    + " imm=" + instruction.getImmediate()
+                    + " address=" + rawAddress
+                    + " value=" + getRegister(instruction.getDst()).toLong()
+            );
+        }
 
         if (rawAddress >= MMIO_BASE) {
+            System.out.println(
+                    "MMIO WRITE -> " + rawAddress
+            );
             if (!kernelMode) {
                 raiseTrap(TTrap.INVALID_MEMORY);
                 return;
             }
-
             mmioBus.write((int) rawAddress, getRegister(instruction.getDst()));
             incrementPC();
             return;
@@ -978,6 +991,129 @@ public final class TCPU implements TMachine {
                     raiseTrap(TTrap.DEVICE_ERROR);
                 }
                 break;
+
+            case TSyscall.GRAPHICS_PIXEL:
+                int x = (int) getRegister(2).toLong();
+                int y = (int) getRegister(3).toLong();
+                int color = (int) getRegister(4).toLong();
+
+                if (x < 0 || x >= graphicsDevice.getWidth() || y < 0 || y >= graphicsDevice.getHeight()) {
+                    raiseTrap(TTrap.INVALID_MEMORY);
+                    return;
+                }
+
+                mmioBus.write(MMIO_GRAPHICS_X, TWord.fromLong(x));
+                mmioBus.write(MMIO_GRAPHICS_Y, TWord.fromLong(y));
+                mmioBus.write(MMIO_GRAPHICS_COLOR, TWord.fromLong(color));
+                mmioBus.write(MMIO_GRAPHICS_COMMAND, TWord.fromLong(1));
+
+                incrementPC();
+                break;
+
+            case TSyscall.GRAPHICS_CLEAR: {
+                int colorc = (int) getRegister(2).toLong();
+                graphicsDevice.clear(colorc);
+                incrementPC();
+                break;
+            }
+
+            case TSyscall.GRAPHICS_LINE: {
+                int x1 = (int) getRegister(2).toLong();
+                int y1 = (int) getRegister(3).toLong();
+                int x2 = (int) getRegister(4).toLong();
+                int y2 = (int) getRegister(5).toLong();
+                int colorl = (int) getRegister(6).toLong();
+                graphicsDevice.drawLine(x1, y1, x2, y2, colorl);
+                incrementPC();
+                break;
+            }
+
+            case TSyscall.GRAPHICS_RECT: {
+                int xr = (int) getRegister(2).toLong();
+                int yr = (int) getRegister(3).toLong();
+                int width = (int) getRegister(4).toLong();
+                int height = (int) getRegister(5).toLong();
+                int colorr = (int) getRegister(6).toLong();
+                graphicsDevice.drawRect(xr, yr, width, height, colorr);
+                incrementPC();
+                break;
+            }
+
+            case TSyscall.GRAPHICS_FILL_RECT: {
+                int xfr = (int) getRegister(2).toLong();
+                int yfr = (int) getRegister(3).toLong();
+                int width = (int) getRegister(4).toLong();
+                int height = (int) getRegister(5).toLong();
+                int colorfr = (int) getRegister(6).toLong();
+                graphicsDevice.fillRect(xfr, yfr, width, height, colorfr);
+                incrementPC();
+                break;
+            }
+            case TSyscall.GRAPHICS_CIRCLE: {
+                int xc = (int) getRegister(2).toLong();
+                int yc = (int) getRegister(3).toLong();
+                int radius = (int) getRegister(4).toLong();
+                int colorgc = (int) getRegister(5).toLong();
+                graphicsDevice.drawCircle(xc, yc, radius, colorgc);
+                incrementPC();
+                break;
+            }
+            case TSyscall.GRAPHICS_FILL_CIRCLE: {
+                int xfc = (int) getRegister(2).toLong();
+                int yfc = (int) getRegister(3).toLong();
+                int radius = (int) getRegister(4).toLong();
+                int colorfc = (int) getRegister(5).toLong();
+                graphicsDevice.fillCircle(xfc, yfc, radius, colorfc);
+                incrementPC();
+                break;
+            }
+            case TSyscall.GRAPHICS_GET_PIXEL: {
+                int xgp = (int) getRegister(2).toLong();
+                int ygp = (int) getRegister(3).toLong();
+                if (xgp < 0 || xgp >= graphicsDevice.getWidth() || ygp < 0 || ygp >= graphicsDevice.getHeight()) {
+                    raiseTrap(TTrap.INVALID_MEMORY);
+                    return;
+                }
+                setRegister(7, TWord.fromLong(graphicsDevice.getPixel(xgp, ygp)));
+                incrementPC();
+                break;
+            }
+
+            case TSyscall.GRAPHICS_WIDTH:
+                setRegister(7, TWord.fromLong(graphicsDevice.getWidth()));
+                incrementPC();
+                break;
+
+            case TSyscall.GRAPHICS_HEIGHT:
+                setRegister(7, TWord.fromLong(graphicsDevice.getHeight()));
+                incrementPC();
+                break;
+
+            case TSyscall.GRAPHICS_COLOR:
+                graphicsDevice.clear((int) getRegister(2).toLong());
+                incrementPC();
+                break;
+
+            case TSyscall.GRAPHICS_PRESENT:
+                /* 
+                * El framebuffer ya es visible para el backend. 
+                * Actualmente no requiere ninguna operación adicional. */
+                incrementPC();
+                break;
+
+            case TSyscall.SLEEP:
+                int milliseconds = (int) getRegister(2).toLong();
+
+                if (milliseconds > 0) {
+                    try {
+                        Thread.sleep(milliseconds);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+
+                incrementPC();
+                return;
 
             default:
                 raiseTrap(TTrap.INVALID_SYSCALL);

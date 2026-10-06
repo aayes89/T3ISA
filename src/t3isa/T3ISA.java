@@ -39,7 +39,7 @@ import test.TRenderizadorTexto;
  */
 public class T3ISA {
 
-    public static final boolean isDEBUG = false;
+    public static final boolean isDEBUG = true;
 
     public static void main(String[] args) {
 
@@ -49,29 +49,6 @@ public class T3ISA {
 
         TCPU cpu = new TCPU();
         TGraphicsDevice graphicsDevice = cpu.getGraphicsDevice();
-        cpu.setKernelMode(true);
-
-        cpu.getMMIOBus().write(
-                TCPU.MMIO_GRAPHICS_X,
-                TWord.fromLong(100)
-        );
-
-        cpu.getMMIOBus().write(
-                TCPU.MMIO_GRAPHICS_Y,
-                TWord.fromLong(100)
-        );
-
-        cpu.getMMIOBus().write(
-                TCPU.MMIO_GRAPHICS_COLOR,
-                TWord.fromLong(0xFFFFFF)
-        );
-
-        cpu.getMMIOBus().write(
-                TCPU.MMIO_GRAPHICS_COMMAND,
-                TWord.fromLong(1)
-        );
-
-        cpu.setKernelMode(true);
 
         //TRenderizadorTexto renderText = new TRenderizadorTexto();
         //renderText.renderizarTexto(graphicsDevice, "T3SO - A 3state computer\nMade by Slam 2026\n\nGithub: aayes89/t3isa", 10, 100, 2, 0x00FF0000, 0x000000);

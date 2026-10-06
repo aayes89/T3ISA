@@ -44,6 +44,7 @@ import t3isa.NETWORKING.THostNetwork;
 import t3isa.NETWORKING.TICMP;
 import t3isa.NETWORKING.TIPv4;
 import t3isa.NETWORKING.TTCP;
+import test.TestMMIO;
 
 /**
  *
@@ -289,10 +290,12 @@ public final class TShell {
         }
 
         String program = parts[1].toLowerCase();
-        String source = "";
+        String source = "", src = "";
 
         switch (program) {
             case "hello":
+                src = TestMMIO.test;
+                
                 source = "MOVI R2, 0\n"
                         + "MOVI R3, 72\n"
                         + "MOVI R1, 6\n"
@@ -321,7 +324,7 @@ public final class TShell {
                 return;
         }
 
-        kernel.createProcess(source);
+        kernel.createProcess(src);
         console.writeLine("program '" + program + "' started");
 
         if (kernel.getScheduler().getCurrentProcess() == null) {

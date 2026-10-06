@@ -136,13 +136,15 @@ public final class TARP {
         byte[] senderIP = Arrays.copyOfRange(packet, 14, 18);
         byte[] targetMAC = Arrays.copyOfRange(packet, 18, 24);
         byte[] targetIP = Arrays.copyOfRange(packet, 24, 28);
-        System.out.println(
-                "ARP RX: op=" + operation
-                + " sender=" + intToIP(ipToInt(senderIP))
-                + " target=" + intToIP(ipToInt(targetIP))
-                + " senderMAC=" + macToString(senderMAC)
-                + " ethernetSource=" + macToString(ethernetSource)
-        );
+        if (t3isa.T3ISA.isDEBUG) {
+            System.out.println(
+                    "ARP RX: op=" + operation
+                    + " sender=" + intToIP(ipToInt(senderIP))
+                    + " target=" + intToIP(ipToInt(targetIP))
+                    + " senderMAC=" + macToString(senderMAC)
+                    + " ethernetSource=" + macToString(ethernetSource)
+            );
+        }
 
         // Aprender siempre la asociación del emisor.
         cache.put(ipToInt(senderIP), senderMAC);

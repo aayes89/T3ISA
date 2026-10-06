@@ -188,4 +188,224 @@ public final class TGraphicsDevice implements TDevice, TMMIODevice {
                 break;
         }
     }
+
+    // Limpia toda la pantalla.
+    public void clear(int color) {
+        for (int i = 0; i < framebuffer.length; i++) {
+            framebuffer[i] = color;
+        }
+    }
+
+    // Línea mediante Bresenham.
+    public void drawLine(int x1, int y1, int x2, int y2, int color) {
+        int dx = Math.abs(x2 - x1);
+        int dy = Math.abs(y2 - y1);
+
+        int sx = x1 < x2 ? 1 : -1;
+        int sy = y1 < y2 ? 1 : -1;
+
+        int err = dx - dy;
+
+        while (true) {
+            setPixel(x1, y1, color);
+
+            if (x1 == x2 && y1 == y2) {
+                break;
+            }
+
+            int e2 = err * 2;
+
+            if (e2 > -dy) {
+                err -= dy;
+                x1 += sx;
+            }
+
+            if (e2 < dx) {
+                err += dx;
+                y1 += sy;
+            }
+        }
+    }
+
+    // Rectángulo sin relleno.
+    public void drawRect(int x, int y, int w, int h, int color) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+
+        drawLine(
+                x,
+                y,
+                x + w - 1,
+                y,
+                color
+        );
+
+        drawLine(
+                x,
+                y,
+                x,
+                y + h - 1,
+                color
+        );
+
+        drawLine(
+                x + w - 1,
+                y,
+                x + w - 1,
+                y + h - 1,
+                color
+        );
+
+        drawLine(
+                x,
+                y + h - 1,
+                x + w - 1,
+                y + h - 1,
+                color
+        );
+    }
+
+    // Rectángulo relleno.
+    public void fillRect(int x, int y, int w, int h, int color) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+
+        int x2 = x + w;
+        int y2 = y + h;
+
+        if (x < 0) {
+            x = 0;
+        }
+
+        if (y < 0) {
+            y = 0;
+        }
+
+        if (x2 > width) {
+            x2 = width;
+        }
+
+        if (y2 > height) {
+            y2 = height;
+        }
+
+        for (int py = y; py < y2; py++) {
+            int offset = py * width + x;
+
+            for (int px = x; px < x2; px++) {
+                framebuffer[offset++] = color;
+            }
+        }
+    }
+
+    // Círculo mediante punto medio.
+    public void drawCircle(int cx, int cy, int radius, int color) {
+        if (radius < 0) {
+            return;
+        }
+
+        int x = radius;
+        int y = 0;
+        int decision = 1 - radius;
+
+        while (x >= y) {
+
+            setPixel(cx + x, cy + y, color);
+            setPixel(cx + y, cy + x, color);
+            setPixel(cx - y, cy + x, color);
+            setPixel(cx - x, cy + y, color);
+            setPixel(cx - x, cy - y, color);
+            setPixel(cx - y, cy - x, color);
+            setPixel(cx + y, cy - x, color);
+            setPixel(cx + x, cy - y, color);
+
+            y++;
+
+            if (decision <= 0) {
+                decision += 2 * y + 1;
+            } else {
+                x--;
+                decision += 2 * (y - x) + 1;
+            }
+        }
+    }
+
+    // Círculo relleno.
+    public void fillCircle(int cx, int cy, int radius, int color) {
+        if (radius < 0) {
+            return;
+        }
+
+        int r2 = radius * radius;
+
+        int minY = Math.max(0, cy - radius);
+
+        int maxY = Math.min(height - 1, cy + radius);
+
+        for (int y = minY; y <= maxY; y++) {
+            int dy = y - cy;
+
+            int remaining = r2 - dy * dy;
+
+            int dx = (int) Math.sqrt(remaining);
+
+            int minX = Math.max(0, cx - dx);
+
+            int maxX = Math.min(width - 1, cx + dx);
+
+            for (int x = minX; x <= maxX; x++) {
+                framebuffer[y * width + x] = color;
+            }
+        }
+    }
+
+    /*
+     * Operación gráfica general.
+     *
+     * command:
+     *
+     * 1  = pixel
+     * 2  = clear
+     * 3  = line
+     * 4  = rect
+     * 5  = fill rect
+     * 6  = circle
+     * 7  = fill circle
+     */
+    public void graphics(int command, int a, int b, int c, int d, int e) {
+
+        switch (command) {
+
+            case 1:
+                setPixel(a, b, c);
+                break;
+
+            case 2:
+                clear(a);
+                break;
+
+            case 3:
+                drawLine(a, b, c, d, e);
+                break;
+
+            case 4:
+                drawRect(a, b, c, d, e);
+                break;
+
+            case 5:
+                fillRect(a, b, c, d, e);
+                break;
+
+            case 6:
+                drawCircle(a, b, c, d);
+                break;
+
+            case 7:
+                fillCircle(a, b, c, d);
+                break;
+        }
+    }
+
 }

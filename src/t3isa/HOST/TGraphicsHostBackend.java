@@ -65,15 +65,23 @@ public final class TGraphicsHostBackend {
                 @Override
                 protected void paintComponent(Graphics g) {
                     super.paintComponent(g);
-                    g.drawImage(image, 0, 0, getWidth(), getHeight(), null);
+                    g.drawImage(image, 0, 0, null);
+                    //g.drawImage(image, 0, 0, getWidth(), getHeight(), null);
                 }
             };
+            panel.setPreferredSize(
+                    new java.awt.Dimension(
+                            device.getWidth(),
+                            device.getHeight()
+                    )
+            );
 
             panel.setDoubleBuffered(true);
             frame.setContentPane(panel);
-            frame.setSize(device.getWidth(), device.getHeight());
+            //frame.setSize(device.getWidth(), device.getHeight());
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
+            frame.pack();
 
             int interval = Math.max(1, 1000 / device.getRefreshRate());
             timer = new Timer(interval, e -> refresh());

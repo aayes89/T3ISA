@@ -52,4 +52,17 @@ public final class TSyscall {
     public static final int NET_STATUS = 17;
     public static final int NET_SEND = 18;
     public static final int NET_RECV = 19;
+    public static final int GRAPHICS_PIXEL = 20;
+    public static final int GRAPHICS_CLEAR = 21;
+    public static final int GRAPHICS_LINE = 22;
+    public static final int GRAPHICS_RECT = 23;
+    public static final int GRAPHICS_FILL_RECT = 24;
+    public static final int GRAPHICS_CIRCLE = 25;
+    public static final int GRAPHICS_FILL_CIRCLE = 26;
+    public static final int GRAPHICS_GET_PIXEL = 27;
+    public static final int GRAPHICS_WIDTH = 28;
+    public static final int GRAPHICS_HEIGHT = 29;
+    public static final int GRAPHICS_COLOR = 30;
+    public static final int GRAPHICS_PRESENT = 31;
+    public static final int SLEEP = 32;
 }
