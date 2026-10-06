@@ -41,7 +41,7 @@ public final class TAssemblerText {
     }
 
     public static TWord[] assemble(String source, int memoryBase) {
-
+        int address = memoryBase;
         String[] lines = source.split("\\R");
         List<String> instructions = new ArrayList<>();
         java.util.Map<String, Integer> labels = new java.util.HashMap<>();
@@ -69,15 +69,28 @@ public final class TAssemblerText {
                 if (labels.containsKey(label)) {
                     throw new IllegalArgumentException("Etiqueta duplicada: " + label);
                 }
-                labels.put(label, memoryBase + instructions.size());
+
+                labels.put(label, address);
+                //labels.put(label, memoryBase + instructions.size());
                 line = line.substring(colon + 1).trim();
                 if (line.isEmpty()) {
                     break;
                 }
             }
 
+            /*if (!line.isEmpty()) {
+                instructions.add(line);
+            }*/
             if (!line.isEmpty()) {
                 instructions.add(line);
+
+                String[] tokens = tokenize(line);
+
+                if (tokens[0].equalsIgnoreCase("CONST")) {
+                    address += 2;
+                } else {
+                    address++;
+                }
             }
         }
 
@@ -98,7 +111,8 @@ public final class TAssemblerText {
                 }
             }
 
-            program.add(parseInstruction(line));
+            //program.add(parseInstruction(line));
+            program.addAll(parseInstruction(line));
         }
 
         return program.toArray(new TWord[0]);
@@ -112,7 +126,24 @@ public final class TAssemblerText {
         return line;
     }
 
-    private static TWord parseInstruction(String line) {
+    private static List<TWord> single(TWord word) {
+        List<TWord> result = new ArrayList<>(1);
+        result.add(word);
+        return result;
+    }
+
+    private static long longInteger(String token) {
+        try {
+            if (token.startsWith("0x") || token.startsWith("0X")) {
+                return Long.parseLong(token.substring(2), 16);
+            }
+            return Long.parseLong(token);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Número inválido: " + token);
+        }
+    }
+
+    private static List<TWord> parseInstruction(String line) {
         String[] tokens = tokenize(line);
         if (tokens.length == 0) {
             throw new IllegalArgumentException("Instrucción vacía");
@@ -122,123 +153,129 @@ public final class TAssemblerText {
         switch (mnemonic) {
             case "NOP":
                 require(tokens, 1);
-                return TAssembler.nop();
+                return single(TAssembler.nop());
 
             case "HALT":
                 require(tokens, 1);
-                return TAssembler.halt();
+                return single(TAssembler.halt());
 
             case "MOV":
                 require(tokens, 3);
-                return TAssembler.mov(register(tokens[1]), register(tokens[2]));
+                return single(TAssembler.mov(register(tokens[1]), register(tokens[2])));
 
             case "MOVI":
                 require(tokens, 3);
-                return TAssembler.movi(register(tokens[1]), integer(tokens[2]));
+                return single(TAssembler.movi(register(tokens[1]), integer(tokens[2])));
 
+            case "CONST":
+                require(tokens, 3);
+                List<TWord> result = new ArrayList<>(2);
+                result.add(TAssembler.constInstruction(register(tokens[1])));
+                result.add(TWord.fromLong(longInteger(tokens[2])));
+                return result;
             case "ADD":
                 require(tokens, 4);
-                return TAssembler.add(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+                return single(TAssembler.add(register(tokens[1]), register(tokens[2]), register(tokens[3])));
 
             case "SUB":
                 require(tokens, 4);
-                return TAssembler.sub(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+                return single(TAssembler.sub(register(tokens[1]), register(tokens[2]), register(tokens[3])));
 
             case "MUL":
                 require(tokens, 4);
-                return TAssembler.mul(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+                return single(TAssembler.mul(register(tokens[1]), register(tokens[2]), register(tokens[3])));
 
             case "DIV":
                 require(tokens, 4);
-                return TAssembler.div(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+                return single(TAssembler.div(register(tokens[1]), register(tokens[2]), register(tokens[3])));
 
             case "MOD":
                 require(tokens, 4);
-                return TAssembler.mod(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+                return single(TAssembler.mod(register(tokens[1]), register(tokens[2]), register(tokens[3])));
 
             case "SHL":
                 require(tokens, 4);
-                return TAssembler.shl(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+                return single(TAssembler.shl(register(tokens[1]), register(tokens[2]), register(tokens[3])));
 
             case "SHR":
                 require(tokens, 4);
-                return TAssembler.shr(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+                return single(TAssembler.shr(register(tokens[1]), register(tokens[2]), register(tokens[3])));
 
             case "NEG":
                 require(tokens, 3);
-                return TAssembler.neg(register(tokens[1]), register(tokens[2]));
+                return single(TAssembler.neg(register(tokens[1]), register(tokens[2])));
 
             case "CMP":
                 require(tokens, 3);
-                return TAssembler.cmp(register(tokens[1]), register(tokens[2]));
+                return single(TAssembler.cmp(register(tokens[1]), register(tokens[2])));
 
             case "TAND":
                 require(tokens, 4);
-                return TAssembler.encode(TOpcode.TAND, register(tokens[1]), register(tokens[2]), register(tokens[3]), 0);
+                return single(TAssembler.encode(TOpcode.TAND, register(tokens[1]), register(tokens[2]), register(tokens[3]), 0));
 
             case "TOR":
                 require(tokens, 4);
-                return TAssembler.encode(TOpcode.TOR, register(tokens[1]), register(tokens[2]), register(tokens[3]), 0);
+                return single(TAssembler.encode(TOpcode.TOR, register(tokens[1]), register(tokens[2]), register(tokens[3]), 0));
 
             case "TNOT":
                 require(tokens, 3);
-                return TAssembler.encode(TOpcode.TNOT, register(tokens[1]), register(tokens[2]), 0, 0);
+                return single(TAssembler.encode(TOpcode.TNOT, register(tokens[1]), register(tokens[2]), 0, 0));
 
             case "JMP":
                 require(tokens, 2);
-                return TAssembler.jmp(integer(tokens[1]));
+                return single(TAssembler.jmp(integer(tokens[1])));
 
             case "JNEG":
                 require(tokens, 2);
-                return TAssembler.jneg(integer(tokens[1]));
+                return single(TAssembler.jneg(integer(tokens[1])));
 
             case "JZERO":
                 require(tokens, 2);
-                return TAssembler.jzero(integer(tokens[1]));
+                return single(TAssembler.jzero(integer(tokens[1])));
 
             case "JPOS":
                 require(tokens, 2);
-                return TAssembler.jpos(integer(tokens[1]));
+                return single(TAssembler.jpos(integer(tokens[1])));
 
             case "TXOR":
                 require(tokens, 4);
-                return TAssembler.txor(register(tokens[1]), register(tokens[2]), register(tokens[3]));
+                return single(TAssembler.txor(register(tokens[1]), register(tokens[2]), register(tokens[3])));
 
             case "LOAD":
                 require(tokens, 4);
-                return TAssembler.load(register(tokens[1]), register(tokens[2]), integer(tokens[3]));
+                return single(TAssembler.load(register(tokens[1]), register(tokens[2]), integer(tokens[3])));
 
             case "STORE":
                 require(tokens, 4);
-                return TAssembler.store(register(tokens[1]), register(tokens[2]), integer(tokens[3]));
+                return single(TAssembler.store(register(tokens[1]), register(tokens[2]), integer(tokens[3])));
 
             case "PUSH":
                 require(tokens, 2);
-                return TAssembler.push(register(tokens[1]));
+                return single(TAssembler.push(register(tokens[1])));
 
             case "POP":
                 require(tokens, 2);
-                return TAssembler.pop(register(tokens[1]));
+                return single(TAssembler.pop(register(tokens[1])));
 
             case "CALL":
                 require(tokens, 2);
-                return TAssembler.call(integer(tokens[1]));
+                return single(TAssembler.call(integer(tokens[1])));
 
             case "SYS":
                 require(tokens, 1);
-                return TAssembler.encode(TOpcode.SYS, 0, 0, 0, 0);
+                return single(TAssembler.encode(TOpcode.SYS, 0, 0, 0, 0));
 
             case "RET":
                 require(tokens, 1);
-                return TAssembler.ret();
+                return single(TAssembler.ret());
 
             case "IRET":
                 //require(tokens, 1);
-                return TAssembler.encode(TOpcode.IRET, 0, 0, 0, 0);
+                return single(TAssembler.encode(TOpcode.IRET, 0, 0, 0, 0));
 
             case "EXIT":
                 require(tokens, 1);
-                return TAssembler.encode(TOpcode.SYS, 0, 0, 0, TSyscall.EXIT);
+                return single(TAssembler.encode(TOpcode.SYS, 0, 0, 0, TSyscall.EXIT));
 
             default:
                 throw new IllegalArgumentException("Mnemonic desconocido: " + mnemonic);

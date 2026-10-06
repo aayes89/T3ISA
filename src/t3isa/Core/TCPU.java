@@ -412,7 +412,6 @@ public final class TCPU implements TMachine {
             if (T3ISA.isDEBUG) {
                 System.out.println("MEMORY EXCEPTION PC=" + pc);
             }
-            e.printStackTrace();
             raiseTrap(TTrap.INVALID_MEMORY);
         } catch (ArithmeticException e) {
             if (T3ISA.isDEBUG) {
@@ -460,6 +459,43 @@ public final class TCPU implements TMachine {
             case MOVI:
                 setRegister(instruction.getDst(), TWord.fromLong(instruction.getImmediate()));
                 incrementPC();
+                break;
+
+            case CONST:
+                int constAddress = pc + 1;
+
+                if (T3ISA.isDEBUG) {
+                    System.out.println(
+                            "CONST EXEC PC=" + pc
+                            + " DST=R" + instruction.getDst()
+                            + " CONST_ADDR=" + constAddress
+                            + " VALUE=" + memory[constAddress].toLong()
+                    );
+                }
+
+                if (constAddress < 0 || constAddress >= MEMORY_SIZE) {
+                    raiseTrap(TTrap.INVALID_MEMORY);
+                    return;
+                }
+
+                setRegister(
+                        instruction.getDst(),
+                        memory[constAddress].copy()
+                );
+
+                if (T3ISA.isDEBUG) {
+                    System.out.println(
+                            "CONST SET OK R" + instruction.getDst()
+                            + " VALUE=" + getRegister(instruction.getDst()).toLong()
+                    );
+                }
+
+                pc += 2;
+
+                if (T3ISA.isDEBUG) {
+                    System.out.println("CONST PC NEXT=" + pc);
+                }
+
                 break;
 
             case ADD:

@@ -132,7 +132,8 @@ MOVI R1, 25
 MOVI R2, 300
 MOVI R3, 450
 MOVI R4, 100
-MOVI R5, 255
+CONST R5, 0xFF0000
+                                     
 SYS
 
                                       
@@ -146,7 +147,7 @@ MOVI R1, 26
 MOVI R2, 650
 MOVI R3, 450
 MOVI R4, 100
-MOVI R5, 255
+CONST R5, 0x00FF00
 SYS
 
 MOVI R1, 32

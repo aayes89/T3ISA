@@ -93,6 +93,10 @@ public final class TAssembler {
         return encode(TOpcode.MOVI, dst, 0, 0, value);
     }
 
+    public static TWord constInstruction(int dst) {
+        return encode(TOpcode.CONST, dst, 0, 0, 0);
+    }
+
     public static TWord add(int dst, int src1, int src2) {
         return encode(TOpcode.ADD, dst, src1, src2, 0);
     }

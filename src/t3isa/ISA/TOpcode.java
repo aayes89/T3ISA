@@ -33,6 +33,7 @@ public enum TOpcode {
     HALT(1),
     MOV(10),
     MOVI(11),
+    CONST(12),
     ADD(20),
     SUB(21),
     NEG(22),
