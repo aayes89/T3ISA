@@ -66,7 +66,10 @@ import t3os.KERNEL.TKernel;
     * 170    - device interrupt
     * 180    - keyboard interrupt
     *
-    * 0..999       KERNEL
+    * 0..999    KERNEL
+    *      FONT_BASE
+    *           FONT_WORDS
+    * ..    FONTS 8x16
     * 1000..15999  USER
     * 16000..19682 STACK
     * 19683  MMIO_GRAPHICS_X
@@ -1154,7 +1157,31 @@ public final class TCPU implements TMachine {
                 }
 
                 incrementPC();
+                break;
+
+            case TSyscall.GRAPHICS_CHAR: {
+                int character = (int) getRegister(2).toLong();
+                int xgc = (int) getRegister(3).toLong();
+                int ygc = (int) getRegister(4).toLong();
+                int scale = (int) getRegister(5).toLong();
+                int foreground = (int) getRegister(6).toLong();
+                int background = (int) getRegister(7).toLong();
+
+                if (character < 0 || character > 255 || scale <= 0) {
+                    raiseTrap(TTrap.INVALID_SYSCALL);
+                    return;
+                }
+
+                if (xgc < 0 || ygc < 0 || xgc + 8 * scale > graphicsDevice.getWidth() || ygc + 16 * scale > graphicsDevice.getHeight()) {
+                    raiseTrap(TTrap.INVALID_MEMORY);
+                    return;
+                }
+
+                graphicsDevice.drawChar(character, xgc, ygc, scale, foreground, background);
+
+                incrementPC();
                 return;
+            }
 
             default:
                 raiseTrap(TTrap.INVALID_SYSCALL);

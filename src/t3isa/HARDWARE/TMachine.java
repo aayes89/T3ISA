@@ -38,7 +38,9 @@ public interface TMachine {
     int REGISTERS = REGISTER_COUNT;
     int MEMORY_SIZE = 19683;
     int KERNEL_MEMORY_END = 999;
+
     int USER_MEMORY_START = 1000;
+
     int KERNEL_STACK_TOP = 15999;
     int KERNEL_STACK_BOTTOM = 15000;
 

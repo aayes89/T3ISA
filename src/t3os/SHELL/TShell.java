@@ -294,7 +294,18 @@ public final class TShell {
 
         switch (program) {
             case "hello":
-                src = TestMMIO.test;
+                src = //TestMMIO.test;
+                        """
+                        CONST R2, 65
+                        CONST R3, 100
+                        CONST R4, 100
+                        CONST R5, 1
+                        CONST R6, 0xFFFFFF
+                        CONST R7, -1
+                        
+                        MOVI R1, 33
+                        SYS
+                        """;
                 
                 source = "MOVI R2, 0\n"
                         + "MOVI R3, 72\n"

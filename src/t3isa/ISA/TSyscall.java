@@ -65,4 +65,6 @@ public final class TSyscall {
     public static final int GRAPHICS_COLOR = 30;
     public static final int GRAPHICS_PRESENT = 31;
     public static final int SLEEP = 32;
+    public static final int GRAPHICS_CHAR = 33;
+
 }

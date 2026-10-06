@@ -273,6 +273,10 @@ public final class TAssemblerText {
                 //require(tokens, 1);
                 return single(TAssembler.encode(TOpcode.IRET, 0, 0, 0, 0));
 
+            case "DATA":
+                require(tokens, 2);
+                return single(TWord.fromLong(longInteger(tokens[1])));
+
             case "EXIT":
                 require(tokens, 1);
                 return single(TAssembler.encode(TOpcode.SYS, 0, 0, 0, TSyscall.EXIT));
