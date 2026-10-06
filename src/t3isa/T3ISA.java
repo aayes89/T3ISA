@@ -27,6 +27,7 @@ import t3os.T3OS;
 import t3isa.Core.TCPU;
 import t3isa.Core.TWord;
 import t3isa.DEVICE.TGraphicsDevice;
+import t3isa.DEVICE.TMouseDevice;
 import t3isa.HARDWARE.TMachine;
 import t3isa.HOST.TGraphicsHostBackend;
 import test.TRenderizadorTexto;
@@ -49,10 +50,11 @@ public class T3ISA {
 
         TCPU cpu = new TCPU();
         TGraphicsDevice graphicsDevice = cpu.getGraphicsDevice();
+        TMouseDevice mouseDevice = cpu.getMouseDevice();
 
         //TRenderizadorTexto renderText = new TRenderizadorTexto();
         //renderText.renderizarTexto(graphicsDevice, "T3SO - A 3state computer\nMade by Slam 2026\n\nGithub: aayes89/t3isa", 10, 100, 2, 0x00FF0000, 0x000000);
-        TGraphicsHostBackend graphics = new TGraphicsHostBackend(graphicsDevice);
+        TGraphicsHostBackend graphics = new TGraphicsHostBackend(graphicsDevice, mouseDevice);
 
         graphics.open();
         T3OS os = new T3OS(cpu);

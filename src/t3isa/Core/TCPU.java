@@ -24,6 +24,7 @@
 package t3isa.Core;
 
 import t3isa.DEVICE.TGraphicsDevice;
+import t3isa.DEVICE.TMouseDevice;
 import t3isa.Exceptions.TMemoryException;
 import t3isa.T3ISA;
 import t3isa.HARDWARE.TDevice;
@@ -107,6 +108,7 @@ public final class TCPU implements TMachine {
     private final TDeviceBus deviceBus;
     private final TMMIOBus mmioBus;
     private final TGraphicsDevice graphicsDevice;
+    private final TMouseDevice mouseDevice;
     private TKernel kernel;
 
     public TCPU() {
@@ -117,8 +119,11 @@ public final class TCPU implements TMachine {
 
         deviceBus = new TDeviceBus(16);
         graphicsDevice = new TGraphicsDevice(1024, 768, 60, 32);
+        mouseDevice = new TMouseDevice();
+
         mmioBus = new TMMIOBus(8);
         mmioBus.map(MMIO_BASE, 4, graphicsDevice);
+        mmioBus.map(MMIO_BASE + 4, 4, mouseDevice);
 
         reset();
     }
@@ -1479,5 +1484,9 @@ public final class TCPU implements TMachine {
 
     public TGraphicsDevice getGraphicsDevice() {
         return graphicsDevice;
+    }
+
+    public TMouseDevice getMouseDevice() {
+        return mouseDevice;
     }
 }

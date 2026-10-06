@@ -28,6 +28,8 @@ package t3isa.HOST;
  * @author Slam
  */
 import java.awt.Graphics;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -35,22 +37,28 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
 import t3isa.DEVICE.TGraphicsDevice;
+import t3isa.DEVICE.TMouseDevice;
 
 public final class TGraphicsHostBackend {
 
     private final TGraphicsDevice device;
+    private final TMouseDevice mouseDevice;
 
     private JFrame frame;
     private JPanel panel;
     private BufferedImage image;
     private Timer timer;
 
-    public TGraphicsHostBackend(TGraphicsDevice device) {
+    public TGraphicsHostBackend(TGraphicsDevice device, TMouseDevice mouseDevice) {
         if (device == null) {
             throw new IllegalArgumentException("Graphics device no puede ser null");
         }
+        if (mouseDevice == null) {
+            throw new IllegalArgumentException("Mouse device no puede ser null");
+        }
 
         this.device = device;
+        this.mouseDevice = mouseDevice;
         image = new BufferedImage(device.getWidth(), device.getHeight(), BufferedImage.TYPE_INT_RGB);
     }
 
@@ -74,6 +82,61 @@ public final class TGraphicsHostBackend {
                             device.getWidth(),
                             device.getHeight()
                     )
+            );
+            panel.addMouseMotionListener(new MouseAdapter() {
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    mouseDevice.setPosition(e.getX(), e.getY());
+                }
+
+                @Override
+                public void mouseDragged(MouseEvent e) {
+                    mouseDevice.setPosition(e.getX(), e.getY());
+                }
+            }
+            );
+
+            panel.addMouseListener(new MouseAdapter() {
+
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    int buttons = mouseDevice.getButtons();
+
+                    if (e.getButton() == MouseEvent.BUTTON1) {
+                        buttons |= 1;
+                    }
+
+                    if (e.getButton() == MouseEvent.BUTTON2) {
+                        buttons |= 2;
+                    }
+
+                    if (e.getButton() == MouseEvent.BUTTON3) {
+                        buttons |= 4;
+                    }
+
+                    mouseDevice.setButtons(buttons);
+                }
+
+                @Override
+                public void mouseReleased(MouseEvent e) {
+
+                    int buttons = mouseDevice.getButtons();
+
+                    if (e.getButton() == MouseEvent.BUTTON1) {
+                        buttons &= ~1;
+                    }
+
+                    if (e.getButton() == MouseEvent.BUTTON2) {
+                        buttons &= ~2;
+                    }
+
+                    if (e.getButton() == MouseEvent.BUTTON3) {
+                        buttons &= ~4;
+                    }
+
+                    mouseDevice.setButtons(buttons);
+                }
+            }
             );
 
             panel.setDoubleBuffered(true);
