@@ -670,4 +670,8 @@ public class TKernel {
     public TTCP getTCP() {
         return ttcp;
     }
+
+    public TMachine getMachine() {
+        return cpu;
+    }
 }

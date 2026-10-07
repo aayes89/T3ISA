@@ -52,6 +52,8 @@ public final class TUIFileExplorer extends TUIElement {
     private int dragOffsetY;
 
     private int selectedIndex;
+    private long lastClickTime;
+    private String lastClickPath;
 
     public TUIFileExplorer(int x, int y, int width, int height, TKernel kernel) {
         super(x, y, width, height);
@@ -70,6 +72,8 @@ public final class TUIFileExplorer extends TUIElement {
         selectedIndex = -1;
         selectedPath = null;
         selectedDirectory = false;
+        lastClickTime = 0;
+        lastClickPath = null;
 
         clipboardPath = null;
         clipboardCut = false;
@@ -160,6 +164,19 @@ public final class TUIFileExplorer extends TUIElement {
 
     @Override
     public void mouseDown(int button, int mouseX, int mouseY) {
+        // El popup tiene prioridad sobre la ventana.
+        if (contextMenu.isOpen()) {
+            if (mouseX >= contextMenu.getX() && mouseX < contextMenu.getX()
+                    + contextMenu.getWidth() && mouseY >= contextMenu.getY()
+                    && mouseY < contextMenu.getY() + contextMenu.getHeight()) {
+                contextMenu.mouseDown(button, mouseX, mouseY);
+                return;
+            }
+
+            // Click fuera del popup.
+            contextMenu.close();
+        }
+
         if (!contains(mouseX, mouseY)) {
             return;
         }
@@ -202,6 +219,11 @@ public final class TUIFileExplorer extends TUIElement {
 
     @Override
     public void mouseUp(int button) {
+        if (contextMenu.isOpen()) {
+            contextMenu.mouseUp(button);
+            return;
+        }
+
         if (button == 1) {
             dragging = false;
         }
@@ -226,7 +248,6 @@ public final class TUIFileExplorer extends TUIElement {
     }
 
     private void openEntry(int index) {
-
         TVFS.TFileInfo[] files;
 
         try {
@@ -239,12 +260,28 @@ public final class TUIFileExplorer extends TUIElement {
             return;
         }
 
+        TVFS.TFileInfo file = files[index];
         selectEntry(index);
 
-        TVFS.TFileInfo file = files[index];
+        long now = System.currentTimeMillis();
+        boolean doubleClick = file.getPath().equals(lastClickPath) && now - lastClickTime <= 400;
+
+        lastClickTime = now;
+        lastClickPath = file.getPath();
+        if (!doubleClick) {
+            return;
+        }
 
         if (file.isDirectory()) {
             openDirectory(file.getPath());
+            return;
+        }
+
+        String name = file.getName().toLowerCase();
+        if (name.endsWith(".t3i") || name.endsWith(".it3")) {
+            executeSelected();
+        } else {
+            openSelected();
         }
     }
 
@@ -274,6 +311,8 @@ public final class TUIFileExplorer extends TUIElement {
 
     public void refresh() {
         selectedIndex = -1;
+        selectedPath = null;
+        selectedDirectory = false;
     }
 
     public void openDirectory(String path) {
@@ -290,13 +329,14 @@ public final class TUIFileExplorer extends TUIElement {
     }
 
     private void copySelected() {
-
         if (selectedPath == null) {
             return;
         }
 
         clipboardPath = selectedPath;
         clipboardCut = false;
+
+        System.out.println("Copiado: " + clipboardPath);
     }
 
     private void pasteClipboard() {
@@ -307,8 +347,19 @@ public final class TUIFileExplorer extends TUIElement {
         try {
             String name = clipboardPath.substring(clipboardPath.lastIndexOf('/') + 1);
             String destination = "/".equals(currentPath) ? "/" + name : currentPath + "/" + name;
+            if (destination.equals(clipboardPath)) {
+                System.out.println("T3Explorador: origen y destino son iguales");
+                return;
+            }
+
             vfs.copy(clipboardPath, destination);
+            System.out.println("Pegado: " + destination);
             refresh();
+            /*
+            * El portapapeles permanece disponible
+            * para realizar múltiples copias.
+             */
+            clipboardCut = false;
         } catch (RuntimeException e) {
             System.out.println("T3Explorador: " + e.getMessage());
         }
@@ -319,14 +370,14 @@ public final class TUIFileExplorer extends TUIElement {
             return;
         }
 
+        String path = selectedPath;
         try {
-            vfs.delete(selectedPath);
-
+            vfs.delete(path);
             selectedPath = null;
             selectedDirectory = false;
             selectedIndex = -1;
-
             refresh();
+            System.out.println("Eliminado: " + path);
         } catch (RuntimeException e) {
             System.out.println("T3Explorador: " + e.getMessage());
         }
@@ -361,8 +412,9 @@ public final class TUIFileExplorer extends TUIElement {
 
         try {
             String content = vfs.read(selectedPath);
-            System.out.println("T3OS FILE: " + selectedPath);
+            System.out.println("========== " + selectedPath + " ==========");
             System.out.println(content);
+            System.out.println("==============================");
         } catch (RuntimeException e) {
             System.out.println("T3Explorador: " + e.getMessage());
         }
@@ -373,15 +425,35 @@ public final class TUIFileExplorer extends TUIElement {
             return;
         }
 
-        /*
-        * Aquí conectare:
-        *
-        * TKernel.exec(...)
-        *
-        * cuando defina el formato
-        * ejecutable de T3OS.
-        * Por ahora podría ser ASM del ISA
-         */
+        String name = selectedPath.toLowerCase();
+        if (!name.endsWith(".t3i") && !name.endsWith(".it3")) {
+            System.out.println("T3Explorador: no es un ejecutable T3OS: " + selectedPath);
+            return;
+        }
+
+        try {
+            String source = vfs.read(selectedPath);
+            if (source == null || source.trim().isEmpty()) {
+                System.out.println("T3Explorador: archivo vacío: " + selectedPath);
+                return;
+            }
+
+            /*
+            * Exactamente el mismo mecanismo
+            * utilizado por TShell.run().
+            *
+            * TKernel.createProcess(String)
+            * ensambla mediante TAssemblerText
+            * y crea el proceso.
+             */
+            kernel.createProcess(source);
+            System.out.println("T3OS: ejecutando " + selectedPath);
+            if (kernel.getScheduler().getCurrentProcess() == null) {
+                kernel.getScheduler().schedule(kernel.getMachine());
+            }
+        } catch (RuntimeException e) {
+            System.out.println("T3Explorador: error ejecutando " + selectedPath + ": " + e.getMessage());
+        }
     }
 
     public void goParent() {
