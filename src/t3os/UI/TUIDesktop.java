@@ -24,6 +24,7 @@
 package t3os.UI;
 
 import t3os.KERNEL.TKernel;
+import t3os.T3OS;
 
 /**
  *
@@ -41,6 +42,7 @@ public final class TUIDesktop extends TUIElement {
     private final TKernel kernel;
 
     private int backgroundColor;
+    private int bgMode;
 
     private boolean showClock;
 
@@ -60,6 +62,8 @@ public final class TUIDesktop extends TUIElement {
         this.kernel = kernel;
 
         backgroundColor = 0x00202020;
+        bgMode = 0; // 0 - fondo inicial 1 segundo fondo
+
         showClock = true;
         clockX = width - 88;
         clockY = height - 28;
@@ -141,9 +145,21 @@ public final class TUIDesktop extends TUIElement {
     public void draw(TUI ui) {
         this.ui = ui;
         // Fondo.
-        ui.fillRect(x, y, width, height, backgroundColor);
+        switch (bgMode) {
+            case 0: // Gradiente azul
+                gradiente();
+                break;
+            case 1: // Fractal mandelbrot
+                mandelbrot();
+                break;
+            default:
+                // fondo fijo
+                ui.fillRect(x, y, width, height, backgroundColor);
+        }
+
         // Taskbar.
         taskbar.draw(ui);
+
         // Start.
         if (startMenu.isVisible()) {
             startMenu.draw(ui);
@@ -211,11 +227,54 @@ public final class TUIDesktop extends TUIElement {
     // Cambiar fondo de pantalla (Colores por ahora)
     private void changeBackground() {
         // Por ahora cambio entre fondos predefinidos.
-        // Añadiré mandelbrot o cargar imágenes
+        // Añadiré mandelbrot, gradientes o cargar imágenes
+        if (bgMode == 0) {
+            bgMode = 1;
+        } else if (bgMode == 1) {
+            bgMode = 0;
+        }
         if (backgroundColor == 0x00202020) {
             backgroundColor = 0x00000080;
         } else {
             backgroundColor = 0x00202020;
+        }
+
+    }
+
+    // Gradiente en azul
+    public void gradiente() {
+        for (int y = 0; y < 728; y += 16) {
+            int b = 60 + (y / 3);
+            if (b > 255) {
+                b = 255;
+            }
+            int col = ((y / 8) << 16) | ((y / 4) << 8) | b;
+            ui.fillRect(0, y, 1024, 16, col);
+        }
+    }
+
+    // Conjunto Mandelbrot usando punto fijo
+    public void mandelbrot() {
+        for (int py = 0; py < 728; py += 4) {
+            for (int px = 0; px < 1024; px += 4) {
+                int x0 = ((px - 600) * 4096) / 300;
+                int y0 = ((py - 364) * 4096) / 300;
+                int cx = 0, cy = 0, iter = 0;
+                while (iter < 24) {
+                    int nx2 = (cx * cx) >> 12;
+                    int ny2 = (cy * cy) >> 12;
+                    if (nx2 + ny2 > 16384) {
+                        break; // 4.0 << 12
+                    }
+                    int xtemp = nx2 - ny2 + x0;
+                    cy = ((2 * cx * cy) >> 12) + y0;
+                    cx = xtemp;
+                    iter++;
+                }
+                int color = (iter == 24) ? 0x00000000 : (0x000000FF | (iter * 10 << 8) | (iter * 5));
+
+                ui.fillRect(px, py, 4, 4, color);
+            }
         }
     }
 
@@ -260,7 +319,13 @@ public final class TUIDesktop extends TUIElement {
 
     // Abrir terminal
     private void openTerminal() {
+        if (ui == null) {
+            return;
+        }
         // Se conectará con TShell.
+        TUITerminal term = new TUITerminal(80, 60, 500, 400, 0x000000, kernel);
+        ui.add(term);
+        ui.bringToFront(term);
     }
 
     // Reiniciar sistema

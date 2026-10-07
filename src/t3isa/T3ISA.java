@@ -39,7 +39,7 @@ import t3isa.HOST.TGraphicsHostBackend;
  */
 public class T3ISA {
 
-    public static final boolean isDEBUG = false;
+    public static final boolean isDEBUG = true;
 
     public static void main(String[] args) {
 

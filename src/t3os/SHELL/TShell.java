@@ -99,7 +99,7 @@ public final class TShell {
     }
 
     // Dispatcher de comandos en T3OS
-    private boolean execute(String line) {
+    public boolean execute(String line) {
         String[] parts = line.split("\\s+");
         String command = parts[0].toLowerCase();
         switch (command) {
