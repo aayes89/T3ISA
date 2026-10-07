@@ -36,6 +36,7 @@ public final class TUIFileExplorer extends TUIElement {
     private static final int TOOLBAR_HEIGHT = 28;
     private static final int ROW_HEIGHT = 22;
 
+    private TUI ui;
     private final TKernel kernel;
     private final TVFS vfs;
     private final TUIPopupMenu contextMenu;
@@ -412,11 +413,12 @@ public final class TUIFileExplorer extends TUIElement {
 
         try {
             String content = vfs.read(selectedPath);
-            System.out.println("========== " + selectedPath + " ==========");
-            System.out.println(content);
-            System.out.println("==============================");
+            TUIEditor editor = new TUIEditor(100, 80, 600, 460, kernel, selectedPath, content);
+
+            // aquí debe agregarse al TUI
+            // y ponerse al frente
         } catch (RuntimeException e) {
-            System.out.println("T3Explorador: " + e.getMessage());
+            System.out.println("T3Editor: " + e.getMessage());
         }
     }
 
@@ -469,6 +471,10 @@ public final class TUIFileExplorer extends TUIElement {
         }
 
         refresh();
+    }
+
+    public void setUI(TUI ui) {
+        this.ui = ui;
     }
 
     public String getCurrentPath() {

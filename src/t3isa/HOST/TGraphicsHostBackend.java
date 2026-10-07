@@ -28,6 +28,8 @@ package t3isa.HOST;
  * @author Slam
  */
 import java.awt.Graphics;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -37,28 +39,35 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
 import t3isa.DEVICE.TGraphicsDevice;
+import t3isa.DEVICE.TKeyboardDevice;
 import t3isa.DEVICE.TMouseDevice;
 
 public final class TGraphicsHostBackend {
 
     private final TGraphicsDevice device;
     private final TMouseDevice mouseDevice;
+    private final TKeyboardDevice keyboardDevice;
 
     private JFrame frame;
     private JPanel panel;
     private BufferedImage image;
     private Timer timer;
 
-    public TGraphicsHostBackend(TGraphicsDevice device, TMouseDevice mouseDevice) {
+    public TGraphicsHostBackend(TGraphicsDevice device, TMouseDevice mouseDevice, TKeyboardDevice keyboardDevice) {
         if (device == null) {
             throw new IllegalArgumentException("Graphics device no puede ser null");
         }
         if (mouseDevice == null) {
             throw new IllegalArgumentException("Mouse device no puede ser null");
         }
+        if (keyboardDevice == null) {
+            throw new IllegalArgumentException("Keyboard device no puede ser null");
+        }
 
         this.device = device;
         this.mouseDevice = mouseDevice;
+        this.keyboardDevice = keyboardDevice;
+
         image = new BufferedImage(device.getWidth(), device.getHeight(), BufferedImage.TYPE_INT_RGB);
     }
 
@@ -139,11 +148,22 @@ public final class TGraphicsHostBackend {
             }
             );
 
+            panel.setFocusable(true);
+
+            panel.addKeyListener(new KeyAdapter() {
+
+                @Override
+                public void keyPressed(KeyEvent e) {
+                    keyboardDevice.push(e.getKeyCode(), e.getKeyChar());
+                }
+            });
+
             panel.setDoubleBuffered(true);
             frame.setContentPane(panel);
             //frame.setSize(device.getWidth(), device.getHeight());
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
+            panel.requestFocusInWindow();
             frame.pack();
 
             int interval = Math.max(1, 1000 / device.getRefreshRate());

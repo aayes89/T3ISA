@@ -1171,7 +1171,7 @@ public final class TShell {
 
         while (!machine.isHalted()) {
             ui.updateMouse(machine.getMouseX(), machine.getMouseY(), machine.getMouseButtons());
-            machine.graphics(2, 0x00FFFFFF, 0, 0, 0, 0);
+            machine.graphics(2, 0x00FFFFFF, 0, 0, 0, 0,0);
 
             ui.draw();
 

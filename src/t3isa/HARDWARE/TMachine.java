@@ -28,6 +28,7 @@ package t3isa.HARDWARE;
  * @author Slam
  */
 import t3isa.Core.TWord;
+import t3isa.DEVICE.TKeyboardDevice;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TTrap;
 import t3os.KERNEL.TKernel;
@@ -74,6 +75,8 @@ public interface TMachine {
     int MMIO_GRAPHICS_Y = MMIO_BASE + 1;
     int MMIO_GRAPHICS_COLOR = MMIO_BASE + 2;
     int MMIO_GRAPHICS_COMMAND = MMIO_BASE + 3;
+    
+    TKeyboardDevice getKeyboardDevice();
 
     void loadProgram(int address, TWord[] program);
 
@@ -141,7 +144,7 @@ public interface TMachine {
 
     public int getCurrentPid();
 
-    void graphics(int command, int a, int b, int c, int d, int e);
+    void graphics(int command, int a, int b, int c, int d, int e, int f);
 
     void drawChar(int character, int x, int y, int scale, int foreground, int background);
 

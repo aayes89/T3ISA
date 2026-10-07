@@ -32,31 +32,15 @@ public final class TUILabel extends TUIElement {
     private String text;
     private int color;
 
-    public TUILabel(
-            int x,
-            int y,
-            String text,
-            int color) {
-
-        super(
-                x,
-                y,
-                text == null ? 0 : text.length() * 8,
-                16
-        );
-
+    public TUILabel(int x, int y, String text, int color) {
+        super(x, y, text == null ? 0 : text.length() * 8, 16);
         this.text = text == null ? "" : text;
         this.color = color;
     }
 
     @Override
     public void draw(TUI ui) {
-        ui.drawText(
-                text,
-                x,
-                y,
-                color
-        );
+        ui.drawText(text, x, y, color);
     }
 
     public String getText() {
@@ -64,14 +48,8 @@ public final class TUILabel extends TUIElement {
     }
 
     public void setText(String text) {
-
-        this.text
-                = text == null
-                        ? ""
-                        : text;
-
-        this.width
-                = this.text.length() * 8;
+        this.text = text == null ? "" : text;
+        this.width = this.text.length() * 8;
     }
 
     public int getColor() {

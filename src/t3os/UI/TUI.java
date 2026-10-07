@@ -29,6 +29,7 @@ package t3os.UI;
  */
 import java.util.ArrayList;
 import java.util.List;
+import t3isa.DEVICE.TKeyboardDevice;
 import t3isa.HARDWARE.TMachine;
 
 public final class TUI {
@@ -55,6 +56,27 @@ public final class TUI {
         }
         this.machine = machine;
         this.popupMenu = null;
+    }
+
+    public void updateKeyboard() {
+        TKeyboardDevice keyboard = machine.getKeyboardDevice();
+        while (keyboard.hasKey()) {
+            TKeyboardDevice.Key key = keyboard.poll();
+            for (int i = elements.size() - 1; i >= 0; i--) {
+                TUIElement element = elements.get(i);
+                if (!element.isVisible() || !element.isEnabled()) {
+                    continue;
+                }
+
+                if (element instanceof TUIEditor) {
+                    TUIEditor editor = (TUIEditor) element;
+                    if (editor.getTextArea().isFocused()) {
+                        editor.keyPressed(key);
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     public void add(TUIElement element) {
@@ -230,11 +252,11 @@ public final class TUI {
     }
 
     void fillRect(int x, int y, int width, int height, int color) {
-        machine.graphics(5, x, y, width, height, color);
+        machine.graphics(5, x, y, width, height, color, 0);
     }
 
     void drawRect(int x, int y, int width, int height, int color) {
-        machine.graphics(4, x, y, width, height, color);
+        machine.graphics(4, x, y, width, height, color, 0);
     }
 
     void drawText(String text, int x, int y, int color) {

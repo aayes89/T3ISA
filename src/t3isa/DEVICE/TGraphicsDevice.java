@@ -170,7 +170,6 @@ public final class TGraphicsDevice implements TDevice, TMMIODevice {
         int v = (int) value.toLong();
 
         switch (offset) {
-
             case 0:
                 mmioX = v;
                 break;
@@ -238,37 +237,10 @@ public final class TGraphicsDevice implements TDevice, TMMIODevice {
             return;
         }
 
-        drawLine(
-                x,
-                y,
-                x + w - 1,
-                y,
-                color
-        );
-
-        drawLine(
-                x,
-                y,
-                x,
-                y + h - 1,
-                color
-        );
-
-        drawLine(
-                x + w - 1,
-                y,
-                x + w - 1,
-                y + h - 1,
-                color
-        );
-
-        drawLine(
-                x,
-                y + h - 1,
-                x + w - 1,
-                y + h - 1,
-                color
-        );
+        drawLine(x, y, x + w - 1, y, color);
+        drawLine(x, y, x, y + h - 1, color);
+        drawLine(x + w - 1, y, x + w - 1, y + h - 1, color);
+        drawLine(x, y + h - 1, x + w - 1, y + h - 1, color);
     }
 
     // Rectángulo relleno.
@@ -874,11 +846,11 @@ public final class TGraphicsDevice implements TDevice, TMMIODevice {
      * 5  = fill rect
      * 6  = circle
      * 7  = fill circle
+     * 8  = drawChar
      */
-    public void graphics(int command, int a, int b, int c, int d, int e) {
+    public void graphics(int command, int a, int b, int c, int d, int e, int f) {
 
         switch (command) {
-
             case 1:
                 setPixel(a, b, c);
                 break;
@@ -905,6 +877,16 @@ public final class TGraphicsDevice implements TDevice, TMMIODevice {
 
             case 7:
                 fillCircle(a, b, c, d);
+                break;
+
+            case 8:
+                drawChar(a, // character
+                        b, // x
+                        c, // y
+                        d, // scale
+                        e, // foreground
+                        f // background
+                );
                 break;
         }
     }

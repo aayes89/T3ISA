@@ -36,6 +36,7 @@ public final class TUIDesktop extends TUIElement {
     private final TUIStartMenu startMenu;
     private final TUIPopupMenu desktopMenu;
     private TUIFileExplorer t3explorer;
+    private TUIEditor editor;
     private final TKernel kernel;
 
     private int backgroundColor;
@@ -67,6 +68,7 @@ public final class TUIDesktop extends TUIElement {
         startMenu = new TUIStartMenu(0, height - 340, 220, 300);
         clock = new TUIClock(clockX, clockY, 20, 40);
         desktopMenu = new TUIPopupMenu(0, 0, 190, 300);
+
         createDesktopMenu();
         createStartMenu();
 
@@ -76,6 +78,7 @@ public final class TUIDesktop extends TUIElement {
     private void createDesktopMenu() {
         desktopMenu.addItem("Cambiar fondo", this::changeBackground);
         desktopMenu.addItem("Explorador", this::openExplorer);
+        desktopMenu.addItem("Editor", this::openEditor);
         desktopMenu.addItem("Terminal", this::openTerminal);
         desktopMenu.addItem("Reiniciar", this::reboot);
         desktopMenu.addItem("Apagar", this::shutdown);
@@ -87,41 +90,48 @@ public final class TUIDesktop extends TUIElement {
         int startX = 0;
         int startY = height - 340;
 
-        TUIButton explorer = new TUIButton(startX, startY, itemWidth, itemHeight, "Explorador");
-        explorer.setAction(() -> {
+        TUIButton btn_explorer = new TUIButton(startX, startY, itemWidth, itemHeight, "Explorador");
+        btn_explorer.setAction(() -> {
             startMenu.close();
             openExplorer();
         });
 
-        TUIButton terminal = new TUIButton(startX, startY + itemHeight, itemWidth, itemHeight, "Terminal");
-        terminal.setAction(() -> {
+        TUIButton btn_editor = new TUIButton(startX, startY, itemWidth, itemHeight, "T3Editor");
+        btn_editor.setAction(() -> {
+            startMenu.close();
+            openEditor();
+        });
+
+        TUIButton btn_terminal = new TUIButton(startX, startY + itemHeight, itemWidth, itemHeight, "Terminal");
+        btn_terminal.setAction(() -> {
             startMenu.close();
             openTerminal();
         });
 
-        TUIButton settings = new TUIButton(startX, startY + itemHeight * 2, itemWidth, itemHeight, "Configuración");
-        settings.setAction(() -> {
+        TUIButton btn_settings = new TUIButton(startX, startY + itemHeight * 2, itemWidth, itemHeight, "Configuración");
+        btn_settings.setAction(() -> {
             startMenu.close();
             openSettings();
         });
 
-        TUIButton reboot = new TUIButton(startX, startY + itemHeight * 3, itemWidth, itemHeight, "Reiniciar");
-        reboot.setAction(() -> {
+        TUIButton btn_reboot = new TUIButton(startX, startY + itemHeight * 3, itemWidth, itemHeight, "Reiniciar");
+        btn_reboot.setAction(() -> {
             startMenu.close();
             reboot();
         });
 
-        TUIButton shutdown = new TUIButton(startX, startY + itemHeight * 4, itemWidth, itemHeight, "Apagar");
-        shutdown.setAction(() -> {
+        TUIButton btn_shutdown = new TUIButton(startX, startY + itemHeight * 4, itemWidth, itemHeight, "Apagar");
+        btn_shutdown.setAction(() -> {
             startMenu.close();
             shutdown();
         });
 
-        startMenu.addButton(explorer);
-        startMenu.addButton(terminal);
-        startMenu.addButton(settings);
-        startMenu.addButton(reboot);
-        startMenu.addButton(shutdown);
+        startMenu.addButton(btn_explorer);
+        startMenu.addButton(btn_editor);
+        startMenu.addButton(btn_terminal);
+        startMenu.addButton(btn_settings);
+        startMenu.addButton(btn_reboot);
+        startMenu.addButton(btn_shutdown);
     }
 
     private void openSettings() {
@@ -218,6 +228,22 @@ public final class TUIDesktop extends TUIElement {
         } else {
             t3explorer.setVisible(true);
             t3explorer.refresh();
+        }
+
+        ui.bringToFront(t3explorer);
+    }
+
+    private void openEditor() {
+        if (ui == null) {
+            return;
+        }
+
+        if (editor == null) {
+            editor = new TUIEditor(80, 60, 500, 400, kernel, "/archivo.txt", "");
+            ui.add(editor);
+        } else {
+            editor.setVisible(true);
+            editor.refresh();
         }
 
         ui.bringToFront(t3explorer);

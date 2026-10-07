@@ -24,6 +24,7 @@
 package t3isa.Core;
 
 import t3isa.DEVICE.TGraphicsDevice;
+import t3isa.DEVICE.TKeyboardDevice;
 import t3isa.DEVICE.TMouseDevice;
 import t3isa.Exceptions.TMemoryException;
 import t3isa.T3ISA;
@@ -112,6 +113,7 @@ public final class TCPU implements TMachine {
     private final TMMIOBus mmioBus;
     private final TGraphicsDevice graphicsDevice;
     private final TMouseDevice mouseDevice;
+    private final TKeyboardDevice keyboardDevice;
     private TKernel kernel;
 
     public TCPU() {
@@ -123,6 +125,7 @@ public final class TCPU implements TMachine {
         deviceBus = new TDeviceBus(16);
         graphicsDevice = new TGraphicsDevice(1024, 768, 60, 32);
         mouseDevice = new TMouseDevice();
+        keyboardDevice = new TKeyboardDevice();
 
         mmioBus = new TMMIOBus(8);
         mmioBus.map(MMIO_BASE, 4, graphicsDevice);
@@ -358,7 +361,7 @@ public final class TCPU implements TMachine {
     @Override
     public void step() {
 
-        if (halted) {            
+        if (halted) {
             return;
         }
 
@@ -1518,8 +1521,8 @@ public final class TCPU implements TMachine {
     }
 
     @Override
-    public void graphics(int command, int a, int b, int c, int d, int e) {
-        graphicsDevice.graphics(command, a, b, c, d, e);
+    public void graphics(int command, int a, int b, int c, int d, int e, int f) {
+        graphicsDevice.graphics(command, a, b, c, d, e, f);
     }
 
     @Override
@@ -1541,4 +1544,10 @@ public final class TCPU implements TMachine {
     public int getMouseButtons() {
         return mouseDevice.getButtons();
     }
+
+    @Override
+    public TKeyboardDevice getKeyboardDevice() {
+        return keyboardDevice;
+    }
+
 }
