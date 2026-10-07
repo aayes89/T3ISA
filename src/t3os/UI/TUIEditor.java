@@ -58,7 +58,13 @@ public class TUIEditor extends TUIElement {
         }
 
         if (!kernel.getVFS().exists(path)) {
-            throw new IllegalArgumentException("Archivo no existe: " + path);
+            if (path.contains("archivo.txt")) {
+                // archivo nuevo, debe ser creado
+                kernel.getVFS().create(path);
+            } else {
+                // Nunca va a llegar aquí pero lo guardamos
+                throw new IllegalArgumentException("Archivo no existe: " + path);
+            }
         }
 
         if (kernel.getVFS().isDirectory(path)) {
@@ -67,6 +73,7 @@ public class TUIEditor extends TUIElement {
 
         this.kernel = kernel;
         this.path = path;
+
         String content = kernel.getVFS().read(path);
 
         text_area = new TUITextArea(

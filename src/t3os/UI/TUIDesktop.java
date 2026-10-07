@@ -246,7 +246,7 @@ public final class TUIDesktop extends TUIElement {
             editor.refresh();
         }
 
-        ui.bringToFront(t3explorer);
+        ui.bringToFront(editor);
     }
 
     private void openTerminal() {

@@ -415,8 +415,9 @@ public final class TUIFileExplorer extends TUIElement {
             String content = vfs.read(selectedPath);
             TUIEditor editor = new TUIEditor(100, 80, 600, 460, kernel, selectedPath, content);
 
-            // aquí debe agregarse al TUI
-            // y ponerse al frente
+            ui.add(editor);
+            ui.bringToFront(editor);
+            editor.draw(ui);
         } catch (RuntimeException e) {
             System.out.println("T3Editor: " + e.getMessage());
         }

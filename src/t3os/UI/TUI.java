@@ -62,8 +62,14 @@ public final class TUI {
         TKeyboardDevice keyboard = machine.getKeyboardDevice();
         while (keyboard.hasKey()) {
             TKeyboardDevice.Key key = keyboard.poll();
+
+            if (key == null) {
+                continue;
+            }
+
             for (int i = elements.size() - 1; i >= 0; i--) {
                 TUIElement element = elements.get(i);
+
                 if (!element.isVisible() || !element.isEnabled()) {
                     continue;
                 }
@@ -72,7 +78,7 @@ public final class TUI {
                     TUIEditor editor = (TUIEditor) element;
                     if (editor.getTextArea().isFocused()) {
                         editor.keyPressed(key);
-                        return;
+                        break;
                     }
                 }
             }

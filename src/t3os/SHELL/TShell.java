@@ -62,12 +62,15 @@ public final class TShell {
     private final TConsoleDevice console;
     private String currentDirectory = "/";
 
+    // Constructor
     public TShell(TMachine machine, TKernel kernel, TConsoleDevice console) {
         this.machine = machine;
         this.kernel = kernel;
         this.console = console;
     }
 
+    // === SHELL ===
+    // Shell y gestión de comandos
     public void start() {
         console.writeLine("");
         console.writeLine("================================");
@@ -95,6 +98,7 @@ public final class TShell {
         }
     }
 
+    // Dispatcher de comandos en T3OS
     private boolean execute(String line) {
         String[] parts = line.split("\\s+");
         String command = parts[0].toLowerCase();
@@ -220,6 +224,7 @@ public final class TShell {
         }
     }
 
+    // Ayuda de T3OS
     private void help() {
         console.writeLine("");
         console.writeLine("Commands:");
@@ -256,29 +261,8 @@ public final class TShell {
         console.writeLine("");
     }
 
-    private void ps() {
-        console.writeLine("");
-        console.writeLine("PID     STATE");
-
-        for (TPCB pcb : kernel.getScheduler().getProcesses()) {
-            console.writeLine(pcb.getPid() + "       " + pcb.getState());
-        }
-
-        console.writeLine("");
-    }
-
-    private void mem() {
-        console.writeLine("");
-        console.writeLine("MEMORY MAP");
-        console.writeLine("KERNEL    0.." + TMachine.KERNEL_MEMORY_END);
-        console.writeLine("USER      " + TMachine.USER_MEMORY_START + ".." + (TMachine.KERNEL_STACK_TOP - 1));
-        console.writeLine("KERNEL STACK    " + TMachine.KERNEL_STACK_BOTTOM + ".." + TMachine.KERNEL_STACK_TOP);
-        console.writeLine("USER STACK    " + TMachine.USER_STACK_BOTTOM + ".." + TMachine.USER_STACK_TOP);
-        console.writeLine("");
-    }
-
+    // Comando ECHO equivalente de Linux
     private void echo(String line) {
-
         if (line.length() <= 4) {
             console.writeLine("");
             return;
@@ -287,12 +271,14 @@ public final class TShell {
         console.writeLine(line.substring(5));
     }
 
+    // Auxiliar para limpiar la consola
     private void clear() {
         for (int i = 0; i < 40; i++) {
             console.writeLine("");
         }
     }
 
+    // Ejecutar ejemplos, código ISA por medio de creación de procesos
     private void run(String[] parts) {
 
         if (parts.length < 2) {
@@ -360,6 +346,8 @@ public final class TShell {
         console.writeLine("");
     }
 
+    // === PILA DE SISTEMA ===
+    // Obtiene un valor de un registro
     private void peek(String[] parts) {
         if (parts.length != 2) {
             console.writeLine("usage: peek <address>");
@@ -377,6 +365,7 @@ public final class TShell {
         }
     }
 
+    // Empuja un valor a un registro
     private void poke(String[] parts) {
         if (parts.length != 3) {
             console.writeLine("usage: poke <address> <value>");
@@ -396,6 +385,30 @@ public final class TShell {
         }
     }
 
+    // Comando PS, mostrar los procesos activos
+    private void ps() {
+        console.writeLine("");
+        console.writeLine("PID     STATE");
+
+        for (TPCB pcb : kernel.getScheduler().getProcesses()) {
+            console.writeLine(pcb.getPid() + "       " + pcb.getState());
+        }
+
+        console.writeLine("");
+    }
+
+    // Mostrar valores de la Pila y Memoria
+    private void mem() {
+        console.writeLine("");
+        console.writeLine("MEMORY MAP");
+        console.writeLine("KERNEL    0.." + TMachine.KERNEL_MEMORY_END);
+        console.writeLine("USER      " + TMachine.USER_MEMORY_START + ".." + (TMachine.KERNEL_STACK_TOP - 1));
+        console.writeLine("KERNEL STACK    " + TMachine.KERNEL_STACK_BOTTOM + ".." + TMachine.KERNEL_STACK_TOP);
+        console.writeLine("USER STACK    " + TMachine.USER_STACK_BOTTOM + ".." + TMachine.USER_STACK_TOP);
+        console.writeLine("");
+    }
+
+    // Mostrar el valor de todos los registros del sistema
     private void regs() {
         console.writeLine("");
         console.writeLine("REGISTERS");
@@ -407,6 +420,7 @@ public final class TShell {
         console.writeLine("");
     }
 
+    // Mostrar información de registros del sistema (depuración)
     private void machine() {
         console.writeLine("");
         console.writeLine("CPU");
@@ -419,6 +433,8 @@ public final class TShell {
         console.writeLine("");
     }
 
+    // === SISTEMA DE ARCHIVOS ===
+    // Comando para cambiar entre directorios según la ruta
     private void cd(String[] parts) {
         if (parts.length != 2) {
             console.writeLine("usage: cd <directory>");
@@ -435,6 +451,7 @@ public final class TShell {
         currentDirectory = path;
     }
 
+    // Comando para ver contenido de un directorio dada la ruta
     private void ls() {
         try {
             TVFS.TFileInfo[] files = kernel.getVFS().list(currentDirectory);
@@ -459,6 +476,7 @@ public final class TShell {
         }
     }
 
+    // Comando para crear un directorio
     private void mkdir(String[] parts) {
         if (parts.length != 2) {
             console.writeLine("usage: mkdir <directory>");
@@ -474,6 +492,7 @@ public final class TShell {
         }
     }
 
+    // Comando para crear un archivo en una ruta dada
     private void touch(String[] parts) {
         if (parts.length != 2) {
             console.writeLine("usage: touch <file>");
@@ -489,6 +508,7 @@ public final class TShell {
         }
     }
 
+    // Comando para escribir en un archivo previamente creado
     private void write(String[] parts) {
         if (parts.length < 3) {
             console.writeLine("usage: write <file> <text>");
@@ -517,6 +537,7 @@ public final class TShell {
         }
     }
 
+    // Comando para visualizar contenido de un archivo
     private void cat(String[] parts) {
         if (parts.length != 2) {
             console.writeLine("usage: cat <file>");
@@ -530,6 +551,7 @@ public final class TShell {
         }
     }
 
+    // Comando para eliminar archivos y carpetas
     private void rm(String[] parts) {
         if (parts.length != 2) {
             console.writeLine("usage: rm <file>");
@@ -545,6 +567,7 @@ public final class TShell {
         }
     }
 
+    // Mostrar información del sistema de archivos
     private void fs() {
         TVFS vfs = kernel.getVFS();
 
@@ -557,10 +580,12 @@ public final class TShell {
         console.writeLine("");
     }
 
+    // Devuelve la ruta actual del directorio
     private void pwd() {
         console.writeLine(currentDirectory);
     }
 
+    // Devolver la ruta completa
     private String resolvePath(String path) {
         if (path == null || path.isEmpty()) {
             return currentDirectory;
@@ -599,6 +624,7 @@ public final class TShell {
         return result;
     }
 
+    // Garantizar que se encuentra en el directorio raiz
     private String parentDirectory(String path) {
         if ("/".equals(path)) {
             return "/";
@@ -613,6 +639,8 @@ public final class TShell {
         return path.substring(0, index);
     }
 
+    // === REDES ===
+    // Comando IFCONFIG incompleto
     private void ifconfig_old() {
         // Para la abstracción de red cuando esté en modo ASM
         TNetworkDevice device = kernel.getNetworkDevice();
@@ -625,6 +653,7 @@ public final class TShell {
         console.writeLine("");
     }
 
+    // Comando IFCONFIG base en Windows/MacOS/Linux
     private void ifconfig() {
         try {
             List<NetworkInterface> interfaces = THostNetwork.getInterfaces();
@@ -651,6 +680,7 @@ public final class TShell {
         }
     }
 
+    // Comando PING por ICMP
     private void ping(String[] args) {
         if (args.length < 2) {
             console.writeLine("usage: ping <host>");
@@ -731,6 +761,7 @@ public final class TShell {
         }
     }
 
+    // Comando NSLOOKUP
     private void nslookup(String[] args) {
 
         if (args.length < 1) {
@@ -754,6 +785,7 @@ public final class TShell {
         }
     }
 
+    // Comando WHOIS
     private void whois(String[] args) {
         if (args.length < 1) {
             console.writeLine("usage: whois <domain>");
@@ -768,6 +800,7 @@ public final class TShell {
         }
     }
 
+    // Comando WGET equivalente de linux/unix
     private void wget(String[] args) {
         if (args.length < 1) {
             console.writeLine("usage: wget <url>");
@@ -782,6 +815,7 @@ public final class TShell {
         }
     }
 
+    // Comando netcat propio
     private void nc(String[] parts) {
 
         boolean listen = false;
@@ -955,6 +989,7 @@ public final class TShell {
         ncConnect(host, port, verbose, inputFile, outputFile);
     }
 
+    // Auxiliar para enviar por netcat
     private void ncTransfer(TTCP.Connection connection, String inputFile, String outputFile) {
         byte[] inputData = null;
         if (inputFile != null) {
@@ -1031,6 +1066,7 @@ public final class TShell {
         }
     }
 
+    // Auxiliar para recibir por netcat
     private void ncConnect(String host, int port, boolean verbose, String inputFile, String outputFile) {
         try {
             byte[] ip = InetAddress.getByName(host).getAddress();
@@ -1065,6 +1101,7 @@ public final class TShell {
         }
     }
 
+    // Auxiliar para escuchar con netcat
     private void ncListen(int port, boolean verbose, String outputFile) {
 
         try {
@@ -1090,22 +1127,7 @@ public final class TShell {
         }
     }
 
-    private String formatMAC(byte[] mac) {
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; i < mac.length; i++) {
-            if (i > 0) {
-                result.append(':');
-            }
-
-            int value = mac[i] & 0xFF;
-            if (value < 16) {
-                result.append('0');
-            }
-            result.append(Integer.toHexString(value));
-        }
-        return result.toString();
-    }
-
+    // Obtener tabla ARP y hacer PING por ARP
     private void arp(String[] args) {
         TARP arp = kernel.getARP();
         if (args.length == 1) {
@@ -1138,6 +1160,24 @@ public final class TShell {
         console.writeLine("     arp <ip>");
     }
 
+    // Auxiliar para formatear MAC
+    private String formatMAC(byte[] mac) {
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < mac.length; i++) {
+            if (i > 0) {
+                result.append(':');
+            }
+
+            int value = mac[i] & 0xFF;
+            if (value < 16) {
+                result.append('0');
+            }
+            result.append(Integer.toHexString(value));
+        }
+        return result.toString();
+    }
+
+    // Auxiliar para formatear IP
     private byte[] parseIP(String value) {
         String[] parts = value.split("\\.");
         if (parts.length != 4) {
@@ -1163,6 +1203,8 @@ public final class TShell {
         return ip;
     }
 
+    // === MODO UI ===
+    // Iniciar el UI de T3OS
     private void startGraphics() {
         TUI ui = new TUI(machine);
         TUIDesktop desktop = new TUIDesktop(1024, 768, kernel);
@@ -1171,7 +1213,7 @@ public final class TShell {
 
         while (!machine.isHalted()) {
             ui.updateMouse(machine.getMouseX(), machine.getMouseY(), machine.getMouseButtons());
-            machine.graphics(2, 0x00FFFFFF, 0, 0, 0, 0,0);
+            machine.graphics(2, 0x00FFFFFF, 0, 0, 0, 0, 0);
 
             ui.draw();
 

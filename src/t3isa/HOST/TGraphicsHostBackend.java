@@ -154,17 +154,21 @@ public final class TGraphicsHostBackend {
 
                 @Override
                 public void keyPressed(KeyEvent e) {
-                    keyboardDevice.push(e.getKeyCode(), e.getKeyChar());
+                    keyboardDevice.push(
+                            e.getKeyCode(),
+                            e.getKeyChar()
+                    );
                 }
             });
 
             panel.setDoubleBuffered(true);
+
             frame.setContentPane(panel);
-            //frame.setSize(device.getWidth(), device.getHeight());
             frame.setLocationRelativeTo(null);
-            frame.setVisible(true);
-            panel.requestFocusInWindow();
             frame.pack();
+            frame.setVisible(true);
+
+            SwingUtilities.invokeLater(() -> panel.requestFocusInWindow());
 
             int interval = Math.max(1, 1000 / device.getRefreshRate());
             timer = new Timer(interval, e -> refresh());
