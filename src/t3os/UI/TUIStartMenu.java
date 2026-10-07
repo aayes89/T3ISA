@@ -30,6 +30,7 @@ package t3os.UI;
 import java.util.ArrayList;
 import java.util.List;
 
+// Componente Menu de inicio
 public final class TUIStartMenu extends TUIElement {
 
     private final List<TUIButton> buttons;
@@ -37,6 +38,7 @@ public final class TUIStartMenu extends TUIElement {
     private int backgroundColor;
     private int borderColor;
 
+    // Constructor
     public TUIStartMenu(int x, int y, int width, int height) {
         super(x, y, width, height);
         buttons = new ArrayList<>();
@@ -45,6 +47,7 @@ public final class TUIStartMenu extends TUIElement {
         visible = false;
     }
 
+    // Dibujar el menu de inicio
     @Override
     public void draw(TUI ui) {
         if (!visible) {
@@ -62,6 +65,7 @@ public final class TUIStartMenu extends TUIElement {
         }
     }
 
+    // Caputa de eventos de mouse
     @Override
     public void mouseMove(int mouseX, int mouseY) {
         if (!visible) {
@@ -98,6 +102,7 @@ public final class TUIStartMenu extends TUIElement {
         }
     }
 
+    // Añadir botón al menu
     public void addButton(TUIButton button) {
         if (button == null) {
             throw new IllegalArgumentException("Botón no puede ser null");
@@ -106,10 +111,12 @@ public final class TUIStartMenu extends TUIElement {
         buttons.add(button);
     }
 
+    // Eliminar botón del menu
     public void removeButton(TUIButton button) {
         buttons.remove(button);
     }
 
+    // Getter y Setters
     public void open() {
         visible = true;
     }

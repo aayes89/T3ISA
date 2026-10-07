@@ -30,6 +30,7 @@ package t3os.UI;
 import java.util.ArrayList;
 import java.util.List;
 
+// Componente Barra de tareas
 public final class TUITaskbar extends TUIElement {
 
     private final List<TUIButton> buttons;
@@ -39,6 +40,7 @@ public final class TUITaskbar extends TUIElement {
 
     private final TUIButton startButton;
 
+    // Constructor
     public TUITaskbar(int x, int y, int width, int height) {
         super(x, y, width, height);
         buttons = new ArrayList<>();
@@ -48,6 +50,7 @@ public final class TUITaskbar extends TUIElement {
         startButton = new TUIButton(x + 4, y + 4, 80, height - 8, "Start");
     }
 
+    // Dibujar en pantalla
     @Override
     public void draw(TUI ui) {
         ui.fillRect(x, y, width, height, backgroundColor);
@@ -64,6 +67,7 @@ public final class TUITaskbar extends TUIElement {
         }
     }
 
+    // Capturar eventos de mouse
     @Override
     public void mouseMove(int mouseX, int mouseY) {
         startButton.mouseMove(mouseX, mouseY);
@@ -104,6 +108,7 @@ public final class TUITaskbar extends TUIElement {
         }
     }
 
+    // Añadir boton a la barra
     public void addButton(TUIButton button) {
         if (button == null) {
             throw new IllegalArgumentException("Botón no puede ser null");
@@ -112,10 +117,12 @@ public final class TUITaskbar extends TUIElement {
         buttons.add(button);
     }
 
+    // Eliminar boton de la barra
     public void removeButton(TUIButton button) {
         buttons.remove(button);
     }
 
+    // Getter y Setters
     public TUIButton getStartButton() {
         return startButton;
     }

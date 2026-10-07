@@ -42,6 +42,7 @@ import t3isa.DEVICE.TGraphicsDevice;
 import t3isa.DEVICE.TKeyboardDevice;
 import t3isa.DEVICE.TMouseDevice;
 
+// Gestión del hardware de dispositivos para el modo gráfico
 public final class TGraphicsHostBackend {
 
     private final TGraphicsDevice device;
@@ -53,6 +54,7 @@ public final class TGraphicsHostBackend {
     private BufferedImage image;
     private Timer timer;
 
+    // Constructor
     public TGraphicsHostBackend(TGraphicsDevice device, TMouseDevice mouseDevice, TKeyboardDevice keyboardDevice) {
         if (device == null) {
             throw new IllegalArgumentException("Graphics device no puede ser null");
@@ -71,6 +73,7 @@ public final class TGraphicsHostBackend {
         image = new BufferedImage(device.getWidth(), device.getHeight(), BufferedImage.TYPE_INT_RGB);
     }
 
+    // Crea la pantalla (Monitor) y gestiona eventos de los dispositivos
     public void open() {
         SwingUtilities.invokeLater(() -> {
 
@@ -78,7 +81,6 @@ public final class TGraphicsHostBackend {
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
             panel = new JPanel() {
-
                 @Override
                 protected void paintComponent(Graphics g) {
                     super.paintComponent(g);
@@ -86,12 +88,7 @@ public final class TGraphicsHostBackend {
                     //g.drawImage(image, 0, 0, getWidth(), getHeight(), null);
                 }
             };
-            panel.setPreferredSize(
-                    new java.awt.Dimension(
-                            device.getWidth(),
-                            device.getHeight()
-                    )
-            );
+            panel.setPreferredSize(new java.awt.Dimension(device.getWidth(), device.getHeight()));
             panel.addMouseMotionListener(new MouseAdapter() {
                 @Override
                 public void mouseMoved(MouseEvent e) {
@@ -105,8 +102,10 @@ public final class TGraphicsHostBackend {
             }
             );
 
+            // Eventos del mouse
             panel.addMouseListener(new MouseAdapter() {
 
+                // Clic del mouse presionado
                 @Override
                 public void mousePressed(MouseEvent e) {
                     int buttons = mouseDevice.getButtons();
@@ -126,6 +125,7 @@ public final class TGraphicsHostBackend {
                     mouseDevice.setButtons(buttons);
                 }
 
+                // Clic del mouse liberado
                 @Override
                 public void mouseReleased(MouseEvent e) {
 
@@ -150,8 +150,10 @@ public final class TGraphicsHostBackend {
 
             panel.setFocusable(true);
 
+            // Eventos del teclado
             panel.addKeyListener(new KeyAdapter() {
 
+                // Captura y procesamiento de teclas
                 @Override
                 public void keyPressed(KeyEvent e) {
                     keyboardDevice.push(
@@ -170,12 +172,14 @@ public final class TGraphicsHostBackend {
 
             SwingUtilities.invokeLater(() -> panel.requestFocusInWindow());
 
+            // Inicialización de Timer para uso en tasa de refrescado de pantalla
             int interval = Math.max(1, 1000 / device.getRefreshRate());
             timer = new Timer(interval, e -> refresh());
             timer.start();
         });
     }
 
+    // Refrescar pantalla (framebuffer)
     private void refresh() {
         int[] framebuffer = device.getFramebuffer();
         int width = device.getWidth();
@@ -185,9 +189,9 @@ public final class TGraphicsHostBackend {
         panel.repaint();
     }
 
+    // Cerrar los eventos de pantalla y tiempo
     public void close() {
         SwingUtilities.invokeLater(() -> {
-
             if (timer != null) {
                 timer.stop();
                 timer = null;
@@ -200,6 +204,7 @@ public final class TGraphicsHostBackend {
         });
     }
 
+    // Getter
     public TGraphicsDevice getDevice() {
         return device;
     }

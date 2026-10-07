@@ -30,15 +30,20 @@ package t3os.UI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
+// Componente Reloj
 public final class TUIClock extends TUIElement {
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
+    // Constructor
     public TUIClock(int x, int y, int width, int height) {
         super(x, y, width, height);
     }
 
+    // Dibujar fecha y hora en pantalla
+    // Hora  (HH:mm:ss)
+    // Fecha (dd/mm/yyyy)
     @Override
     public void draw(TUI ui) {
         LocalDateTime now = LocalDateTime.now();

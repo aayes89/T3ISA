@@ -27,6 +27,7 @@ package t3os.UI;
  *
  * @author Slam
  */
+// Componente Botón
 public final class TUIButton extends TUIElement {
 
     private String text;
@@ -36,11 +37,13 @@ public final class TUIButton extends TUIElement {
 
     private Runnable action;
 
+    // Constructor
     public TUIButton(int x, int y, int width, int height, String text) {
         super(x, y, width, height);
         this.text = text;
     }
 
+    // Dibujar componente en pantalla
     @Override
     public void draw(TUI ui) {
 
@@ -56,6 +59,7 @@ public final class TUIButton extends TUIElement {
         ui.drawText(text, x + 5, y + height / 2, 0x00000000);
     }
 
+    // Captura de eventos de mouse
     @Override
     public void mouseMove(int mouseX, int mouseY) {
         hovered = contains(mouseX, mouseY);
@@ -89,6 +93,7 @@ public final class TUIButton extends TUIElement {
         }
     }
 
+    // GETTER y SETTERS
     public void setText(String text) {
         this.text = text;
     }

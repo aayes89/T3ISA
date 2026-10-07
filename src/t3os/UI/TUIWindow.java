@@ -30,6 +30,7 @@ import java.util.List;
  *
  * @author Slam
  */
+// Componente de ventana
 public final class TUIWindow extends TUIElement {
 
     private String title;
@@ -40,12 +41,14 @@ public final class TUIWindow extends TUIElement {
     private int dragOffsetY;
     private final List<TUIElement> children;
 
+    // Constructor
     public TUIWindow(int x, int y, int width, int height, String title) {
         super(x, y, width, height);
         this.title = title;
         this.children = new ArrayList<>();
     }
 
+    // Dibujar ventana y sus componentes en pantalla
     @Override
     public void draw(TUI ui) {
         // Fondo
@@ -69,6 +72,7 @@ public final class TUIWindow extends TUIElement {
         }
     }
 
+    // Captura de eventos de mouse
     @Override
     public void mouseMove(int mouseX, int mouseY) {
         if (!dragging) {
@@ -98,6 +102,7 @@ public final class TUIWindow extends TUIElement {
         }
     }
 
+    // Añadir elemento a la ventana
     public void add(TUIElement element) {
         if (element == null) {
             throw new IllegalArgumentException("Elemento UI no puede ser null");
@@ -105,10 +110,12 @@ public final class TUIWindow extends TUIElement {
         children.add(element);
     }
 
+    // Eliminar elemento de la ventana
     public void remove(TUIElement element) {
         children.remove(element);
     }
 
+    // Getter y Setters
     public int getChildCount() {
         return children.size();
     }

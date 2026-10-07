@@ -33,6 +33,7 @@ import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TTrap;
 import t3os.KERNEL.TKernel;
 
+// Interfaz de cara a T3OS para interactuar con el hardware
 public interface TMachine {
 
     int REGISTER_COUNT = 27;

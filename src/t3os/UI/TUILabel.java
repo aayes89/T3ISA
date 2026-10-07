@@ -27,22 +27,27 @@ package t3os.UI;
  *
  * @author Slam
  */
+// Componente Etiqueta para UI
 public final class TUILabel extends TUIElement {
 
     private String text;
     private int color;
 
+    // Constructor
     public TUILabel(int x, int y, String text, int color) {
         super(x, y, text == null ? 0 : text.length() * 8, 16);
         this.text = text == null ? "" : text;
         this.color = color;
     }
 
+    // Dibujar la etiqueta
+    // Validar si es necesario añadir colores BG y FG
     @Override
     public void draw(TUI ui) {
         ui.drawText(text, x, y, color);
     }
 
+    // Getter y Setters
     public String getText() {
         return text;
     }

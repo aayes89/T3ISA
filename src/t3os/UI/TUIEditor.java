@@ -30,6 +30,7 @@ import t3os.KERNEL.TKernel;
  *
  * @author Slam
  */
+// Editor de texto
 public class TUIEditor extends TUIElement {
 
     private static final int TITLE_HEIGHT = 24;
@@ -47,6 +48,7 @@ public class TUIEditor extends TUIElement {
 
     private boolean modified;
 
+    // Constructor
     public TUIEditor(int x, int y, int width, int height, TKernel kernel, String path, String text) {
         super(x, y, width, height);
 
@@ -88,6 +90,7 @@ public class TUIEditor extends TUIElement {
         modified = false;
     }
 
+    // Dibujar interfaz del editor y sus componentes
     @Override
     public void draw(TUI ui) {
         if (!visible) {
@@ -133,6 +136,7 @@ public class TUIEditor extends TUIElement {
         text_area.draw(ui);
     }
 
+    // Comando para guardar los cambios en el editor
     public void Guardar() {
         if (!kernel.getVFS().exists(path)) {
             return;
@@ -147,10 +151,7 @@ public class TUIEditor extends TUIElement {
         modified = false;
     }
 
-    public void guardar() {
-        Guardar();
-    }
-
+    // Procesar evento de movimiento del mouse
     @Override
     public void mouseMove(int mouseX, int mouseY) {
         if (!dragging) {
@@ -162,6 +163,7 @@ public class TUIEditor extends TUIElement {
         text_area.setPosition(x + 4, y + TITLE_HEIGHT + TOOLBAR_HEIGHT + 4);
     }
 
+    // Procesar evento de clic presionado en mouse
     @Override
     public void mouseDown(int button, int mouseX, int mouseY) {
         if (!visible) {
@@ -193,6 +195,7 @@ public class TUIEditor extends TUIElement {
         handleClick(mouseX, mouseY);
     }
 
+    // Procesar evento de liberación del clic en el mouse
     @Override
     public void mouseUp(int button) {
         if (button == 1) {
@@ -200,10 +203,12 @@ public class TUIEditor extends TUIElement {
         }
     }
 
+    // Actualizar posición del cursor en el área de texto
     public void refresh() {
         text_area.setPosition(x + 4, y + TITLE_HEIGHT + TOOLBAR_HEIGHT + 4);
     }
 
+    // Manejar el evento de clic sobre el botón guardar o el área de texto
     private void handleClick(int mouseX, int mouseY) {
         int toolbarY = y + TITLE_HEIGHT;
 
@@ -219,6 +224,22 @@ public class TUIEditor extends TUIElement {
         }
     }
 
+    // Procesar evento de teclado (escribir en área de texto)
+    public void keyPressed(TKeyboardDevice.Key key) {
+        if (key == null) {
+            return;
+        }
+
+        int cursorBefore = text_area.getCursor();
+        String textBefore = text_area.getText();
+
+        text_area.keyPressed(key.getCode(), key.getCharacter());
+        if (cursorBefore != text_area.getCursor() || !textBefore.equals(text_area.getText())) {
+            modified = true;
+        }
+    }
+
+    // GETTER y SETTER
     public String getPath() {
         return path;
     }
@@ -239,17 +260,4 @@ public class TUIEditor extends TUIElement {
         this.modified = modified;
     }
 
-    public void keyPressed(TKeyboardDevice.Key key) {
-        if (key == null) {
-            return;
-        }
-
-        int cursorBefore = text_area.getCursor();
-        String textBefore = text_area.getText();
-
-        text_area.keyPressed(key.getCode(), key.getCharacter());
-        if (cursorBefore != text_area.getCursor() || !textBefore.equals(text_area.getText())) {
-            modified = true;
-        }
-    }
 }

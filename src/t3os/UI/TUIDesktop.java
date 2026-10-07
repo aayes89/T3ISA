@@ -29,6 +29,7 @@ import t3os.KERNEL.TKernel;
  *
  * @author Slam
  */
+// Implementación del escritorio para el UI
 public final class TUIDesktop extends TUIElement {
 
     private final TUIClock clock;
@@ -50,12 +51,11 @@ public final class TUIDesktop extends TUIElement {
 
     private TUI ui;
 
+    // Constructor
     public TUIDesktop(int width, int height, TKernel kernel) {
         super(0, 0, width, height);
         if (kernel == null) {
-            throw new IllegalArgumentException(
-                    "Kernel no puede ser null"
-            );
+            throw new IllegalArgumentException("Kernel no puede ser null");
         }
         this.kernel = kernel;
 
@@ -75,6 +75,7 @@ public final class TUIDesktop extends TUIElement {
         taskbar.setStartAction(startMenu::toggle);
     }
 
+    // Generar elementos del menu clic derecho
     private void createDesktopMenu() {
         desktopMenu.addItem("Cambiar fondo", this::changeBackground);
         desktopMenu.addItem("Explorador", this::openExplorer);
@@ -84,6 +85,7 @@ public final class TUIDesktop extends TUIElement {
         desktopMenu.addItem("Apagar", this::shutdown);
     }
 
+    // Generar elementos del menú de inicio
     private void createStartMenu() {
         int itemHeight = 32;
         int itemWidth = 220;
@@ -134,12 +136,8 @@ public final class TUIDesktop extends TUIElement {
         startMenu.addButton(btn_shutdown);
     }
 
-    private void openSettings() {
-        // Se implementará posteriormente.
-    }
-
+    // Dibujar los componentes del escritorio
     @Override
-
     public void draw(TUI ui) {
         this.ui = ui;
         // Fondo.
@@ -156,6 +154,7 @@ public final class TUIDesktop extends TUIElement {
         }
     }
 
+    // Eventos al mover el mouse
     @Override
     public void mouseMove(int mouseX, int mouseY) {
         taskbar.mouseMove(mouseX, mouseY);
@@ -164,6 +163,7 @@ public final class TUIDesktop extends TUIElement {
         }
     }
 
+    // Eventos al presionar clic del mouse
     @Override
     public void mouseDown(int button, int mouseX, int mouseY) {
         if (button == 3) {
@@ -195,6 +195,7 @@ public final class TUIDesktop extends TUIElement {
         }
     }
 
+    // Eventos al soltar clic del mouse
     @Override
     public void mouseUp(int button) {
         if (button != 1) {
@@ -207,6 +208,7 @@ public final class TUIDesktop extends TUIElement {
         }
     }
 
+    // Cambiar fondo de pantalla (Colores por ahora)
     private void changeBackground() {
         // Por ahora cambio entre fondos predefinidos.
         // Añadiré mandelbrot o cargar imágenes
@@ -217,6 +219,12 @@ public final class TUIDesktop extends TUIElement {
         }
     }
 
+    // Abrir Panel de control
+    private void openSettings() {
+        // Se implementará posteriormente.
+    }
+
+    // Abrir explorador
     private void openExplorer() {
         if (ui == null) {
             return;
@@ -233,6 +241,7 @@ public final class TUIDesktop extends TUIElement {
         ui.bringToFront(t3explorer);
     }
 
+    // Abrir editor
     private void openEditor() {
         if (ui == null) {
             return;
@@ -249,14 +258,17 @@ public final class TUIDesktop extends TUIElement {
         ui.bringToFront(editor);
     }
 
+    // Abrir terminal
     private void openTerminal() {
         // Se conectará con TShell.
     }
 
+    // Reiniciar sistema
     private void reboot() {
         // Se implementará cuando T3OS tenga reinicio completo.
     }
 
+    // Apagar sistema
     private void shutdown() {
         if (ui != null) {
             ui.closePopup();
@@ -265,6 +277,7 @@ public final class TUIDesktop extends TUIElement {
         System.exit(0);
     }
 
+    // === GETTER y SETTERS ===
     public TUIPopupMenu getDesktopMenu() {
         return desktopMenu;
     }

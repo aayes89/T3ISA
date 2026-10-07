@@ -44,6 +44,7 @@ public final class TUI {
     private TUIElement contextElement;
     private TUIPopupMenu popupMenu;
 
+    // Constructor
     public TUI(TMachine machine) {
         elements = new ArrayList<>();
 
@@ -58,6 +59,7 @@ public final class TUI {
         this.popupMenu = null;
     }
 
+    // Captura de eventos del teclado
     public void updateKeyboard() {
         TKeyboardDevice keyboard = machine.getKeyboardDevice();
         while (keyboard.hasKey()) {
@@ -85,6 +87,7 @@ public final class TUI {
         }
     }
 
+    // Añadir componentes al UI
     public void add(TUIElement element) {
         if (element == null) {
             throw new IllegalArgumentException("Elemento UI no puede ser null");
@@ -93,6 +96,7 @@ public final class TUI {
         elements.add(element);
     }
 
+    // Eliminar un componente del UI
     public void remove(TUIElement element) {
         if (mouseCapture == element) {
             mouseCapture = null;
@@ -109,36 +113,7 @@ public final class TUI {
         elements.remove(element);
     }
 
-    public void setPopupMenu(TUIPopupMenu popupMenu) {
-        if (this.popupMenu != null) {
-            elements.remove(this.popupMenu);
-        }
-        this.popupMenu = popupMenu;
-        if (popupMenu != null) {
-            add(popupMenu);
-            bringToFront(popupMenu);
-        }
-    }
-
-    public TUIPopupMenu getPopupMenu() {
-        return popupMenu;
-    }
-
-    public void openPopup(int x, int y) {
-        if (popupMenu == null) {
-            return;
-        }
-        popupMenu.open(x, y);
-        bringToFront(popupMenu);
-    }
-
-    public void closePopup() {
-        if (popupMenu != null) {
-            popupMenu.close();
-        }
-        contextElement = null;
-    }
-
+    // Dibujar elementos en el UI
     public void draw() {
         for (TUIElement element : elements) {
             if (!element.isVisible()) {
@@ -148,6 +123,7 @@ public final class TUI {
         }
     }
 
+    // Capturar y procesar eventos del mouse
     public void updateMouse(int x, int y, int buttons) {
         int previousButtons = mouseButtons;
 
@@ -237,12 +213,70 @@ public final class TUI {
         }
     }
 
+    // Poner delante un elemento determinado
     public void bringToFront(TUIElement element) {
         if (!elements.remove(element)) {
             return;
         }
 
         elements.add(element);
+    }
+
+    // Abrir un menu popup en la posición x e y
+    public void openPopup(int x, int y) {
+        if (popupMenu == null) {
+            return;
+        }
+        popupMenu.open(x, y);
+        bringToFront(popupMenu);
+    }
+
+    // Cerrar el menu popup activo
+    public void closePopup() {
+        if (popupMenu != null) {
+            popupMenu.close();
+        }
+        contextElement = null;
+    }
+
+    // Auxiliar para pintar un rectángulo relleno en pantalla
+    void fillRect(int x, int y, int width, int height, int color) {
+        machine.graphics(5, x, y, width, height, color, 0);
+    }
+
+    // Auxiliar para dibujar contorno de un rectángulo en pantalla
+    void drawRect(int x, int y, int width, int height, int color) {
+        machine.graphics(4, x, y, width, height, color, 0);
+    }
+
+    // Auxiliar para imprimir texto en pantalla
+    void drawText(String text, int x, int y, int color) {
+        if (text == null) {
+            return;
+        }
+
+        int cursorX = x;
+        for (int i = 0; i < text.length(); i++) {
+            machine.drawChar(text.charAt(i), cursorX, y, 1, color, -1);
+            cursorX += 8;
+        }
+    }
+
+    // GETTERS y SETTERS
+    // Establecer un Menu Popup
+    public void setPopupMenu(TUIPopupMenu popupMenu) {
+        if (this.popupMenu != null) {
+            elements.remove(this.popupMenu);
+        }
+        this.popupMenu = popupMenu;
+        if (popupMenu != null) {
+            add(popupMenu);
+            bringToFront(popupMenu);
+        }
+    }
+
+    public TUIPopupMenu getPopupMenu() {
+        return popupMenu;
     }
 
     public int getMouseX() {
@@ -257,23 +291,4 @@ public final class TUI {
         return mouseButtons;
     }
 
-    void fillRect(int x, int y, int width, int height, int color) {
-        machine.graphics(5, x, y, width, height, color, 0);
-    }
-
-    void drawRect(int x, int y, int width, int height, int color) {
-        machine.graphics(4, x, y, width, height, color, 0);
-    }
-
-    void drawText(String text, int x, int y, int color) {
-        if (text == null) {
-            return;
-        }
-
-        int cursorX = x;
-        for (int i = 0; i < text.length(); i++) {
-            machine.drawChar(text.charAt(i), cursorX, y, 1, color, -1);
-            cursorX += 8;
-        }
-    }
 }

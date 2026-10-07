@@ -30,6 +30,7 @@ package t3os.UI;
 import java.util.ArrayList;
 import java.util.List;
 
+// Menu contextual estilo popup
 public final class TUIPopupMenu extends TUIElement {
 
     private final List<TUIButton> items;
@@ -37,6 +38,7 @@ public final class TUIPopupMenu extends TUIElement {
     private int borderColor;
     private static final int ITEM_HEIGHT = 24;
 
+    // Constructor
     public TUIPopupMenu(int x, int y, int width, int height) {
         super(x, y, width, height);
         items = new ArrayList<>();
@@ -45,6 +47,7 @@ public final class TUIPopupMenu extends TUIElement {
         visible = false;
     }
 
+    // Dibujar el menu, se actualiza el alto según elementos dentro
     @Override
     public void draw(TUI ui) {
         if (!visible) {
@@ -62,6 +65,7 @@ public final class TUIPopupMenu extends TUIElement {
         }
     }
 
+    // Captura de eventos de mouse en los componentes internos del menu
     @Override
     public void mouseMove(int mouseX, int mouseY) {
         if (!visible) {
@@ -96,6 +100,7 @@ public final class TUIPopupMenu extends TUIElement {
         }
     }
 
+    // Añadir elemento al menu
     public void addItem(String text, Runnable action) {
         int itemY = y + items.size() * ITEM_HEIGHT;
         TUIButton item = new TUIButton(x, itemY, width, ITEM_HEIGHT, text);
@@ -109,6 +114,7 @@ public final class TUIPopupMenu extends TUIElement {
         height = items.size() * ITEM_HEIGHT;
     }
 
+    // Eliminar elemento del menu
     public void removeItem(TUIButton item) {
         if (!items.remove(item)) {
             return;
@@ -116,6 +122,7 @@ public final class TUIPopupMenu extends TUIElement {
         repositionItems();
     }
 
+    // Actualizar tamaño del menu según elementos
     private void repositionItems() {
         for (int i = 0; i < items.size(); i++) {
             TUIButton item = items.get(i);
@@ -125,6 +132,7 @@ public final class TUIPopupMenu extends TUIElement {
         height = items.size() * ITEM_HEIGHT;
     }
 
+    // Mostrar menu en posición
     public void open(int x, int y) {
         this.x = x;
         this.y = y;
@@ -132,6 +140,7 @@ public final class TUIPopupMenu extends TUIElement {
         visible = true;
     }
 
+    // GEtter y Setters
     public void close() {
         visible = false;
     }

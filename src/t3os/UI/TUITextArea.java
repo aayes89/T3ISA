@@ -29,6 +29,7 @@ package t3os.UI;
  */
 import java.awt.event.KeyEvent;
 
+// Componente Área de texto
 public class TUITextArea extends TUIElement {
 
     private final StringBuilder sb;
@@ -37,6 +38,7 @@ public class TUITextArea extends TUIElement {
     private int cursor;
     private boolean focused;
 
+    // Constructor
     public TUITextArea(int x, int y, int width, int height, String text, int color) {
         super(x, y, width, height);
 
@@ -51,6 +53,7 @@ public class TUITextArea extends TUIElement {
         focused = false;
     }
 
+    // Dibujar área de texto en pantalla
     @Override
     public void draw(TUI ui) {
         ui.fillRect(x, y, width, height, 0x00FFFFFF);
@@ -97,6 +100,7 @@ public class TUITextArea extends TUIElement {
         }
     }
 
+    // Capturar evenetos de mouse
     @Override
     public void mouseDown(int button, int mouseX, int mouseY) {
         if (button != 1) {
@@ -138,6 +142,7 @@ public class TUITextArea extends TUIElement {
         return sb.length();
     }
 
+    // Gestión del cursor capturando teclas particulares
     public void keyPressed(int key, char character) {
         switch (key) {
             case KeyEvent.VK_LEFT:
@@ -178,6 +183,7 @@ public class TUITextArea extends TUIElement {
         }
     }
 
+    // Inserta texto en posición del cursor
     public void addString(String text) {
         if (text == null) {
             return;
@@ -187,6 +193,7 @@ public class TUITextArea extends TUIElement {
         cursor += text.length();
     }
 
+    // Añade texto al final del actual
     public void append(String text) {
         if (text == null) {
             return;
@@ -196,6 +203,7 @@ public class TUITextArea extends TUIElement {
         cursor = sb.length();
     }
 
+    // Elimina el último caracter en el buffer cada vez
     public void backspace() {
         if (cursor <= 0) {
             return;
@@ -205,6 +213,7 @@ public class TUITextArea extends TUIElement {
         cursor--;
     }
 
+    // Elimina el caracter en la posición del cursor actual
     public void delete() {
         if (cursor >= sb.length()) {
             return;
@@ -213,30 +222,35 @@ public class TUITextArea extends TUIElement {
         sb.deleteCharAt(cursor);
     }
 
+    // Mover a la izquierda el cursor (posición actual -1)
     public void moveLeft() {
         if (cursor > 0) {
             cursor--;
         }
     }
 
+    // Mover a la derecha el cursor (posición actual +1)
     public void moveRight() {
         if (cursor < sb.length()) {
             cursor++;
         }
     }
 
+    // Pone posición del cursor en 0 horizontal respecto a Y
     public void moveHome() {
         while (cursor > 0 && sb.charAt(cursor - 1) != '\n') {
             cursor--;
         }
     }
 
+    // Pone posición del cursor al max horizontal respecto a Y
     public void moveEnd() {
         while (cursor < sb.length() && sb.charAt(cursor) != '\n') {
             cursor++;
         }
     }
 
+    // Getter y Setters
     public String getText() {
         return sb.toString();
     }

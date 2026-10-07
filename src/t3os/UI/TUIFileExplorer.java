@@ -30,6 +30,7 @@ package t3os.UI;
 import t3os.FS.TVFS;
 import t3os.KERNEL.TKernel;
 
+// Explorador de archivos
 public final class TUIFileExplorer extends TUIElement {
 
     private static final int TITLE_HEIGHT = 24;
@@ -56,6 +57,7 @@ public final class TUIFileExplorer extends TUIElement {
     private long lastClickTime;
     private String lastClickPath;
 
+    // Constructor
     public TUIFileExplorer(int x, int y, int width, int height, TKernel kernel) {
         super(x, y, width, height);
         if (kernel == null) {
@@ -90,6 +92,7 @@ public final class TUIFileExplorer extends TUIElement {
         contextMenu.addItem("Actualizar", this::refresh);
     }
 
+    // Dibuja la interfaz del explorador
     @Override
     public void draw(TUI ui) {
         // Ventana
@@ -126,6 +129,7 @@ public final class TUIFileExplorer extends TUIElement {
         }
     }
 
+    // Dibuja los componentes internos del explorador (contenido)
     private void drawFiles(TUI ui) {
         int listY = y + TITLE_HEIGHT + TOOLBAR_HEIGHT;
         TVFS.TFileInfo[] files;
@@ -154,6 +158,7 @@ public final class TUIFileExplorer extends TUIElement {
         }
     }
 
+    // Procesar evento de movimiento del mouse 
     @Override
     public void mouseMove(int mouseX, int mouseY) {
         if (!dragging) {
@@ -163,6 +168,7 @@ public final class TUIFileExplorer extends TUIElement {
         y = mouseY - dragOffsetY;
     }
 
+    // Procesar evento de clic presionado en el mouse
     @Override
     public void mouseDown(int button, int mouseX, int mouseY) {
         // El popup tiene prioridad sobre la ventana.
@@ -218,6 +224,7 @@ public final class TUIFileExplorer extends TUIElement {
         handleClick(mouseX, mouseY);
     }
 
+    // Procesar liberación del clic en el mouse
     @Override
     public void mouseUp(int button) {
         if (contextMenu.isOpen()) {
@@ -230,6 +237,7 @@ public final class TUIFileExplorer extends TUIElement {
         }
     }
 
+    // Manejar evento de clic del mouse según posición
     private void handleClick(int mouseX, int mouseY) {
         // Botón ".."
         int toolbarY = y + TITLE_HEIGHT;
@@ -248,6 +256,7 @@ public final class TUIFileExplorer extends TUIElement {
         openEntry(index);
     }
 
+    // Procesar ejecución de archivo seleccionado según extensión
     private void openEntry(int index) {
         TVFS.TFileInfo[] files;
 
@@ -286,6 +295,7 @@ public final class TUIFileExplorer extends TUIElement {
         }
     }
 
+    // Seleccionar archivo o directorio
     private void selectEntry(int index) {
 
         TVFS.TFileInfo[] files;
@@ -310,12 +320,15 @@ public final class TUIFileExplorer extends TUIElement {
         selectedDirectory = file.isDirectory();
     }
 
+    // Restaura parámetros
     public void refresh() {
         selectedIndex = -1;
         selectedPath = null;
         selectedDirectory = false;
     }
 
+    // Cambia el estado de un directorio para indicar que está abierto
+    // Obtiene su ruta
     public void openDirectory(String path) {
         if (path == null || path.isEmpty()) {
             return;
@@ -329,6 +342,7 @@ public final class TUIFileExplorer extends TUIElement {
         refresh();
     }
 
+    // Copia la ruta del elemento seleccionado al portapapeles
     private void copySelected() {
         if (selectedPath == null) {
             return;
@@ -340,6 +354,7 @@ public final class TUIFileExplorer extends TUIElement {
         System.out.println("Copiado: " + clipboardPath);
     }
 
+    // Toma el elemento en el portapapeles y lo genera en la posición actual
     private void pasteClipboard() {
         if (clipboardPath == null) {
             return;
@@ -366,6 +381,7 @@ public final class TUIFileExplorer extends TUIElement {
         }
     }
 
+    // Elimina el elemento seleccionado
     private void deleteSelected() {
         if (selectedPath == null) {
             return;
@@ -384,23 +400,32 @@ public final class TUIFileExplorer extends TUIElement {
         }
     }
 
+    // TODO - Usar una variable global y el mismo menú contextual para los tres
+    // Renombrar el elemento seleccionado
     private void renameSelected() {
-
         if (selectedPath == null) {
             return;
         }
-
-        // El diálogo de entrada de texto se conectará aquí.
+        // Crear un menu contextual que espera un texto para el nuevo nombre
+        // El string resultante y la ruta del archivo original se almacenan
+        // Se llama a la función rename con esos parámetros
     }
 
+    // Crear un directorio
     private void createDirectory() {
-        // El diálogo de entrada de texto se conectará aquí.     
+        // Crear un menu contextual que espera un texto para el nombre del directorio
+        // El string resultante y la ruta actual se almacenan
+        // Se llama a la función mkdir con esos parámetros
     }
 
+    // Crear un archivo
     private void createFile() {
-        // El diálogo de entrada de texto se conectará aquí.
+        // Crear un menu contextual que espera un texto para el nombre del archivo
+        // El string resultante y la ruta actual se almacenan
+        // Se llama a touch con esos parámetros
     }
 
+    // Ingresa a un directorio o inicia el editor según el tipo de archivo
     private void openSelected() {
         if (selectedPath == null) {
             return;
@@ -423,6 +448,7 @@ public final class TUIFileExplorer extends TUIElement {
         }
     }
 
+    // Ejecuta un programa si la extesión es .t3i o .it3
     private void executeSelected() {
         if (selectedPath == null || selectedDirectory) {
             return;
@@ -459,6 +485,7 @@ public final class TUIFileExplorer extends TUIElement {
         }
     }
 
+    // Almacena la ruta de la raíz
     public void goParent() {
         if ("/".equals(currentPath)) {
             return;
@@ -474,6 +501,7 @@ public final class TUIFileExplorer extends TUIElement {
         refresh();
     }
 
+    // GETTER y SETTERS
     public void setUI(TUI ui) {
         this.ui = ui;
     }

@@ -27,6 +27,7 @@ package t3os.UI;
  *
  * @author Slam
  */
+// Representación abstracta de un componente del UI
 public abstract class TUIElement {
 
     protected int x;
@@ -37,6 +38,7 @@ public abstract class TUIElement {
     protected boolean visible;
     protected boolean enabled;
 
+    // Constructor
     protected TUIElement(int x, int y, int width, int height) {
         this.x = x;
         this.y = y;
@@ -50,7 +52,6 @@ public abstract class TUIElement {
     public abstract void draw(TUI ui);
 
     public boolean contains(int mouseX, int mouseY) {
-
         return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
 
