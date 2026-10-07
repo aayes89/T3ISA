@@ -361,7 +361,12 @@ public final class TVFS {
         source = normalize(source);
         destination = normalize(destination);
 
-        if (!exists(source)) {
+        if ("/".equals(source)) {
+            throw new IllegalArgumentException("No se puede renombrar /");
+        }
+
+        TNode sourceNode = find(source);
+        if (sourceNode == null) {
             throw new IllegalArgumentException("source not found: " + source);
         }
 
@@ -370,21 +375,40 @@ public final class TVFS {
         }
 
         String parent = parentPath(destination);
-
         if (!isDirectory(parent)) {
             throw new IllegalArgumentException(
                     "destination directory not found: " + parent);
         }
 
-        if (isDirectory(source)) {
-            throw new IllegalArgumentException("directory rename not implemented");
+        // No permitir mover un directorio dentro de sí mismo.
+        if (sourceNode.directory) {
+            String prefix = source + "/";
+            if (destination.equals(source) || destination.startsWith(prefix)) {
+                throw new IllegalArgumentException("destination inside source");
+            }
         }
 
-        String content = read(source);
+        String oldPrefix = source + "/";
+        String newPrefix = destination + "/";
+        for (TNode node : nodes) {
+            if (node == sourceNode) {
+                continue;
+            }
 
-        create(destination);
-        write(destination, content);
-        delete(source);
+            if (node.path.equals(source)) {
+                continue;
+            }
+
+            if (sourceNode.directory && node.path.startsWith(oldPrefix)) {
+                String relative = node.path.substring(oldPrefix.length());
+                node.path = newPrefix + relative;
+            }
+        }
+
+        sourceNode.path = destination;
+        sourceNode.name = fileName(destination);
+        saveDirectory();
+        validateConsistency();
     }
 
     private void saveDirectory() {
@@ -839,8 +863,8 @@ public final class TVFS {
 
     private static final class TNode {
 
-        private final String path;
-        private final String name;
+        private String path;
+        private String name;
         private final boolean directory;
 
         private final List<Integer> blocks;
