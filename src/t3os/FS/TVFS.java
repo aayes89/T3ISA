@@ -323,6 +323,70 @@ public final class TVFS {
         node.size = 0;
     }
 
+    public void copy(String source, String destination) {
+        source = normalize(source);
+        destination = normalize(destination);
+
+        TNode sourceNode = find(source);
+
+        if (sourceNode == null) {
+            throw new IllegalArgumentException("source not found: " + source);
+        }
+
+        // Si destination es un directorio, copiar dentro de él conservando el nombre.
+        if (isDirectory(destination)) {
+            destination = "/".equals(destination) ? "/" + sourceNode.name : destination + "/" + sourceNode.name;
+        }
+
+        if (exists(destination)) {
+            throw new IllegalArgumentException("destination already exists: " + destination);
+        }
+
+        String parent = parentPath(destination);
+        if (!isDirectory(parent)) {
+            throw new IllegalArgumentException("destination directory not found: " + parent);
+        }
+
+        if (sourceNode.directory) {
+            copyDirectory(sourceNode, destination);
+        } else {
+            copyFile(sourceNode, destination);
+        }
+
+        saveDirectory();
+        validateConsistency();
+    }
+
+    public void rename(String source, String destination) {
+        source = normalize(source);
+        destination = normalize(destination);
+
+        if (!exists(source)) {
+            throw new IllegalArgumentException("source not found: " + source);
+        }
+
+        if (exists(destination)) {
+            throw new IllegalArgumentException("destination already exists: " + destination);
+        }
+
+        String parent = parentPath(destination);
+
+        if (!isDirectory(parent)) {
+            throw new IllegalArgumentException(
+                    "destination directory not found: " + parent);
+        }
+
+        if (isDirectory(source)) {
+            throw new IllegalArgumentException("directory rename not implemented");
+        }
+
+        String content = read(source);
+
+        create(destination);
+        write(destination, content);
+        delete(source);
+    }
+
     private void saveDirectory() {
         if (directoryBlocks.isEmpty()) {
             directoryBlocks.add(DIRECTORY_BLOCK);
@@ -515,6 +579,80 @@ public final class TVFS {
                 }
             }
             nodes.add(node);
+        }
+    }
+
+    private void copyFile(TNode source, String destination) {
+        TNode target = new TNode(destination, fileName(destination), false);
+        List<Integer> newBlocks = new ArrayList<>();
+        try {
+            int required = source.blocks.size();
+            if (required > fs.getFreeBlocks()) {
+                throw new IllegalStateException("Espacio insuficiente");
+            }
+
+            // Reservar primero todos los bloques.
+            for (int i = 0; i < required; i++) {
+                newBlocks.add(fs.allocateBlock());
+            }
+
+            // Copia binaria directa bloque por bloque.
+            for (int i = 0; i < required; i++) {
+                int sourceBlock = source.blocks.get(i);
+                int targetBlock = newBlocks.get(i);
+                byte[] data = fs.readBlock(sourceBlock);
+                fs.writeBlock(targetBlock, data);
+                target.blocks.add(targetBlock);
+            }
+
+            target.size = source.size;
+            nodes.add(target);
+
+        } catch (RuntimeException e) {
+            // Rollback.
+            for (int block : newBlocks) {
+                if (fs.isBlockUsed(block)) {
+                    fs.freeBlock(block);
+                }
+            }
+            throw e;
+        }
+    }
+
+    private void copyDirectory(TNode source, String destination) {
+        TNode target = new TNode(destination, fileName(destination), true);
+        nodes.add(target);
+
+        String sourcePrefix = "/".equals(source.path) ? "/" : source.path + "/";
+        List<TNode> children = new ArrayList<>();
+        for (TNode node : nodes) {
+            if (node == source) {
+                continue;
+            }
+
+            if (!node.path.startsWith(sourcePrefix)) {
+                continue;
+            }
+
+            String relative = node.path.substring(sourcePrefix.length());
+            if (relative.isEmpty()) {
+                continue;
+            }
+
+            // Sólo hijos directos.
+            if (relative.contains("/")) {
+                continue;
+            }
+            children.add(node);
+        }
+
+        for (TNode child : children) {
+            String childDestination = destination + "/" + child.name;
+            if (child.directory) {
+                copyDirectory(child, childDestination);
+            } else {
+                copyFile(child, childDestination);
+            }
         }
     }
 
