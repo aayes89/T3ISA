@@ -1165,7 +1165,7 @@ public final class TShell {
 
     private void startGraphics() {
         TUI ui = new TUI(machine);
-        TUIDesktop desktop = new TUIDesktop(1024, 768);        
+        TUIDesktop desktop = new TUIDesktop(1024, 768, kernel);
         ui.add(desktop);
         ui.setPopupMenu(desktop.getDesktopMenu());
 

@@ -23,6 +23,8 @@
  */
 package t3os.UI;
 
+import t3os.KERNEL.TKernel;
+
 /**
  *
  * @author Slam
@@ -33,6 +35,8 @@ public final class TUIDesktop extends TUIElement {
     private final TUITaskbar taskbar;
     private final TUIStartMenu startMenu;
     private final TUIPopupMenu desktopMenu;
+    private TUIFileExplorer t3explorer;
+    private final TKernel kernel;
 
     private int backgroundColor;
 
@@ -45,8 +49,15 @@ public final class TUIDesktop extends TUIElement {
 
     private TUI ui;
 
-    public TUIDesktop(int width, int height) {
+    public TUIDesktop(int width, int height, TKernel kernel) {
         super(0, 0, width, height);
+        if (kernel == null) {
+            throw new IllegalArgumentException(
+                    "Kernel no puede ser null"
+            );
+        }
+        this.kernel = kernel;
+
         backgroundColor = 0x00202020;
         showClock = true;
         clockX = width - 88;
@@ -197,7 +208,19 @@ public final class TUIDesktop extends TUIElement {
     }
 
     private void openExplorer() {
-        // Se conectará con el explorador de archivos.
+        if (ui == null) {
+            return;
+        }
+
+        if (t3explorer == null) {
+            t3explorer = new TUIFileExplorer(80, 60, 500, 400, kernel);
+            ui.add(t3explorer);
+        } else {
+            t3explorer.setVisible(true);
+            t3explorer.refresh();
+        }
+
+        ui.bringToFront(t3explorer);
     }
 
     private void openTerminal() {

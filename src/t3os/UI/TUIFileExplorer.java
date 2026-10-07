@@ -1,0 +1,263 @@
+/*
+ * The MIT License
+ *
+ * Copyright 2026 Slam.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package t3os.UI;
+
+/**
+ *
+ * @author Slam
+ */
+import t3os.FS.TVFS;
+import t3os.KERNEL.TKernel;
+
+public final class TUIFileExplorer extends TUIElement {
+
+    private static final int TITLE_HEIGHT = 24;
+    private static final int TOOLBAR_HEIGHT = 28;
+    private static final int ROW_HEIGHT = 22;
+
+    private final TKernel kernel;
+    private final TVFS vfs;
+
+    private String currentPath;
+
+    private boolean dragging;
+    private int dragOffsetX;
+    private int dragOffsetY;
+
+    private int selectedIndex;
+
+    public TUIFileExplorer(int x, int y, int width, int height, TKernel kernel) {
+        super(x, y, width, height);
+        if (kernel == null) {
+            throw new IllegalArgumentException("Kernel no puede ser null");
+        }
+
+        this.kernel = kernel;
+        this.vfs = kernel.getVFS();
+
+        if (vfs == null) {
+            throw new IllegalStateException("VFS no disponible en el kernel");
+        }
+
+        currentPath = "/";
+        selectedIndex = -1;
+    }
+
+    @Override
+    public void draw(TUI ui) {
+        // Ventana
+        ui.fillRect(x, y, width, height, 0x00D0D0D0);
+
+        // Barra de título
+        ui.fillRect(x, y, width, TITLE_HEIGHT, 0x00008080);
+
+        ui.drawText("T3Explorador", x + 6, y + 4, 0x00FFFFFF);
+
+        // Botón cerrar         
+        ui.fillRect(x + width - 22, y + 4, 16, 16, 0x00C0C0C0);
+
+        ui.drawText("X", x + width - 18, y + 4, 0x00000000);
+
+        // Toolbar
+        int toolbarY = y + TITLE_HEIGHT;
+        ui.fillRect(x, toolbarY, width, TOOLBAR_HEIGHT, 0x00B0B0B0);
+
+        // Botón arriba
+        ui.fillRect(x + 4, toolbarY + 4, 24, 20, 0x00D0D0D0);
+        ui.drawRect(x + 4, toolbarY + 4, 24, 20, 0x00000000);
+        ui.drawText("..", x + 10, toolbarY + 6, 0x00000000);
+
+        // Ruta
+        ui.fillRect(x + 34, toolbarY + 4, width - 38, 20, 0x00FFFFFF);
+        ui.drawText(currentPath, x + 40, toolbarY + 6, 0x00000000);
+
+        // Listado
+        drawFiles(ui);
+    }
+
+    private void drawFiles(TUI ui) {
+        int listY = y + TITLE_HEIGHT + TOOLBAR_HEIGHT;
+        TVFS.TFileInfo[] files;
+
+        try {
+            files = vfs.list(currentPath);
+        } catch (RuntimeException e) {
+            ui.drawText(e.getMessage(), x + 8, listY + 8, 0x00FF0000);
+            return;
+        }
+
+        for (int i = 0; i < files.length; i++) {
+            TVFS.TFileInfo file = files[i];
+            int rowY = listY + i * ROW_HEIGHT;
+            if (i == selectedIndex) {
+                ui.fillRect(x + 2, rowY, width - 4, ROW_HEIGHT, 0x00808080);
+            }
+
+            String type = file.isDirectory() ? "[DIR]" : "[FILE]";
+            ui.drawText(type, x + 8, rowY + 3, 0x00000000);
+            ui.drawText(file.getName(), x + 60, rowY + 3, 0x00000000);
+
+            if (!file.isDirectory()) {
+                ui.drawText(String.valueOf(file.getSize()), x + width - 80, rowY + 3, 0x00000000);
+            }
+        }
+    }
+
+    @Override
+    public void mouseMove(int mouseX, int mouseY) {
+        if (!dragging) {
+            return;
+        }
+        x = mouseX - dragOffsetX;
+        y = mouseY - dragOffsetY;
+    }
+
+    @Override
+    public void mouseDown(int button, int mouseX, int mouseY) {
+        if (!contains(mouseX, mouseY)) {
+            return;
+        }
+
+        // Click derecho: ejecutar la acción igual que izquierdo.
+        if (button == 3) {
+            handleClick(mouseX, mouseY);
+            return;
+        }
+
+        if (button != 1) {
+            return;
+        }
+
+        // Cerrar
+        if (mouseX >= x + width - 24 && mouseY >= y && mouseY < y + TITLE_HEIGHT) {
+            setVisible(false);
+            return;
+        }
+
+        // Arrastrar ventana
+        if (mouseY >= y && mouseY < y + TITLE_HEIGHT) {
+            dragging = true;
+            dragOffsetX = mouseX - x;
+            dragOffsetY = mouseY - y;
+            return;
+        }
+
+        handleClick(mouseX, mouseY);
+    }
+
+    @Override
+    public void mouseUp(int button) {
+        if (button == 1) {
+            dragging = false;
+        }
+    }
+
+    private void handleClick(int mouseX, int mouseY) {
+        // Botón ".."
+        int toolbarY = y + TITLE_HEIGHT;
+        if (mouseY >= toolbarY && mouseY < toolbarY + TOOLBAR_HEIGHT && mouseX >= x + 4 && mouseX < x + 28) {
+            goParent();
+            return;
+        }
+
+        // Listado
+        int listY = y + TITLE_HEIGHT + TOOLBAR_HEIGHT;
+        if (mouseY < listY) {
+            return;
+        }
+
+        int index = (mouseY - listY) / ROW_HEIGHT;
+        openEntry(index);
+    }
+
+    private void openEntry(int index) {
+        TVFS.TFileInfo[] files;
+        try {
+            files = vfs.list(currentPath);
+        } catch (RuntimeException e) {
+            return;
+        }
+
+        if (index < 0 || index >= files.length) {
+            return;
+        }
+
+        selectedIndex = index;
+
+        TVFS.TFileInfo file = files[index];
+        if (!file.isDirectory()) {
+            return;
+        }
+
+        openDirectory(file.getPath());
+    }
+
+    public void refresh() {
+        selectedIndex = -1;
+    }
+
+    public void openDirectory(String path) {
+        if (path == null || path.isEmpty()) {
+            return;
+        }
+
+        if (!vfs.isDirectory(path)) {
+            return;
+        }
+
+        currentPath = path;
+        refresh();
+    }
+
+    public void goParent() {
+        if ("/".equals(currentPath)) {
+            return;
+        }
+
+        int index = currentPath.lastIndexOf('/');
+        if (index <= 0) {
+            currentPath = "/";
+        } else {
+            currentPath = currentPath.substring(0, index);
+        }
+
+        refresh();
+    }
+
+    public String getCurrentPath() {
+        return currentPath;
+    }
+
+    public TVFS getVFS() {
+        return vfs;
+    }
+
+    public TKernel getKernel() {
+        return kernel;
+    }
+
+    public boolean isDragging() {
+        return dragging;
+    }
+}
