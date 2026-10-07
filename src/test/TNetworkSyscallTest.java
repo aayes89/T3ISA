@@ -50,12 +50,8 @@ public final class TNetworkSyscallTest {
         TCPU cpuA = new TCPU();
         TCPU cpuB = new TCPU();
 
-        TKernel kernelA = new TKernel(cpuA, 10, backendA, new byte[]{
-            (byte) 192, (byte) 168, 1, 100
-        });
-        TKernel kernelB = new TKernel(cpuB, 10, backendB, new byte[]{
-            (byte) 192, (byte) 168, 1, 101
-        });
+        TKernel kernelA = new TKernel(cpuA, 10); //, backendA, new byte[]{(byte) 192, (byte) 168, 1, 100});
+        TKernel kernelB = new TKernel(cpuB, 10); //, backendB, new byte[]{(byte) 192, (byte) 168, 1, 101});
 
         cpuA.setKernel(kernelA);
         cpuB.setKernel(kernelB);

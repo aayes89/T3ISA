@@ -358,7 +358,7 @@ public final class TCPU implements TMachine {
     @Override
     public void step() {
 
-        if (halted) {
+        if (halted) {            
             return;
         }
 
@@ -1515,5 +1515,30 @@ public final class TCPU implements TMachine {
 
     public TMouseDevice getMouseDevice() {
         return mouseDevice;
+    }
+
+    @Override
+    public void graphics(int command, int a, int b, int c, int d, int e) {
+        graphicsDevice.graphics(command, a, b, c, d, e);
+    }
+
+    @Override
+    public void drawChar(int character, int x, int y, int scale, int foreground, int background) {
+        graphicsDevice.drawChar(character, x, y, scale, foreground, background);
+    }
+
+    @Override
+    public int getMouseX() {
+        return mouseDevice.getX();
+    }
+
+    @Override
+    public int getMouseY() {
+        return mouseDevice.getY();
+    }
+
+    @Override
+    public int getMouseButtons() {
+        return mouseDevice.getButtons();
     }
 }

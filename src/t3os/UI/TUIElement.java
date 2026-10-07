@@ -57,7 +57,7 @@ public abstract class TUIElement {
     public void mouseMove(int mouseX, int mouseY) {
     }
 
-    public void mouseDown(int button) {
+    public void mouseDown(int button, int mouseX, int mouseY) {
     }
 
     public void mouseUp(int button) {
@@ -94,4 +94,10 @@ public abstract class TUIElement {
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
+
+    public void setPosition(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
 }

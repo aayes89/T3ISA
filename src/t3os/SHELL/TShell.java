@@ -34,6 +34,7 @@ import t3isa.DEVICE.TConsoleDevice;
 import t3os.KERNEL.TPCB;
 import t3os.KERNEL.TKernel;
 import t3isa.Core.TWord;
+import t3isa.DEVICE.TGraphicsDevice;
 import t3isa.DEVICE.TNetworkDevice;
 import t3isa.Exceptions.TMemoryException;
 import t3os.FS.TFileSystem;
@@ -44,6 +45,10 @@ import t3isa.NETWORKING.THostNetwork;
 import t3isa.NETWORKING.TICMP;
 import t3isa.NETWORKING.TIPv4;
 import t3isa.NETWORKING.TTCP;
+import t3os.UI.TUI;
+import t3os.UI.TUIButton;
+import t3os.UI.TUIDesktop;
+import t3os.UI.TUIWindow;
 import test.TestMMIO;
 
 /**
@@ -199,9 +204,14 @@ public final class TShell {
                 nc(parts);
                 return true;
 
+            case "startx":
+                startGraphics();
+                return true;
+
             case "exit":
                 console.writeLine("shutdown");
                 machine.halt();
+                System.exit(0);
                 return false;
 
             default:
@@ -241,6 +251,7 @@ public final class TShell {
         console.writeLine("  wget <url>");
         console.writeLine("  nc <host> <port>");
         console.writeLine("  nc -l -lp -lv -lpv -v -r <port>");
+        console.writeLine("  startx");
         console.writeLine("  exit");
         console.writeLine("");
     }
@@ -294,8 +305,8 @@ public final class TShell {
 
         switch (program) {
             case "hello":
-                src = //TestMMIO.test;
-                        """
+                src = TestMMIO.test;
+                /*"""
                         CONST R2, 65
                         CONST R3, 100
                         CONST R4, 100
@@ -305,8 +316,8 @@ public final class TShell {
                         
                         MOVI R1, 33
                         SYS
-                        """;
-                
+                        """;*/
+
                 source = "MOVI R2, 0\n"
                         + "MOVI R3, 72\n"
                         + "MOVI R1, 6\n"
@@ -1150,5 +1161,26 @@ public final class TShell {
             ip[i] = (byte) n;
         }
         return ip;
+    }
+
+    private void startGraphics() {
+        TUI ui = new TUI(machine);
+        TUIDesktop desktop = new TUIDesktop(1024, 768);        
+        ui.add(desktop);
+        ui.setPopupMenu(desktop.getDesktopMenu());
+
+        while (!machine.isHalted()) {
+            ui.updateMouse(machine.getMouseX(), machine.getMouseY(), machine.getMouseButtons());
+            machine.graphics(2, 0x00FFFFFF, 0, 0, 0, 0);
+
+            ui.draw();
+
+            try {
+                Thread.sleep(16); // 60fps
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
     }
 }

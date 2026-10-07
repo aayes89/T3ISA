@@ -29,6 +29,7 @@ package t3os.UI;
  */
 import java.util.ArrayList;
 import java.util.List;
+import t3isa.HARDWARE.TMachine;
 
 public final class TUI {
 
@@ -37,17 +38,26 @@ public final class TUI {
     private int mouseX;
     private int mouseY;
     private int mouseButtons;
+    TMachine machine;
+    private TUIElement mouseCapture;
+    private TUIElement contextElement;
+    private TUIPopupMenu popupMenu;
 
-    public TUI() {
+    public TUI(TMachine machine) {
         elements = new ArrayList<>();
 
         mouseX = 0;
         mouseY = 0;
         mouseButtons = 0;
+        mouseCapture = null;
+        if (machine == null) {
+            throw new IllegalArgumentException("Machine no puede ser null");
+        }
+        this.machine = machine;
+        this.popupMenu = null;
     }
 
     public void add(TUIElement element) {
-
         if (element == null) {
             throw new IllegalArgumentException("Elemento UI no puede ser null");
         }
@@ -56,16 +66,56 @@ public final class TUI {
     }
 
     public void remove(TUIElement element) {
+        if (mouseCapture == element) {
+            mouseCapture = null;
+        }
+
+        if (contextElement == element) {
+            contextElement = null;
+        }
+
+        if (popupMenu == element) {
+            popupMenu = null;
+        }
+
         elements.remove(element);
     }
 
-    public void draw() {
+    public void setPopupMenu(TUIPopupMenu popupMenu) {
+        if (this.popupMenu != null) {
+            elements.remove(this.popupMenu);
+        }
+        this.popupMenu = popupMenu;
+        if (popupMenu != null) {
+            add(popupMenu);
+            bringToFront(popupMenu);
+        }
+    }
 
+    public TUIPopupMenu getPopupMenu() {
+        return popupMenu;
+    }
+
+    public void openPopup(int x, int y) {
+        if (popupMenu == null) {
+            return;
+        }
+        popupMenu.open(x, y);
+        bringToFront(popupMenu);
+    }
+
+    public void closePopup() {
+        if (popupMenu != null) {
+            popupMenu.close();
+        }
+        contextElement = null;
+    }
+
+    public void draw() {
         for (TUIElement element : elements) {
             if (!element.isVisible()) {
                 continue;
             }
-
             element.draw(this);
         }
     }
@@ -77,24 +127,94 @@ public final class TUI {
         mouseY = y;
         mouseButtons = buttons;
 
-        for (TUIElement element : elements) {
+        // Elemento que tiene captura del botón izquierdo.
+        if (mouseCapture != null) {
+            mouseCapture.mouseMove(mouseX, mouseY);
+            if ((buttons & 1) == 0 && (previousButtons & 1) != 0) {
+                mouseCapture.mouseUp(1);
+                mouseCapture = null;
+            }
+
+            return;
+        }
+
+        // Clic derecho.
+        if ((buttons & 4) != 0 && (previousButtons & 4) == 0) {
+            TUIElement target = null;
+            for (int i = elements.size() - 1; i >= 0; i--) {
+                TUIElement element = elements.get(i);
+                if (!element.isVisible() || !element.isEnabled()) {
+                    continue;
+                }
+
+                if (!element.contains(mouseX, mouseY)) {
+                    continue;
+                }
+
+                target = element;
+                break;
+            }
+
+            // Si ya había un popup y se hizo clic fuera de él, cerrarlo.
+            if (popupMenu != null && popupMenu.isOpen() && target != popupMenu) {
+                closePopup();
+            }
+
+            contextElement = target;
+
+            // El popup no recibe su propio clic derecho.
+            if (target != null && target != popupMenu) {
+                target.mouseDown(3, mouseX, mouseY);
+            }
+            return;
+        }
+
+        // Buscar el elemento superior.
+        TUIElement target = null;
+        for (int i = elements.size() - 1; i >= 0; i--) {
+            TUIElement element = elements.get(i);
             if (!element.isVisible() || !element.isEnabled()) {
                 continue;
             }
 
-            boolean inside = element.contains(mouseX, mouseY);
-            if (inside) {
-                element.mouseMove(mouseX, mouseY);
+            if (!element.contains(mouseX, mouseY)) {
+                continue;
+            }
 
-                if ((buttons & 1) != 0 && (previousButtons & 1) == 0) {
-                    element.mouseDown(1);
-                }
+            target = element;
+            break;
+        }
 
-                if ((buttons & 1) == 0 && (previousButtons & 1) != 0) {
-                    element.mouseUp(1);
-                }
+        // Movimiento.
+        if (target != null) {
+            target.mouseMove(mouseX, mouseY);
+        }
+
+        // Botón izquierdo: transición UP -> DOWN.
+        if ((buttons & 1) != 0 && (previousButtons & 1) == 0) {
+            if (target == null) {
+                return;
+            }
+
+            // El escritorio siempre permanece debajo de los demás elementos.
+            if (!(target instanceof TUIDesktop)) {
+                bringToFront(target);
+            }
+
+            target.mouseDown(1, mouseX, mouseY);
+            // El escritorio no necesita captura.
+            if (!(target instanceof TUIDesktop)) {
+                mouseCapture = target;
             }
         }
+    }
+
+    public void bringToFront(TUIElement element) {
+        if (!elements.remove(element)) {
+            return;
+        }
+
+        elements.add(element);
     }
 
     public int getMouseX() {
@@ -109,15 +229,23 @@ public final class TUI {
         return mouseButtons;
     }
 
-    void fillRect(int i, int i0, int i1, int i2, int i3) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    void fillRect(int x, int y, int width, int height, int color) {
+        machine.graphics(5, x, y, width, height, color);
     }
 
-    void drawRect(int x, int y, int width, int height, int i) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    void drawRect(int x, int y, int width, int height, int color) {
+        machine.graphics(4, x, y, width, height, color);
     }
 
-    void drawText(String text, int i, int i0, int i1) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    void drawText(String text, int x, int y, int color) {
+        if (text == null) {
+            return;
+        }
+
+        int cursorX = x;
+        for (int i = 0; i < text.length(); i++) {
+            machine.drawChar(text.charAt(i), cursorX, y, 1, color, -1);
+            cursorX += 8;
+        }
     }
 }

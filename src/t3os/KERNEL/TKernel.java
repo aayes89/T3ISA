@@ -23,8 +23,14 @@
  */
 package t3os.KERNEL;
 
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
 import java.util.Queue;
+import t3isa.Core.TCPU;
 import t3os.MEMORY.TMemoryManager;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TTrap;
@@ -69,22 +75,28 @@ public class TKernel {
     private int networkTicks;
     private final int quantumTicks; // Cuántos pasos de CPU equivalen a 1 quántum/tic de temporizador
 
-    public TKernel(TMachine cpu, int quantumTicks) {
-        this(cpu, quantumTicks, new TNetworkHostBackend("./t3bpf", "en0"), new byte[]{(byte) 10, (byte) 10, (byte) 10, (byte) 100});
-    }
+    public TKernel(TMachine cpu, int quantumTicks) {//, TNetworkBackend networkBackend, byte[] localIP) {
+        String os = System.getProperty("os.name");
+        byte[] localIP = new byte[]{(byte) 10, (byte) 10, (byte) 10, (byte) 100};
+        TNetworkHostBackend tnhb;
 
-    public TKernel(TMachine cpu, int quantumTicks, TNetworkBackend networkBackend, byte[] localIP) {
+        if (os.toUpperCase().contains("WIN")) { // windows
+            tnhb = new TNetworkHostBackend("C:\\Windows\\System32\\ipconfig.exe", "wireless_0");
+        } else if (os.toUpperCase().contains("MAC")) { // MacOS
+            tnhb = new TNetworkHostBackend("./t3bpf", "en0");
+        } else { // Linux
+            tnhb = new TNetworkHostBackend("./t3bpf", "eth0");
+        }
         this.cpu = cpu;
         this.scheduler = new TScheduler();
         this.quantumTicks = quantumTicks;
         this.memoryManager = new TMemoryManager();
         this.timerTicks = 0;
         this.networkTicks = 0;
-
         fileSystem = new TFileSystem();
         vfs = new TVFS(fileSystem);
 
-        this.networkDevice = new TNetworkDevice(networkBackend);
+        this.networkDevice = new TNetworkDevice(tnhb);
         this.networkDevice.open();
 
         byte[] localMAC = networkDevice.getMAC();

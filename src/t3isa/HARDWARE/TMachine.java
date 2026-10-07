@@ -97,14 +97,7 @@ public interface TMachine {
 
     void setProcessMemoryRange(int base, int limit);
 
-    void restoreProcessContext(
-            int pc,
-            TWord[] registers,
-            int sp,
-            int compare,
-            int stackBase,
-            int stackLimit
-    );
+    void restoreProcessContext(int pc, TWord[] registers, int sp, int compare, int stackBase, int stackLimit);
 
     boolean isHalted();
 
@@ -147,4 +140,14 @@ public interface TMachine {
     public void halt();
 
     public int getCurrentPid();
+
+    void graphics(int command, int a, int b, int c, int d, int e);
+
+    void drawChar(int character, int x, int y, int scale, int foreground, int background);
+
+    int getMouseX();
+
+    int getMouseY();
+
+    int getMouseButtons();
 }

@@ -62,9 +62,18 @@ public final class TUIButton extends TUIElement {
     }
 
     @Override
-    public void mouseDown(int button) {
+    public void mouseDown(int button, int mouseX, int mouseY) {
+        if (!contains(mouseX, mouseY)) {
+            return;
+        }
         if (button == 1) {
             pressed = true;
+            return;
+        }
+        if (button == 3) {
+            if (action != null) {
+                action.run();
+            }
         }
     }
 
@@ -73,7 +82,6 @@ public final class TUIButton extends TUIElement {
         if (button != 1) {
             return;
         }
-
         boolean click = pressed;
         pressed = false;
         if (click && action != null) {
@@ -100,4 +108,5 @@ public final class TUIButton extends TUIElement {
     public boolean isPressed() {
         return pressed;
     }
+
 }
