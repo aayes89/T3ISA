@@ -38,8 +38,14 @@ public final class TUIFileExplorer extends TUIElement {
 
     private final TKernel kernel;
     private final TVFS vfs;
+    private final TUIPopupMenu contextMenu;
 
     private String currentPath;
+    private String selectedPath;
+    private boolean selectedDirectory;
+
+    private String clipboardPath;
+    private boolean clipboardCut;
 
     private boolean dragging;
     private int dragOffsetX;
@@ -62,6 +68,21 @@ public final class TUIFileExplorer extends TUIElement {
 
         currentPath = "/";
         selectedIndex = -1;
+        selectedPath = null;
+        selectedDirectory = false;
+
+        clipboardPath = null;
+        clipboardCut = false;
+        contextMenu = new TUIPopupMenu(0, 0, 180, 240);
+        contextMenu.addItem("Abrir", this::openSelected);
+        contextMenu.addItem("Ejecutar", this::executeSelected);
+        contextMenu.addItem("Copiar", this::copySelected);
+        contextMenu.addItem("Pegar", this::pasteClipboard);
+        contextMenu.addItem("Eliminar", this::deleteSelected);
+        contextMenu.addItem("Renombrar", this::renameSelected);
+        contextMenu.addItem("Nueva carpeta", this::createDirectory);
+        contextMenu.addItem("Nuevo archivo", this::createFile);
+        contextMenu.addItem("Actualizar", this::refresh);
     }
 
     @Override
@@ -94,6 +115,10 @@ public final class TUIFileExplorer extends TUIElement {
 
         // Listado
         drawFiles(ui);
+
+        if (contextMenu.isOpen()) {
+            contextMenu.draw(ui);
+        }
     }
 
     private void drawFiles(TUI ui) {
@@ -141,7 +166,16 @@ public final class TUIFileExplorer extends TUIElement {
 
         // Click derecho: ejecutar la acción igual que izquierdo.
         if (button == 3) {
-            handleClick(mouseX, mouseY);
+            int toolbarY = y + TITLE_HEIGHT;
+            int listY = y + TITLE_HEIGHT + TOOLBAR_HEIGHT;
+            if (mouseY >= listY) {
+                int index = (mouseY - listY) / ROW_HEIGHT;
+                selectEntry(index);
+            }
+            if (contextMenu.isOpen()) {
+                contextMenu.close();
+            }
+            contextMenu.open(mouseX, mouseY);
             return;
         }
 
@@ -192,7 +226,9 @@ public final class TUIFileExplorer extends TUIElement {
     }
 
     private void openEntry(int index) {
+
         TVFS.TFileInfo[] files;
+
         try {
             files = vfs.list(currentPath);
         } catch (RuntimeException e) {
@@ -203,14 +239,37 @@ public final class TUIFileExplorer extends TUIElement {
             return;
         }
 
-        selectedIndex = index;
+        selectEntry(index);
 
         TVFS.TFileInfo file = files[index];
-        if (!file.isDirectory()) {
+
+        if (file.isDirectory()) {
+            openDirectory(file.getPath());
+        }
+    }
+
+    private void selectEntry(int index) {
+
+        TVFS.TFileInfo[] files;
+
+        try {
+            files = vfs.list(currentPath);
+        } catch (RuntimeException e) {
             return;
         }
 
-        openDirectory(file.getPath());
+        if (index < 0 || index >= files.length) {
+            selectedPath = null;
+            selectedDirectory = false;
+            selectedIndex = -1;
+            return;
+        }
+
+        TVFS.TFileInfo file = files[index];
+
+        selectedIndex = index;
+        selectedPath = file.getPath();
+        selectedDirectory = file.isDirectory();
     }
 
     public void refresh() {
@@ -228,6 +287,101 @@ public final class TUIFileExplorer extends TUIElement {
 
         currentPath = path;
         refresh();
+    }
+
+    private void copySelected() {
+
+        if (selectedPath == null) {
+            return;
+        }
+
+        clipboardPath = selectedPath;
+        clipboardCut = false;
+    }
+
+    private void pasteClipboard() {
+        if (clipboardPath == null) {
+            return;
+        }
+
+        try {
+            String name = clipboardPath.substring(clipboardPath.lastIndexOf('/') + 1);
+            String destination = "/".equals(currentPath) ? "/" + name : currentPath + "/" + name;
+            vfs.copy(clipboardPath, destination);
+            refresh();
+        } catch (RuntimeException e) {
+            System.out.println("T3Explorador: " + e.getMessage());
+        }
+    }
+
+    private void deleteSelected() {
+        if (selectedPath == null) {
+            return;
+        }
+
+        try {
+            vfs.delete(selectedPath);
+
+            selectedPath = null;
+            selectedDirectory = false;
+            selectedIndex = -1;
+
+            refresh();
+        } catch (RuntimeException e) {
+            System.out.println("T3Explorador: " + e.getMessage());
+        }
+    }
+
+    private void renameSelected() {
+
+        if (selectedPath == null) {
+            return;
+        }
+
+        // El diálogo de entrada de texto se conectará aquí.
+    }
+
+    private void createDirectory() {
+        // El diálogo de entrada de texto se conectará aquí.     
+    }
+
+    private void createFile() {
+        // El diálogo de entrada de texto se conectará aquí.
+    }
+
+    private void openSelected() {
+        if (selectedPath == null) {
+            return;
+        }
+
+        if (selectedDirectory) {
+            openDirectory(selectedPath);
+            return;
+        }
+
+        try {
+            String content = vfs.read(selectedPath);
+            System.out.println("T3OS FILE: " + selectedPath);
+            System.out.println(content);
+        } catch (RuntimeException e) {
+            System.out.println("T3Explorador: " + e.getMessage());
+        }
+    }
+
+    private void executeSelected() {
+        if (selectedPath == null || selectedDirectory) {
+            return;
+        }
+
+        /*
+        * Aquí conectare:
+        *
+        * TKernel.exec(...)
+        *
+        * cuando defina el formato
+        * ejecutable de T3OS.
+        * Por ahora podría ser ASM del ISA
+         */
     }
 
     public void goParent() {
