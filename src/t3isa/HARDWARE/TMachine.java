@@ -29,6 +29,7 @@ package t3isa.HARDWARE;
  */
 import t3isa.Core.TWord;
 import t3isa.DEVICE.TKeyboardDevice;
+import t3isa.HOST.TGraphicsHostBackend;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TTrap;
 import t3os.KERNEL.TKernel;
@@ -76,7 +77,7 @@ public interface TMachine {
     int MMIO_GRAPHICS_Y = MMIO_BASE + 1;
     int MMIO_GRAPHICS_COLOR = MMIO_BASE + 2;
     int MMIO_GRAPHICS_COMMAND = MMIO_BASE + 3;
-    
+
     TKeyboardDevice getKeyboardDevice();
 
     void loadProgram(int address, TWord[] program);
@@ -154,4 +155,8 @@ public interface TMachine {
     int getMouseY();
 
     int getMouseButtons();
+
+    public void setGraphicsHost(TGraphicsHostBackend graphicsHost);
+
+    public TGraphicsHostBackend getTGraphicsHostBackend();
 }

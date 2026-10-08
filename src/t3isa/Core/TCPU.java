@@ -32,6 +32,7 @@ import t3isa.HARDWARE.TDevice;
 import t3isa.HARDWARE.TDeviceBus;
 import t3isa.HARDWARE.TMMIOBus;
 import t3isa.HARDWARE.TMachine;
+import t3isa.HOST.TGraphicsHostBackend;
 import t3isa.ISA.TInstruction;
 import t3isa.ISA.TInterrupt;
 import t3isa.ISA.TOpcode;
@@ -112,6 +113,7 @@ public final class TCPU implements TMachine {
     private final TDeviceBus deviceBus;
     private final TMMIOBus mmioBus;
     private final TGraphicsDevice graphicsDevice;
+    private TGraphicsHostBackend graphicsHost;
     private final TMouseDevice mouseDevice;
     private final TKeyboardDevice keyboardDevice;
     private TKernel kernel;
@@ -1548,6 +1550,16 @@ public final class TCPU implements TMachine {
     @Override
     public TKeyboardDevice getKeyboardDevice() {
         return keyboardDevice;
+    }
+
+    @Override
+    public void setGraphicsHost(TGraphicsHostBackend graphicsHost) {
+        this.graphicsHost = graphicsHost;
+    }
+
+    @Override
+    public TGraphicsHostBackend getTGraphicsHostBackend() {
+        return this.graphicsHost;
     }
 
 }

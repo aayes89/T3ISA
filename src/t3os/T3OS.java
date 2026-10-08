@@ -30,6 +30,7 @@ import t3os.KERNEL.TKernel;
 import t3os.BOOT.TBoot;
 import t3os.FS.TFileSystem;
 import t3isa.HARDWARE.TMachine;
+import t3isa.HOST.TGraphicsHostBackend;
 
 /**
  *
@@ -41,19 +42,25 @@ public final class T3OS {
 
     private final TMachine machine;
     private final TKernel kernel;
+    private final TGraphicsHostBackend graphicsHost;
     private final TBoot boot;
     private final TConsoleDevice console;
     private final TFileSystem fileSystem;
 
-    public T3OS(TMachine machine) {
+    public T3OS(TMachine machine, TGraphicsHostBackend graphicsHost) {
         if (machine == null) {
             throw new IllegalArgumentException("Machine no puede ser null");
         }
+        if(graphicsHost == null){
+            throw  new IllegalArgumentException("GraphicsHost no puede ser null");
+        }
 
         this.machine = machine;
+        this.graphicsHost = graphicsHost;
         boot = new TBoot(machine);
         kernel = new TKernel(machine, 10);
         machine.setKernel(kernel);
+        machine.setGraphicsHost(graphicsHost);
         console = new TConsoleDevice();
         fileSystem = new TFileSystem();
         machine.getDeviceBus().attach(0, console);

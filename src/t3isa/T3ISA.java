@@ -52,10 +52,9 @@ public class T3ISA {
         TMouseDevice mouseDevice = cpu.getMouseDevice();
         TKeyboardDevice keyboardDevice = cpu.getKeyboardDevice();
 
-        TGraphicsHostBackend graphics = new TGraphicsHostBackend(graphicsDevice, mouseDevice, keyboardDevice);
-
+        TGraphicsHostBackend graphics = new TGraphicsHostBackend(graphicsDevice, mouseDevice, keyboardDevice);        
         graphics.open();
-        T3OS os = new T3OS(cpu);
+        T3OS os = new T3OS(cpu, graphics);
 
         // RESET -> BOOT -> KERNEL
         os.boot();

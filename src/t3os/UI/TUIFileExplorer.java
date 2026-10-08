@@ -401,29 +401,100 @@ public final class TUIFileExplorer extends TUIElement {
         }
     }
 
-    // TODO - Usar una variable global y el mismo menú contextual para los tres
     // Renombrar el elemento seleccionado
     private void renameSelected() {
         if (selectedPath == null) {
             return;
         }
-        // Crear un menu contextual que espera un texto para el nuevo nombre
-        // El string resultante y la ruta del archivo original se almacenan
-        // Se llama a la función rename con esos parámetros
+        // Crear un menu contextual que espera un texto para el nuevo nombre           
+        requestName(nuevoNombre -> {
+            try {
+                // Obtengo ruta del archivo o carpeta seleccionado                
+                // Se llama a la función rename con esos parámetros
+                kernel.getVFS().rename(selectedPath, nuevoNombre);
+                System.out.println("Archivo -> " + selectedPath + ", renombrado a " + nuevoNombre);
+                // Actualizo explorador
+                refresh();
+            } catch (RuntimeException e) {
+                System.out.println(e.getMessage());
+            }
+        });
     }
 
     // Crear un directorio
     private void createDirectory() {
-        // Crear un menu contextual que espera un texto para el nombre del directorio
-        // El string resultante y la ruta actual se almacenan
-        // Se llama a la función mkdir con esos parámetros
+        if (currentPath == null) {
+            return;
+        }
+        // Crear un menu contextual que espera un texto para el nuevo nombre            
+        requestName(nuevoNombre -> {
+            try {
+                // Se llama a la función mkdir con esos parámetros
+                String path;
+                if (currentPath.equals("/")) {
+                    path = currentPath + nuevoNombre;
+                } else {
+                    path = currentPath + "/" + nuevoNombre;
+                }
+                // Creo el directorio
+                kernel.getVFS().mkdir(path);
+                System.out.println("Directorio -> " + nuevoNombre + " creado.");
+                // Actualizo explorador
+                refresh();
+            } catch (RuntimeException e) {
+                System.out.println(e.getMessage());
+            }
+        });
     }
 
     // Crear un archivo
     private void createFile() {
-        // Crear un menu contextual que espera un texto para el nombre del archivo
-        // El string resultante y la ruta actual se almacenan
-        // Se llama a touch con esos parámetros
+        if (currentPath == null) {
+            return;
+        }
+        // Crear un menu contextual que espera un texto para el nuevo nombre       
+        requestName(nuevoNombre -> {
+            try {
+                // Se llama a la función mkdir con esos parámetros
+                String path;
+                if (currentPath.equals("/")) {
+                    path = "/" + nuevoNombre;
+                } else {
+                    path = currentPath + "/" + nuevoNombre;
+                }
+
+                kernel.getVFS().create(path);
+                System.out.println("Archivo -> " + nuevoNombre + " creado.");
+
+                // Actualizo explorador
+                refresh();
+            } catch (RuntimeException e) {
+                System.out.println(e.getMessage());
+            }
+        });
+    }
+
+    // Auxiliar para métodos renombrar, mkdir y touch
+    private void requestName(NameAction action) {
+        if (ui == null || action == null) {
+            return;
+        }
+
+        TUIInputDialog dialog = new TUIInputDialog(x + 60, y + 80, 320, 130, "Introducir nombre", kernel);
+
+        dialog.setAcceptAction(nombre -> {
+            action.execute(nombre);
+            ui.remove(dialog);
+        });
+
+        dialog.setCancelAction(() -> {
+            ui.remove(dialog);
+        });
+
+        ui.add(dialog);
+        ui.bringToFront(dialog);
+
+        dialog.getEditor().getTextArea().setFocused(true);
     }
 
     // Ingresa a un directorio o inicia el editor según el tipo de archivo    
@@ -525,5 +596,11 @@ public final class TUIFileExplorer extends TUIElement {
 
     public boolean isDragging() {
         return dragging;
+    }
+
+    @FunctionalInterface
+    private interface NameAction {
+
+        void execute(String nombre);
     }
 }

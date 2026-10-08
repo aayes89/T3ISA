@@ -36,7 +36,6 @@ import java.awt.image.BufferedImage;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 
 import t3isa.DEVICE.TGraphicsDevice;
 import t3isa.DEVICE.TKeyboardDevice;
@@ -52,7 +51,7 @@ public final class TGraphicsHostBackend {
     private JFrame frame;
     private JPanel panel;
     private BufferedImage image;
-    private Timer timer;
+    private volatile int[] pendingFrame;
 
     // Constructor
     public TGraphicsHostBackend(TGraphicsDevice device, TMouseDevice mouseDevice, TKeyboardDevice keyboardDevice) {
@@ -84,8 +83,14 @@ public final class TGraphicsHostBackend {
                 @Override
                 protected void paintComponent(Graphics g) {
                     super.paintComponent(g);
+
+                    int[] snapshot = pendingFrame;
+
+                    if (snapshot != null) {
+                        image.setRGB(0, 0, device.getWidth(), device.getHeight(), snapshot, 0, device.getWidth());
+                    }
+
                     g.drawImage(image, 0, 0, null);
-                    //g.drawImage(image, 0, 0, getWidth(), getHeight(), null);
                 }
             };
             panel.setPreferredSize(new java.awt.Dimension(device.getWidth(), device.getHeight()));
@@ -155,7 +160,7 @@ public final class TGraphicsHostBackend {
 
                 // Captura y procesamiento de teclas
                 @Override
-                public void keyPressed(KeyEvent e) {                    
+                public void keyPressed(KeyEvent e) {
                     keyboardDevice.push(e.getKeyCode(), e.getKeyChar());
                 }
             });
@@ -168,36 +173,30 @@ public final class TGraphicsHostBackend {
             frame.setVisible(true);
 
             SwingUtilities.invokeLater(() -> panel.requestFocusInWindow());
-
-            // Inicialización de Timer para uso en tasa de refrescado de pantalla
-            int interval = Math.max(1, 1000 / device.getRefreshRate());
-            timer = new Timer(interval, e -> refresh());
-            timer.start();
         });
     }
 
-    // Refrescar pantalla (framebuffer)
-    private void refresh() {
+    public void presentFrame() {
         int[] framebuffer = device.getFramebuffer();
-        int width = device.getWidth();
-        int height = device.getHeight();
 
-        image.setRGB(0, 0, width, height, framebuffer, 0, width);
-        panel.repaint();
+        // El frame se copia completamente antes de publicarlo a Swing.
+        pendingFrame = framebuffer.clone();
+
+        if (panel != null) {
+            panel.repaint();
+        }
     }
 
     // Cerrar los eventos de pantalla y tiempo
     public void close() {
         SwingUtilities.invokeLater(() -> {
-            if (timer != null) {
-                timer.stop();
-                timer = null;
-            }
-
             if (frame != null) {
                 frame.dispose();
                 frame = null;
             }
+
+            panel = null;
+            pendingFrame = null;
         });
     }
 

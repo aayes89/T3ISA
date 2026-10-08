@@ -75,27 +75,30 @@ public final class TUI {
              */
             for (int i = elements.size() - 1; i >= 0; i--) {
                 TUIElement element = elements.get(i);
+
                 if (!element.isVisible() || !element.isEnabled()) {
                     continue;
                 }
 
-                if (!(element instanceof TUIEditor)) {
-                    continue;
+                if (element instanceof TUIInputDialog) {
+                    TUIInputDialog dialog = (TUIInputDialog) element;
+                    if (!dialog.hasFocusedEditor()) {
+                        continue;
+                    }
+
+                    dialog.keyPressed(key);
+                    break;
                 }
 
-                TUIEditor editor = (TUIEditor) element;
-                if (!editor.getTextArea().isFocused()) {
-                    continue;
+                if (element instanceof TUIEditor) {
+                    TUIEditor editor = (TUIEditor) element;
+                    if (!editor.getTextArea().isFocused()) {
+                        continue;
+                    }
+
+                    editor.keyPressed(key);
+                    break;
                 }
-                System.out.println("EDITOR FOCUSED -> sending key");
-
-                editor.keyPressed(key);
-
-                /*
-                * Una tecla solamente debe ser procesada
-                * por el editor que tiene el foco.
-                 */
-                break;
             }
         }
     }
@@ -185,7 +188,9 @@ public final class TUI {
             contextElement = target;
 
             if (target != null && target != popupMenu) {
-                bringToFront(target);
+                if (!(target instanceof TUIDesktop)) {
+                    bringToFront(target);
+                }
                 target.mouseDown(3, mouseX, mouseY);
             }
 
