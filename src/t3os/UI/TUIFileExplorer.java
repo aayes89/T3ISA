@@ -406,7 +406,7 @@ public final class TUIFileExplorer extends TUIElement {
         if (selectedPath == null) {
             return;
         }
-        // Crear un menu contextual que espera un texto para el nuevo nombre           
+        // Crear un menu contextual que espera un texto para el nuevo nombre
         requestName(nuevoNombre -> {
             try {
                 // Obtengo ruta del archivo o carpeta seleccionado                
@@ -426,7 +426,8 @@ public final class TUIFileExplorer extends TUIElement {
         if (currentPath == null) {
             return;
         }
-        // Crear un menu contextual que espera un texto para el nuevo nombre            
+        // Crear un menu contextual que espera un texto para el nuevo nombre   
+
         requestName(nuevoNombre -> {
             try {
                 // Se llama a la función mkdir con esos parámetros
@@ -480,21 +481,22 @@ public final class TUIFileExplorer extends TUIElement {
             return;
         }
 
-        TUIInputDialog dialog = new TUIInputDialog(x + 60, y + 80, 320, 130, "Introducir nombre", kernel);
+        TUIInputDialog dialog = new TUIInputDialog(x + 60, y + 80, 320, 130);
+
+        dialog.setTitle("Introducir nombre");
+        dialog.setText("");
 
         dialog.setAcceptAction(nombre -> {
             action.execute(nombre);
             ui.remove(dialog);
         });
 
-        dialog.setCancelAction(() -> {
-            ui.remove(dialog);
-        });
+        dialog.setCancelAction(() -> ui.remove(dialog));
 
         ui.add(dialog);
         ui.bringToFront(dialog);
 
-        dialog.getEditor().getTextArea().setFocused(true);
+        dialog.getTextArea().setFocused(true);
     }
 
     // Ingresa a un directorio o inicia el editor según el tipo de archivo    
@@ -514,7 +516,8 @@ public final class TUIFileExplorer extends TUIElement {
 
         try {
             String content = vfs.read(selectedPath);
-            TUIEditor editor = new TUIEditor(100, 80, 600, 460, kernel, selectedPath, content);
+            TUIEditor editor = new TUIEditor(100, 80, 600, 460, kernel, selectedPath);
+            editor.getTextArea().setText(content);
 
             ui.add(editor);
             ui.bringToFront(editor);

@@ -49,7 +49,7 @@ public class TUIEditor extends TUIElement {
     private boolean modified;
 
     // Constructor
-    public TUIEditor(int x, int y, int width, int height, TKernel kernel, String path, String text) {
+    public TUIEditor(int x, int y, int width, int height, TKernel kernel, String path) {
         super(x, y, width, height);
 
         if (kernel == null) {

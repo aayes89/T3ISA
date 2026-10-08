@@ -306,7 +306,7 @@ public final class TUIDesktop extends TUIElement {
         }
 
         if (editor == null) {
-            editor = new TUIEditor(80, 60, 500, 400, kernel, "/archivo.txt", "");
+            editor = new TUIEditor(80, 60, 500, 400, kernel, "/archivo.txt");
             ui.add(editor);
         } else {
             editor.setVisible(true);
