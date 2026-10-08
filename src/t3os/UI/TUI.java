@@ -68,21 +68,34 @@ public final class TUI {
             if (key == null) {
                 continue;
             }
-
+            /*
+            * Buscar desde el elemento superior hacia atrás.
+            * El último elemento de la lista es el que está
+            * visualmente al frente.
+             */
             for (int i = elements.size() - 1; i >= 0; i--) {
                 TUIElement element = elements.get(i);
-
                 if (!element.isVisible() || !element.isEnabled()) {
                     continue;
                 }
 
-                if (element instanceof TUIEditor) {
-                    TUIEditor editor = (TUIEditor) element;
-                    if (editor.getTextArea().isFocused()) {
-                        editor.keyPressed(key);
-                        break;
-                    }
+                if (!(element instanceof TUIEditor)) {
+                    continue;
                 }
+
+                TUIEditor editor = (TUIEditor) element;
+                if (!editor.getTextArea().isFocused()) {
+                    continue;
+                }
+                System.out.println("EDITOR FOCUSED -> sending key");
+
+                editor.keyPressed(key);
+
+                /*
+                * Una tecla solamente debe ser procesada
+                * por el editor que tiene el foco.
+                 */
+                break;
             }
         }
     }
@@ -133,20 +146,26 @@ public final class TUI {
 
         // Elemento que tiene captura del botón izquierdo.
         if (mouseCapture != null) {
-            mouseCapture.mouseMove(mouseX, mouseY);
-            if ((buttons & 1) == 0 && (previousButtons & 1) != 0) {
-                mouseCapture.mouseUp(1);
+            if (!mouseCapture.isVisible() || !mouseCapture.isEnabled()) {
                 mouseCapture = null;
+            } else {
+                mouseCapture.mouseMove(mouseX, mouseY);
+
+                if ((buttons & 1) == 0 && (previousButtons & 1) != 0) {
+                    mouseCapture.mouseUp(1);
+                    mouseCapture = null;
+                }
+
+                return;
             }
-
-            return;
         }
-
         // Clic derecho.
         if ((buttons & 4) != 0 && (previousButtons & 4) == 0) {
             TUIElement target = null;
+
             for (int i = elements.size() - 1; i >= 0; i--) {
                 TUIElement element = elements.get(i);
+
                 if (!element.isVisible() || !element.isEnabled()) {
                     continue;
                 }
@@ -158,7 +177,6 @@ public final class TUI {
                 target = element;
                 break;
             }
-
             // Si ya había un popup y se hizo clic fuera de él, cerrarlo.
             if (popupMenu != null && popupMenu.isOpen() && target != popupMenu) {
                 closePopup();
@@ -166,17 +184,19 @@ public final class TUI {
 
             contextElement = target;
 
-            // El popup no recibe su propio clic derecho.
             if (target != null && target != popupMenu) {
+                bringToFront(target);
                 target.mouseDown(3, mouseX, mouseY);
             }
+
             return;
         }
-
         // Buscar el elemento superior.
         TUIElement target = null;
+
         for (int i = elements.size() - 1; i >= 0; i--) {
             TUIElement element = elements.get(i);
+
             if (!element.isVisible() || !element.isEnabled()) {
                 continue;
             }
@@ -188,18 +208,15 @@ public final class TUI {
             target = element;
             break;
         }
-
         // Movimiento.
         if (target != null) {
             target.mouseMove(mouseX, mouseY);
         }
-
         // Botón izquierdo: transición UP -> DOWN.
         if ((buttons & 1) != 0 && (previousButtons & 1) == 0) {
             if (target == null) {
                 return;
             }
-
             // El escritorio siempre permanece debajo de los demás elementos.
             if (!(target instanceof TUIDesktop)) {
                 bringToFront(target);

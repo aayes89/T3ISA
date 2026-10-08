@@ -95,6 +95,7 @@ public final class TUIFileExplorer extends TUIElement {
     // Dibuja la interfaz del explorador
     @Override
     public void draw(TUI ui) {
+        this.ui = ui;
         // Ventana
         ui.fillRect(x, y, width, height, 0x00D0D0D0);
 
@@ -425,7 +426,7 @@ public final class TUIFileExplorer extends TUIElement {
         // Se llama a touch con esos parámetros
     }
 
-    // Ingresa a un directorio o inicia el editor según el tipo de archivo
+    // Ingresa a un directorio o inicia el editor según el tipo de archivo    
     private void openSelected() {
         if (selectedPath == null) {
             return;
@@ -436,15 +437,19 @@ public final class TUIFileExplorer extends TUIElement {
             return;
         }
 
+        if (ui == null) {
+            return;
+        }
+
         try {
             String content = vfs.read(selectedPath);
             TUIEditor editor = new TUIEditor(100, 80, 600, 460, kernel, selectedPath, content);
 
             ui.add(editor);
             ui.bringToFront(editor);
-            editor.draw(ui);
+
         } catch (RuntimeException e) {
-            System.out.println("T3Editor: " + e.getMessage());
+            System.out.println("T3Editor: error abriendo " + selectedPath + ": " + e.getMessage());
         }
     }
 

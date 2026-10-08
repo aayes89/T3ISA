@@ -24,7 +24,6 @@
 package t3os.UI;
 
 import t3os.KERNEL.TKernel;
-import t3os.T3OS;
 
 /**
  *

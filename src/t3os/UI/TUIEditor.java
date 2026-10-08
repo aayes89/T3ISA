@@ -99,7 +99,6 @@ public class TUIEditor extends TUIElement {
 
         // Ventana
         ui.fillRect(x, y, width, height, 0x00D0D0D0);
-
         // Barra de título
         ui.fillRect(x, y, width, TITLE_HEIGHT, 0x00008080);
 
@@ -166,11 +165,7 @@ public class TUIEditor extends TUIElement {
     // Procesar evento de clic presionado en mouse
     @Override
     public void mouseDown(int button, int mouseX, int mouseY) {
-        if (!visible) {
-            return;
-        }
-
-        if (!contains(mouseX, mouseY)) {
+        if (!visible || !enabled) {
             return;
         }
 
@@ -178,17 +173,26 @@ public class TUIEditor extends TUIElement {
             return;
         }
 
+        if (!contains(mouseX, mouseY)) {
+            text_area.setFocused(false);
+            return;
+        }
+
         // Cerrar
         if (mouseX >= x + width - 24 && mouseY >= y && mouseY < y + TITLE_HEIGHT) {
+            text_area.setFocused(false);
             setVisible(false);
             return;
         }
 
         // Arrastrar ventana
         if (mouseY >= y && mouseY < y + TITLE_HEIGHT) {
+            text_area.setFocused(false);
+
             dragging = true;
             dragOffsetX = mouseX - x;
             dragOffsetY = mouseY - y;
+
             return;
         }
 
@@ -214,14 +218,24 @@ public class TUIEditor extends TUIElement {
 
         // Guardar
         if (mouseY >= toolbarY + 4 && mouseY < toolbarY + 24 && mouseX >= x + 4 && mouseX < x + 68) {
+            text_area.setFocused(false);
             Guardar();
             return;
         }
 
-        // Área de edición.
-        if (mouseY >= y + TITLE_HEIGHT + TOOLBAR_HEIGHT) {
+        int editorY = y + TITLE_HEIGHT + TOOLBAR_HEIGHT;
+        int editorX = x + 4;
+        int editorWidth = width - 8;
+        int editorHeight = height - TITLE_HEIGHT - TOOLBAR_HEIGHT - 8;
+
+        // Área de edición
+        if (mouseX >= editorX && mouseX < editorX + editorWidth && mouseY >= editorY && mouseY < editorY + editorHeight) {
             text_area.mouseDown(1, mouseX, mouseY);
+            text_area.setFocused(true);
+            return;
         }
+
+        text_area.setFocused(false);
     }
 
     // Procesar evento de teclado (escribir en área de texto)
@@ -230,11 +244,14 @@ public class TUIEditor extends TUIElement {
             return;
         }
 
-        int cursorBefore = text_area.getCursor();
-        String textBefore = text_area.getText();
+        if (!text_area.isFocused()) {
+            return;
+        }
 
+        String textBefore = text_area.getText();
         text_area.keyPressed(key.getCode(), key.getCharacter());
-        if (cursorBefore != text_area.getCursor() || !textBefore.equals(text_area.getText())) {
+
+        if (!textBefore.equals(text_area.getText())) {
             modified = true;
         }
     }

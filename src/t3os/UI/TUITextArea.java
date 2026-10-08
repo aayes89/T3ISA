@@ -32,11 +32,34 @@ import java.awt.event.KeyEvent;
 // Componente Área de texto
 public class TUITextArea extends TUIElement {
 
+    private static final int CHAR_WIDTH = 8;
+    private static final int LINE_HEIGHT = 16;
+    private static final int PADDING_X = 4;
+    private static final int PADDING_Y = 4;
+
     private final StringBuilder sb;
     private final int color;
 
     private int cursor;
     private boolean focused;
+
+    // Desplazamiento vertical de las líneas visuales
+    private int scrollY;
+
+    private static final class CursorPosition {
+
+        final int line;
+        final int column;
+        final int lineStart;
+        final int lineEnd;
+
+        CursorPosition(int line, int column, int lineStart, int lineEnd) {
+            this.line = line;
+            this.column = column;
+            this.lineStart = lineStart;
+            this.lineEnd = lineEnd;
+        }
+    }
 
     // Constructor
     public TUITextArea(int x, int y, int width, int height, String text, int color) {
@@ -51,56 +74,110 @@ public class TUITextArea extends TUIElement {
         this.color = color;
         cursor = sb.length();
         focused = false;
+        scrollY = 0;
     }
 
-    // Dibujar área de texto en pantalla
+    // Dibujar área de texto
     @Override
     public void draw(TUI ui) {
         ui.fillRect(x, y, width, height, 0x00FFFFFF);
         ui.drawRect(x, y, width, height, 0x00000000);
 
-        String text = sb.toString();
+        int charsPerLine = getCharsPerLine();
 
-        int lineY = y + 4;
+        int visualLine = 0;
+        int lineY = y + PADDING_Y - scrollY;
+
         int lineStart = 0;
 
-        for (int i = 0; i <= text.length(); i++) {
-            if (i == text.length() || text.charAt(i) == '\n') {
-                String line = text.substring(lineStart, i);
+        while (lineStart <= sb.length()) {
+            int lineEnd = getVisualLineEnd(lineStart, charsPerLine);
 
-                ui.drawText(line, x + 4, lineY, color);
+            if (lineY + LINE_HEIGHT > y && lineY < y + height) {
+                drawLine(ui, lineStart, lineEnd, lineY);
+            }
 
-                lineY += 16;
-                lineStart = i + 1;
+            if (lineEnd >= sb.length()) {
+                break;
+            }
 
-                if (lineY >= y + height) {
-                    break;
-                }
+            lineStart = lineEnd;
+
+            // Si el carácter que terminó la línea es '\n', se consume aquí.
+            if (lineStart < sb.length() && sb.charAt(lineStart) == '\n') {
+                lineStart++;
+            }
+
+            visualLine++;
+            lineY += LINE_HEIGHT;
+
+            if (lineY >= y + height) {
+                break;
             }
         }
 
         if (focused) {
+            drawCursor(ui, charsPerLine);
+        }
+    }
 
-            int cursorX = x + 4;
-            int cursorY = y + 4;
+    // Obtener cantidad máxima de caracteres por línea visual
+    private int getCharsPerLine() {
+        int availableWidth = width - (PADDING_X * 2);
 
-            int lineStartCursor = 0;
+        int chars = availableWidth / CHAR_WIDTH;
 
-            for (int i = 0; i < cursor; i++) {
-                if (sb.charAt(i) == '\n') {
-                    cursorX = x + 4;
-                    cursorY += 16;
+        if (chars < 1) {
+            chars = 1;
+        }
 
-                    lineStartCursor = i + 1;
-                }
+        return chars;
+    }
+
+    // Obtener final de una línea visual
+    private int getVisualLineEnd(int start, int charsPerLine) {
+
+        if (start >= sb.length()) {
+            return start;
+        }
+
+        int position = start;
+        int count = 0;
+
+        while (position < sb.length() && count < charsPerLine) {
+            char c = sb.charAt(position);
+            if (c == '\n') {
+                break;
             }
 
-            cursorX += (cursor - lineStartCursor) * 8;
+            position++;
+            count++;
+        }
+
+        return position;
+    }
+
+    // Dibujar una línea visual
+    private void drawLine(TUI ui, int start, int end, int lineY) {
+        if (start >= end) {
+            return;
+        }
+
+        String line = sb.substring(start, end);
+        ui.drawText(line, x + PADDING_X, lineY, color);
+    }
+
+    // Dibujar cursor
+    private void drawCursor(TUI ui, int charsPerLine) {
+        CursorPosition position = getCursorPosition();
+        int cursorX = x + PADDING_X + position.column * CHAR_WIDTH;
+        int cursorY = y + PADDING_Y + position.line * LINE_HEIGHT - scrollY;
+        if (cursorY >= y && cursorY < y + height) {
             ui.fillRect(cursorX, cursorY, 1, 14, color);
         }
     }
 
-    // Capturar evenetos de mouse
+    // Capturar eventos del mouse
     @Override
     public void mouseDown(int button, int mouseX, int mouseY) {
         if (button != 1) {
@@ -113,37 +190,63 @@ public class TUITextArea extends TUIElement {
         }
 
         focused = true;
-        int line = (mouseY - y - 4) / 16;
-        int column = (mouseX - x - 4) / 8;
-        cursor = getCursorFromPosition(line, column);
+
+        int charsPerLine = getCharsPerLine();
+
+        int visualLine = (mouseY - y - PADDING_Y + scrollY) / LINE_HEIGHT;
+        int column = (mouseX - x - PADDING_X) / CHAR_WIDTH;
+
+        if (visualLine < 0) {
+            visualLine = 0;
+        }
+
+        if (column < 0) {
+            column = 0;
+        }
+
+        cursor = getCursorFromPosition(visualLine, column, charsPerLine);
+        ensureCursorVisible();
     }
 
-    private int getCursorFromPosition(int line, int column) {
-        int currentLine = 0;
+    // Convertir posición visual a posición real del StringBuilder
+    private int getCursorFromPosition(int targetLine, int targetColumn, int charsPerLine) {
+        int line = 0;
         int position = 0;
 
         while (position < sb.length()) {
-            if (currentLine == line) {
-                int lineEnd = position;
-                while (lineEnd < sb.length() && sb.charAt(lineEnd) != '\n') {
-                    lineEnd++;
-                }
-
-                return Math.min(position + column, lineEnd);
+            if (line == targetLine) {
+                int lineEnd = getVisualLineEnd(position, charsPerLine);
+                return Math.min(position + targetColumn, lineEnd);
             }
 
-            if (sb.charAt(position) == '\n') {
-                currentLine++;
+            int lineEnd = getVisualLineEnd(position, charsPerLine);
+
+            // Línea terminada por salto real.
+            if (lineEnd < sb.length() && sb.charAt(lineEnd) == '\n') {
+                position = lineEnd + 1;
+                line++;
+                continue;
             }
 
-            position++;
+            // Línea terminada por wrapping.
+            if (lineEnd < sb.length()) {
+                position = lineEnd;
+                line++;
+                continue;
+            }
+
+            break;
         }
 
         return sb.length();
     }
 
-    // Gestión del cursor capturando teclas particulares
+    // Gestión del teclado
     public void keyPressed(int key, char character) {
+        if (!focused) {
+            return;
+        }
+
         switch (key) {
             case KeyEvent.VK_LEFT:
                 moveLeft();
@@ -151,6 +254,14 @@ public class TUITextArea extends TUIElement {
 
             case KeyEvent.VK_RIGHT:
                 moveRight();
+                return;
+
+            case KeyEvent.VK_UP:
+                moveUp();
+                return;
+
+            case KeyEvent.VK_DOWN:
+                moveDown();
                 return;
 
             case KeyEvent.VK_HOME:
@@ -171,6 +282,7 @@ public class TUITextArea extends TUIElement {
 
             case KeyEvent.VK_ENTER:
                 addString("\n");
+                ensureCursorVisible();
                 return;
 
             case KeyEvent.VK_TAB:
@@ -181,9 +293,11 @@ public class TUITextArea extends TUIElement {
         if (!Character.isISOControl(character)) {
             addString(String.valueOf(character));
         }
+
+        ensureCursorVisible();
     }
 
-    // Inserta texto en posición del cursor
+    // Insertar texto en la posición del cursor
     public void addString(String text) {
         if (text == null) {
             return;
@@ -191,9 +305,11 @@ public class TUITextArea extends TUIElement {
 
         sb.insert(cursor, text);
         cursor += text.length();
+
+        ensureCursorVisible();
     }
 
-    // Añade texto al final del actual
+    // Añadir texto al final
     public void append(String text) {
         if (text == null) {
             return;
@@ -201,9 +317,11 @@ public class TUITextArea extends TUIElement {
 
         sb.append(text);
         cursor = sb.length();
+
+        ensureCursorVisible();
     }
 
-    // Elimina el último caracter en el buffer cada vez
+    // Backspace
     public void backspace() {
         if (cursor <= 0) {
             return;
@@ -211,50 +329,198 @@ public class TUITextArea extends TUIElement {
 
         sb.deleteCharAt(cursor - 1);
         cursor--;
+
+        ensureCursorVisible();
     }
 
-    // Elimina el caracter en la posición del cursor actual
+    // Delete
     public void delete() {
         if (cursor >= sb.length()) {
             return;
         }
 
         sb.deleteCharAt(cursor);
+
+        ensureCursorVisible();
     }
 
-    // Mover a la izquierda el cursor (posición actual -1)
+    // Mover cursor izquierda
     public void moveLeft() {
         if (cursor > 0) {
             cursor--;
         }
+
+        ensureCursorVisible();
     }
 
-    // Mover a la derecha el cursor (posición actual +1)
+    // Mover cursor derecha
     public void moveRight() {
         if (cursor < sb.length()) {
             cursor++;
         }
+
+        ensureCursorVisible();
     }
 
-    // Pone posición del cursor en 0 horizontal respecto a Y
+    // Mover cursor una línea visual arriba
+    public void moveUp() {
+        int charsPerLine = getCharsPerLine();
+
+        int line = 0;
+        int lineStart = 0;
+
+        while (lineStart < cursor) {
+            int lineEnd = getVisualLineEnd(lineStart, charsPerLine);
+            if (cursor <= lineEnd) {
+                break;
+            }
+
+            if (lineEnd < sb.length() && sb.charAt(lineEnd) == '\n') {
+                lineStart = lineEnd + 1;
+            } else if (lineEnd < sb.length()) {
+                lineStart = lineEnd;
+            } else {
+                break;
+            }
+
+            line++;
+        }
+
+        if (line <= 0) {
+            return;
+        }
+
+        int column = cursor - lineStart;
+
+        int previousLineStart = 0;
+        int currentLine = 0;
+
+        while (previousLineStart < sb.length() && currentLine < line - 1) {
+            int end = getVisualLineEnd(previousLineStart, charsPerLine);
+
+            if (end < sb.length() && sb.charAt(end) == '\n') {
+                previousLineStart = end + 1;
+            } else if (end < sb.length()) {
+                previousLineStart = end;
+            } else {
+                break;
+            }
+
+            currentLine++;
+        }
+
+        int previousEnd = getVisualLineEnd(previousLineStart, charsPerLine);
+
+        cursor = Math.min(previousLineStart + column, previousEnd);
+        ensureCursorVisible();
+    }
+
+    // Mover cursor una línea visual abajo
+    public void moveDown() {
+        int charsPerLine = getCharsPerLine();
+
+        int line = 0;
+        int lineStart = 0;
+
+        while (lineStart < cursor) {
+            int lineEnd = getVisualLineEnd(lineStart, charsPerLine);
+            if (cursor <= lineEnd) {
+                break;
+            }
+
+            if (lineEnd < sb.length() && sb.charAt(lineEnd) == '\n') {
+                lineStart = lineEnd + 1;
+            } else if (lineEnd < sb.length()) {
+                lineStart = lineEnd;
+            } else {
+                break;
+            }
+
+            line++;
+        }
+
+        int currentColumn = cursor - lineStart;
+        int nextLineStart;
+        int currentEnd = getVisualLineEnd(lineStart, charsPerLine);
+
+        if (currentEnd < sb.length() && sb.charAt(currentEnd) == '\n') {
+            nextLineStart = currentEnd + 1;
+        } else if (currentEnd < sb.length()) {
+            nextLineStart = currentEnd;
+        } else {
+            return;
+        }
+
+        int nextEnd = getVisualLineEnd(nextLineStart, charsPerLine);
+
+        cursor = Math.min(nextLineStart + currentColumn, nextEnd);
+        ensureCursorVisible();
+    }
+
+    // Home
     public void moveHome() {
-        while (cursor > 0 && sb.charAt(cursor - 1) != '\n') {
-            cursor--;
+        int charsPerLine = getCharsPerLine();
+        int lineStart = cursor;
+
+        // Buscar inicio de la línea lógica o visual.
+        while (lineStart > 0) {
+            if (sb.charAt(lineStart - 1) == '\n') {
+                break;
+            }
+
+            int candidateStart = lineStart - 1;
+            int visualOffset = cursor - candidateStart;
+            if (visualOffset > charsPerLine) {
+                break;
+            }
+
+            lineStart--;
         }
+
+        cursor = lineStart;
+        ensureCursorVisible();
     }
 
-    // Pone posición del cursor al max horizontal respecto a Y
+    // End
     public void moveEnd() {
-        while (cursor < sb.length() && sb.charAt(cursor) != '\n') {
-            cursor++;
+        int charsPerLine = getCharsPerLine();
+        int lineStart = cursor;
+        while (lineStart > 0 && sb.charAt(lineStart - 1) != '\n') {
+            int candidate = lineStart - 1;
+            if (cursor - candidate > charsPerLine) {
+                break;
+            }
+
+            lineStart--;
+        }
+
+        int lineEnd = getVisualLineEnd(lineStart, charsPerLine);
+        cursor = lineEnd;
+
+        ensureCursorVisible();
+    }
+
+    // Mantener visible el cursor
+    private void ensureCursorVisible() {
+        CursorPosition position = getCursorPosition();
+        int cursorY = y + PADDING_Y + position.line * LINE_HEIGHT;
+        if (cursorY < y) {
+            scrollY = position.line * LINE_HEIGHT;
+        } else if (cursorY + LINE_HEIGHT > y + height) {
+            scrollY = position.line * LINE_HEIGHT - height + LINE_HEIGHT + PADDING_Y;
+        }
+
+        if (scrollY < 0) {
+            scrollY = 0;
         }
     }
 
-    // Getter y Setters
+    // Obtener texto
     public String getText() {
         return sb.toString();
     }
 
+    // Establecer texto
     public void setText(String text) {
         sb.setLength(0);
         if (text != null) {
@@ -262,16 +528,67 @@ public class TUITextArea extends TUIElement {
         }
 
         cursor = sb.length();
+        scrollY = 0;
     }
 
+    // Obtener cursor
     public int getCursor() {
         return cursor;
     }
 
+    private CursorPosition getCursorPosition() {
+        int charsPerLine = getCharsPerLine();
+
+        int position = 0;
+        int line = 0;
+
+        while (true) {
+            int lineStart = position;
+            if (position >= sb.length()) {
+                return new CursorPosition(line, 0, position, position);
+            }
+
+            int lineEnd = getVisualLineEnd(position, charsPerLine);
+
+            // Cursor dentro de esta línea.
+            if (cursor <= lineEnd) {
+                int column = cursor - lineStart;
+                return new CursorPosition(line, column, lineStart, lineEnd);
+            }
+
+            // La línea termina explícitamente con ENTER.
+            if (lineEnd < sb.length() && sb.charAt(lineEnd) == '\n') {
+                /*
+                * El cursor inmediatamente después del '\n'
+                * pertenece a la siguiente línea.
+                 */
+                if (cursor == lineEnd + 1) {
+                    return new CursorPosition(line + 1, 0, lineEnd + 1, lineEnd + 1);
+                }
+
+                position = lineEnd + 1;
+                line++;
+                continue;
+            }
+
+            // La línea terminó por wrapping.
+            if (lineEnd < sb.length()) {
+                position = lineEnd;
+                line++;
+                continue;
+            }
+
+            // Fin absoluto del documento.
+            return new CursorPosition(line, cursor - lineStart, lineStart, lineEnd);
+        }
+    }
+
+    // Establecer foco
     public void setFocused(boolean focused) {
         this.focused = focused;
     }
 
+    // Obtener foco
     public boolean isFocused() {
         return focused;
     }

@@ -105,9 +105,11 @@ public final class TGraphicsHostBackend {
             // Eventos del mouse
             panel.addMouseListener(new MouseAdapter() {
 
-                // Clic del mouse presionado
                 @Override
                 public void mousePressed(MouseEvent e) {
+
+                    panel.requestFocusInWindow();
+
                     int buttons = mouseDevice.getButtons();
 
                     if (e.getButton() == MouseEvent.BUTTON1) {
@@ -125,7 +127,6 @@ public final class TGraphicsHostBackend {
                     mouseDevice.setButtons(buttons);
                 }
 
-                // Clic del mouse liberado
                 @Override
                 public void mouseReleased(MouseEvent e) {
 
@@ -145,8 +146,7 @@ public final class TGraphicsHostBackend {
 
                     mouseDevice.setButtons(buttons);
                 }
-            }
-            );
+            });
 
             panel.setFocusable(true);
 
@@ -155,11 +155,8 @@ public final class TGraphicsHostBackend {
 
                 // Captura y procesamiento de teclas
                 @Override
-                public void keyPressed(KeyEvent e) {
-                    keyboardDevice.push(
-                            e.getKeyCode(),
-                            e.getKeyChar()
-                    );
+                public void keyPressed(KeyEvent e) {                    
+                    keyboardDevice.push(e.getKeyCode(), e.getKeyChar());
                 }
             });
 
