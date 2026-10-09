@@ -80,6 +80,7 @@ public final class TUI {
                     continue;
                 }
 
+                // Integración con InputDialog
                 if (element instanceof TUIInputDialog) {
                     TUIInputDialog dialog = (TUIInputDialog) element;
                     if (!dialog.hasFocusedEditor()) {
@@ -90,6 +91,7 @@ public final class TUI {
                     break;
                 }
 
+                // Integración con Editor
                 if (element instanceof TUIEditor) {
                     TUIEditor editor = (TUIEditor) element;
                     if (!editor.getTextArea().isFocused()) {
@@ -97,6 +99,12 @@ public final class TUI {
                     }
 
                     editor.keyPressed(key);
+                    break;
+                }
+
+                // Integración con Terminal
+                if (element instanceof TUITerminal terminal && terminal.hasKeyboardFocus()) {
+                    terminal.keyPressed(key);
                     break;
                 }
             }
@@ -147,40 +155,45 @@ public final class TUI {
         mouseY = y;
         mouseButtons = buttons;
 
-        // Elemento que tiene captura del botón izquierdo.
+        boolean leftPressed = (buttons & 1) != 0 && (previousButtons & 1) == 0;
+        boolean leftReleased = (buttons & 1) == 0 && (previousButtons & 1) != 0;
+        boolean rightPressed = (buttons & 4) != 0 && (previousButtons & 4) == 0;
+
+        // Gestionar la captura del ratón.
         if (mouseCapture != null) {
             if (!mouseCapture.isVisible() || !mouseCapture.isEnabled()) {
                 mouseCapture = null;
             } else {
-                mouseCapture.mouseMove(mouseX, mouseY);
+                TUIElement captured = mouseCapture;
+                captured.mouseMove(mouseX, mouseY);
 
-                if ((buttons & 1) == 0 && (previousButtons & 1) != 0) {
-                    mouseCapture.mouseUp(1);
+                if (leftReleased) {
                     mouseCapture = null;
+                    captured.mouseUp(1);
+                } else {
+                    return;
                 }
-
-                return;
             }
         }
-        // Clic derecho.
-        if ((buttons & 4) != 0 && (previousButtons & 4) == 0) {
-            TUIElement target = null;
 
-            for (int i = elements.size() - 1; i >= 0; i--) {
-                TUIElement element = elements.get(i);
+        // Buscar el elemento superior situado bajo el cursor.
+        TUIElement target = null;
 
-                if (!element.isVisible() || !element.isEnabled()) {
-                    continue;
-                }
+        for (int i = elements.size() - 1; i >= 0; i--) {
+            TUIElement element = elements.get(i);
 
-                if (!element.contains(mouseX, mouseY)) {
-                    continue;
-                }
+            if (!element.isVisible() || !element.isEnabled()) {
+                continue;
+            }
 
+            if (element.contains(mouseX, mouseY)) {
                 target = element;
                 break;
             }
-            // Si ya había un popup y se hizo clic fuera de él, cerrarlo.
+        }
+
+        // Procesar el clic derecho.
+        if (rightPressed) {
             if (popupMenu != null && popupMenu.isOpen() && target != popupMenu) {
                 closePopup();
             }
@@ -191,46 +204,65 @@ public final class TUI {
                 if (!(target instanceof TUIDesktop)) {
                     bringToFront(target);
                 }
+
                 target.mouseDown(3, mouseX, mouseY);
             }
 
             return;
         }
-        // Buscar el elemento superior.
-        TUIElement target = null;
 
-        for (int i = elements.size() - 1; i >= 0; i--) {
-            TUIElement element = elements.get(i);
+        // Cerrar el popup con clic izquierdo fuera de él.
+        if (leftPressed && popupMenu != null && popupMenu.isOpen() && target != popupMenu) {
+            closePopup();
 
-            if (!element.isVisible() || !element.isEnabled()) {
-                continue;
+            // Volver a determinar el elemento superior.
+            target = null;
+
+            for (int i = elements.size() - 1; i >= 0; i--) {
+                TUIElement element = elements.get(i);
+
+                if (!element.isVisible() || !element.isEnabled()) {
+                    continue;
+                }
+
+                if (element.contains(mouseX, mouseY)) {
+                    target = element;
+                    break;
+                }
             }
-
-            if (!element.contains(mouseX, mouseY)) {
-                continue;
-            }
-
-            target = element;
-            break;
         }
-        // Movimiento.
+
+        // Notificar movimiento.
         if (target != null) {
             target.mouseMove(mouseX, mouseY);
         }
-        // Botón izquierdo: transición UP -> DOWN.
-        if ((buttons & 1) != 0 && (previousButtons & 1) == 0) {
+
+        // Procesar la pulsación izquierda.
+        if (leftPressed) {
             if (target == null) {
                 return;
             }
-            // El escritorio siempre permanece debajo de los demás elementos.
+
             if (!(target instanceof TUIDesktop)) {
                 bringToFront(target);
             }
 
             target.mouseDown(1, mouseX, mouseY);
-            // El escritorio no necesita captura.
+
             if (!(target instanceof TUIDesktop)) {
                 mouseCapture = target;
+            }
+        }
+
+        // Entregar la liberación al escritorio si no hubo captura.
+        if (leftReleased && mouseCapture == null) {
+            for (int i = elements.size() - 1; i >= 0; i--) {
+                TUIElement element = elements.get(i);
+
+                if (element instanceof TUIDesktop && element.isVisible() && element.isEnabled()) {
+                    element.mouseUp(1);
+                    break;
+                }
             }
         }
     }

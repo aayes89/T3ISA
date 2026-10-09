@@ -37,6 +37,9 @@ public final class TUIStartMenu extends TUIElement {
 
     private int backgroundColor;
     private int borderColor;
+    private final int bottomY;
+    private final int itemHeight;
+    private final int padding;
 
     // Constructor
     public TUIStartMenu(int x, int y, int width, int height) {
@@ -44,6 +47,10 @@ public final class TUIStartMenu extends TUIElement {
         buttons = new ArrayList<>();
         backgroundColor = 0x00D0D0D0;
         borderColor = 0x00000000;
+        itemHeight = 32;
+        padding = 4;
+        // Conserva la posición inferior original del menú. 
+        bottomY = y + height;
         visible = false;
     }
 
@@ -109,11 +116,27 @@ public final class TUIStartMenu extends TUIElement {
         }
 
         buttons.add(button);
+        updateLayout();
     }
 
     // Eliminar botón del menu
     public void removeButton(TUIButton button) {
-        buttons.remove(button);
+        if (buttons.remove(button)) {
+            updateLayout();
+        }
+    }
+    
+    // Actualiza el tamaño del menu según cantidad de botones
+    private void updateLayout() {
+        height = buttons.isEmpty() ? 0 : (padding * 2) + (buttons.size() * itemHeight);
+        // El borde inferior permanece fijo, junto a la barra.
+        y = bottomY - height;
+        // Recoloca todos los botones para evitar solapamientos. 
+        for (int i = 0; i < buttons.size(); i++) {
+            TUIButton button = buttons.get(i);
+            button.setPosition(x, y + padding + (i * itemHeight));
+        }
+
     }
 
     // Getter y Setters
@@ -126,7 +149,12 @@ public final class TUIStartMenu extends TUIElement {
     }
 
     public void toggle() {
-        visible = !visible;
+        //visible = !visible;
+        if(visible){
+            close();
+        }else{
+            open();
+        }
     }
 
     public boolean isOpen() {
@@ -148,4 +176,5 @@ public final class TUIStartMenu extends TUIElement {
     public void setBorderColor(int color) {
         borderColor = color;
     }
+
 }

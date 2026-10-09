@@ -98,6 +98,9 @@ public final class TShell {
 
     // Dispatcher de comandos en T3OS
     public boolean execute(String line) {
+        if (line == null || line.trim().isEmpty()) {
+            return true;
+        }
         String[] parts = line.split("\\s+");
         String command = parts[0].toLowerCase();
         switch (command) {
@@ -214,15 +217,40 @@ public final class TShell {
                 nc(parts);
                 return true;
 
-            case "startx":
-                startGraphics();
+            case "startx": {
+                ShellContext previousContext = context;
+                graphicsExitRequested = false;
+                context = ShellContext.GRAPHICS;
+
+                try {
+                    startGraphics();
+                } finally {
+                    context = previousContext;
+                    graphicsExitRequested = false;
+                }
+
                 return true;
+            }
 
             case "exit":
-                console.writeLine("shutdown");
-                machine.halt();
-                System.exit(0);
-                return false;
+                switch (context) {
+                    case TERMINAL:
+                        console.writeLine("Closing terminal...");
+                        closeTerminalAction.run();
+                        return true;
+
+                    case GRAPHICS:
+                        console.writeLine("Returning to console...");
+                        graphicsExitRequested = true;
+                        return false;
+
+                    case CONSOLE:
+                    default:
+                        console.writeLine("T3OS shutdown...");
+                        machine.halt();
+                        System.exit(0);
+                        return false;
+                }
 
             default:
                 console.writeLine("command not found: " + command);
@@ -1243,8 +1271,33 @@ public final class TShell {
         }
         return ip;
     }
+// === CONTEXTO SHELL ===
 
-    // === MODO UI ===
+    public enum ShellContext {
+        CONSOLE,
+        GRAPHICS,
+        TERMINAL
+    }
+
+    private ShellContext context = ShellContext.CONSOLE;
+    private Runnable closeTerminalAction = () -> {
+    };
+    private boolean graphicsExitRequested = false;
+
+    public void setContext(ShellContext context) {
+        this.context = context;
+    }
+
+    public void setCloseTerminalAction(Runnable action) {
+        this.closeTerminalAction = action != null ? action : () -> {
+        };
+    }
+
+    public boolean isGraphicsExitRequested() {
+        return graphicsExitRequested;
+    }
+
+// === MODO UI ===
 //  Iniciar el UI de T3OS
     private void startGraphics() {
         TUI ui = new TUI(machine);
@@ -1254,10 +1307,13 @@ public final class TShell {
         ui.add(desktop);
         ui.setPopupMenu(desktop.getDesktopMenu());
 
-        while (!machine.isHalted()) {
-
+        while (!machine.isHalted() && !graphicsExitRequested) {
             ui.updateKeyboard();
-            ui.updateMouse(machine.getMouseX(), machine.getMouseY(), machine.getMouseButtons());
+            ui.updateMouse(
+                    machine.getMouseX(),
+                    machine.getMouseY(),
+                    machine.getMouseButtons()
+            );
 
             machine.graphics(2, 0x00FFFFFF, 0, 0, 0, 0, 0);
 
@@ -1265,12 +1321,14 @@ public final class TShell {
             gb.presentFrame();
 
             try {
-                Thread.sleep(16); // 60fps
+                Thread.sleep(16); // 60 fps
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
             }
         }
+
+        graphicsExitRequested = false;
     }
 
 }

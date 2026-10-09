@@ -29,21 +29,31 @@ package t3isa.DEVICE;
  */
 import t3isa.HARDWARE.TDevice;
 import t3isa.Core.TWord;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayDeque;
-
 import java.util.Queue;
+
+import java.util.function.Consumer;
 
 public final class TConsoleDevice implements TDevice {
 
     private final BufferedReader input;
     private final Queue<TWord> inputQueue;
+    private final Consumer<String> output;
 
+    // Consola tradicional.
     public TConsoleDevice() {
-        input = new BufferedReader(new InputStreamReader(System.in));
-        inputQueue = new ArrayDeque<>();
+        this(System.out::print);
+    }
+
+    // Salida configurable: consola gráfica.
+    public TConsoleDevice(Consumer<String> output) {
+        this.input = new BufferedReader(new InputStreamReader(System.in));
+        this.inputQueue = new ArrayDeque<>();
+        this.output = output != null ? output : System.out::print;
     }
 
     @Override
@@ -51,27 +61,28 @@ public final class TConsoleDevice implements TDevice {
         long code = value.toLong();
 
         if (code == 10) {
-            System.out.println();
+            writeLine("");
         } else if (code >= 32 && code <= 126) {
-            System.out.print((char) code);
+            writeText(String.valueOf((char) code));
         } else {
-            System.out.print("[" + code + "]");
+            writeText("[" + code + "]");
         }
     }
 
     public void writeText(String text) {
-        System.out.print(text);
+        output.accept(text);
     }
 
     public void writeLine(String text) {
-        System.out.println(text);
+        output.accept(text + System.lineSeparator());
     }
 
     public String readLine() {
         try {
             return input.readLine();
         } catch (IOException e) {
-            throw new IllegalStateException("Error leyendo consola", e);
+            throw new IllegalStateException(
+                    "Error leyendo consola", e);
         }
     }
 
@@ -98,20 +109,24 @@ public final class TConsoleDevice implements TDevice {
     }
 
     private void readLineIntoQueue() {
-        System.out.print("DEVICE IN > ");
+        writeText("DEVICE IN > ");
 
         try {
             String line = input.readLine();
+
             if (line == null) {
                 return;
             }
 
             for (int i = 0; i < line.length(); i++) {
-                inputQueue.add(TWord.fromLong(line.charAt(i)));
+                inputQueue.add(
+                        TWord.fromLong(line.charAt(i)));
             }
+
             inputQueue.add(TWord.fromLong(10));
         } catch (IOException e) {
-            throw new IllegalStateException("Error leyendo consola", e);
+            throw new IllegalStateException(
+                    "Error leyendo consola", e);
         }
     }
 }

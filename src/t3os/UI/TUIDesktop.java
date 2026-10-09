@@ -24,6 +24,7 @@
 package t3os.UI;
 
 import t3os.KERNEL.TKernel;
+import t3os.SHELL.TShell;
 
 /**
  *
@@ -49,6 +50,10 @@ public final class TUIDesktop extends TUIElement {
     private int clockY;
 
     private int clockColor;
+    private static final int START_MENU_WIDTH = 220;
+    private static final int START_ITEM_HEIGHT = 32;
+    private static final int START_MENU_PADDING = 4;
+    private static final int TASKBAR_HEIGHT = 40;
 
     private TUI ui;
 
@@ -67,7 +72,7 @@ public final class TUIDesktop extends TUIElement {
         clockX = width - 88;
         clockY = height - 28;
         clockColor = 0x00FFFFFF;
-        taskbar = new TUITaskbar(0, height - 40, width, 40);
+        taskbar = new TUITaskbar(0, height - TASKBAR_HEIGHT, width, TASKBAR_HEIGHT);
         startMenu = new TUIStartMenu(0, height - 340, 220, 300);
         clock = new TUIClock(clockX, clockY, 20, 40);
         desktopMenu = new TUIPopupMenu(0, 0, 190, 300);
@@ -90,53 +95,51 @@ public final class TUIDesktop extends TUIElement {
 
     // Generar elementos del menú de inicio
     private void createStartMenu() {
-        int itemHeight = 32;
         int itemWidth = 220;
-        int startX = 0;
-        int startY = height - 340;
+        int itemHeight = 32;
 
-        TUIButton btn_explorer = new TUIButton(startX, startY, itemWidth, itemHeight, "Explorador");
-        btn_explorer.setAction(() -> {
+        TUIButton btnExplorer = new TUIButton(0, 0, itemWidth, itemHeight, "Explorador");
+        btnExplorer.setAction(() -> {
             startMenu.close();
             openExplorer();
         });
 
-        TUIButton btn_editor = new TUIButton(startX, startY, itemWidth, itemHeight, "T3Editor");
-        btn_editor.setAction(() -> {
+        TUIButton btnEditor = new TUIButton(0, 0, itemWidth, itemHeight, "T3Editor");
+        btnEditor.setAction(() -> {
             startMenu.close();
             openEditor();
         });
 
-        TUIButton btn_terminal = new TUIButton(startX, startY + itemHeight, itemWidth, itemHeight, "Terminal");
-        btn_terminal.setAction(() -> {
+        TUIButton btnTerminal = new TUIButton(0, 0, itemWidth, itemHeight, "Terminal");
+        btnTerminal.setAction(() -> {
             startMenu.close();
             openTerminal();
         });
 
-        TUIButton btn_settings = new TUIButton(startX, startY + itemHeight * 2, itemWidth, itemHeight, "Configuración");
-        btn_settings.setAction(() -> {
+        TUIButton btnSettings = new TUIButton(0, 0, itemWidth, itemHeight, "Configuración");
+        btnSettings.setAction(() -> {
             startMenu.close();
             openSettings();
         });
 
-        TUIButton btn_reboot = new TUIButton(startX, startY + itemHeight * 3, itemWidth, itemHeight, "Reiniciar");
-        btn_reboot.setAction(() -> {
+        TUIButton btnReboot = new TUIButton(0, 0, itemWidth, itemHeight, "Reiniciar");
+        btnReboot.setAction(() -> {
             startMenu.close();
             reboot();
         });
 
-        TUIButton btn_shutdown = new TUIButton(startX, startY + itemHeight * 4, itemWidth, itemHeight, "Apagar");
-        btn_shutdown.setAction(() -> {
+        TUIButton btnShutdown = new TUIButton(0, 0, itemWidth, itemHeight, "Apagar");
+        btnShutdown.setAction(() -> {
             startMenu.close();
             shutdown();
         });
 
-        startMenu.addButton(btn_explorer);
-        startMenu.addButton(btn_editor);
-        startMenu.addButton(btn_terminal);
-        startMenu.addButton(btn_settings);
-        startMenu.addButton(btn_reboot);
-        startMenu.addButton(btn_shutdown);
+        startMenu.addButton(btnExplorer);
+        startMenu.addButton(btnEditor);
+        startMenu.addButton(btnTerminal);
+        startMenu.addButton(btnSettings);
+        startMenu.addButton(btnReboot);
+        startMenu.addButton(btnShutdown);
     }
 
     // Dibujar los componentes del escritorio
@@ -226,10 +229,13 @@ public final class TUIDesktop extends TUIElement {
     // Cambiar fondo de pantalla (Colores por ahora)
     private void changeBackground() {
         // Por ahora cambio entre fondos predefinidos.
-        // Añadiré mandelbrot, gradientes o cargar imágenes
+        // Añadiré cargar imágenes, por ahora es rotativo
         if (bgMode == 0) {
             bgMode = 1;
         } else if (bgMode == 1) {
+            bgMode = 2;
+        } else {
+            gradiente();
             bgMode = 0;
         }
         if (backgroundColor == 0x00202020) {
@@ -321,10 +327,13 @@ public final class TUIDesktop extends TUIElement {
         if (ui == null) {
             return;
         }
-        // Se conectará con TShell.
-        TUITerminal term = new TUITerminal(80, 60, 500, 400, 0x000000, kernel);
-        ui.add(term);
-        ui.bringToFront(term);
+
+        TUITerminal terminal = new TUITerminal(100, 80, 700, 450, 0x00000000, kernel);
+        terminal.setContext(TShell.ShellContext.TERMINAL);
+
+        ui.add(terminal);
+        ui.bringToFront(terminal);
+        terminal.setKeyboardFocus(true);
     }
 
     // Reiniciar sistema
