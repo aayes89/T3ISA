@@ -50,9 +50,7 @@ public final class TUIDesktop extends TUIElement {
     private int clockY;
 
     private int clockColor;
-    private static final int START_MENU_WIDTH = 220;
-    private static final int START_ITEM_HEIGHT = 32;
-    private static final int START_MENU_PADDING = 4;
+    
     private static final int TASKBAR_HEIGHT = 40;
 
     private TUI ui;

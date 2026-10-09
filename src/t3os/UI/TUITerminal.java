@@ -184,7 +184,8 @@ public final class TUITerminal extends TUIElement {
         char character = key.getCharacter();
 
         // Enter: ejecutar comando.
-        if (code == 10 || code == 13 || character == '\n' || character == '\r') {
+        if (code == 10 || code == 13
+                || character == '\n' || character == '\r') {
             executeCurrentLine();
             return;
         }
@@ -203,8 +204,45 @@ public final class TUITerminal extends TUIElement {
             return;
         }
 
-        // Solo caracteres imprimibles.
-        if (!Character.isISOControl(character)) {
+        // Ignorar teclas modificadoras y otras teclas especiales.
+        switch (code) {
+            case java.awt.event.KeyEvent.VK_SHIFT:
+            case java.awt.event.KeyEvent.VK_CONTROL:
+            case java.awt.event.KeyEvent.VK_ALT:
+            case java.awt.event.KeyEvent.VK_ALT_GRAPH:
+            case java.awt.event.KeyEvent.VK_CAPS_LOCK:
+            case java.awt.event.KeyEvent.VK_META:
+            case java.awt.event.KeyEvent.VK_LEFT:
+            case java.awt.event.KeyEvent.VK_RIGHT:
+            case java.awt.event.KeyEvent.VK_UP:
+            case java.awt.event.KeyEvent.VK_DOWN:
+            case java.awt.event.KeyEvent.VK_HOME:
+            case java.awt.event.KeyEvent.VK_END:
+            case java.awt.event.KeyEvent.VK_PAGE_UP:
+            case java.awt.event.KeyEvent.VK_PAGE_DOWN:
+            case java.awt.event.KeyEvent.VK_INSERT:
+            case java.awt.event.KeyEvent.VK_DELETE:
+            case java.awt.event.KeyEvent.VK_TAB:
+            case java.awt.event.KeyEvent.VK_F1:
+            case java.awt.event.KeyEvent.VK_F2:
+            case java.awt.event.KeyEvent.VK_F3:
+            case java.awt.event.KeyEvent.VK_F4:
+            case java.awt.event.KeyEvent.VK_F5:
+            case java.awt.event.KeyEvent.VK_F6:
+            case java.awt.event.KeyEvent.VK_F7:
+            case java.awt.event.KeyEvent.VK_F8:
+            case java.awt.event.KeyEvent.VK_F9:
+            case java.awt.event.KeyEvent.VK_F10:
+            case java.awt.event.KeyEvent.VK_F11:
+            case java.awt.event.KeyEvent.VK_F12:
+                return;
+        }
+
+        // Insertar únicamente caracteres imprimibles.
+        // Se permiten espacios auténticos de la barra espaciadora.
+        if (character >= 0x20
+                && !Character.isISOControl(character)
+                && character != 0x7F) {
             inputLine.append(character);
         }
     }

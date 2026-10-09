@@ -288,13 +288,28 @@ public class TUITextArea extends TUIElement {
             case KeyEvent.VK_TAB:
                 addString("    ");
                 return;
+            // Teclas modificadoras: nunca insertan texto. 
+            case KeyEvent.VK_SHIFT:
+            case KeyEvent.VK_CONTROL:
+            case KeyEvent.VK_ALT:
+            case KeyEvent.VK_ALT_GRAPH:
+            case KeyEvent.VK_CAPS_LOCK:
+            case KeyEvent.VK_META:
+            case KeyEvent.VK_ESCAPE:
+            case KeyEvent.VK_PAGE_UP:
+            case KeyEvent.VK_PAGE_DOWN:
+            case KeyEvent.VK_INSERT:
+            case KeyEvent.VK_PRINTSCREEN:
+            case KeyEvent.VK_PAUSE:
+                return;
         }
 
-        if (!Character.isISOControl(character)) {
+        // Solo insertar caracteres imprimibles. 
+        // Los espacios reales siguen estando permitidos. 
+        if (character >= 0x20 && !Character.isISOControl(character) && character != 0x7F) {
             addString(String.valueOf(character));
+            ensureCursorVisible();
         }
-
-        ensureCursorVisible();
     }
 
     // Insertar texto en la posición del cursor
