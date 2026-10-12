@@ -73,7 +73,45 @@ public final class TUIBrowser extends TUIElement {
     private int dragOffsetY;
     private int addressCursor;
 
+    private T3HtmlNode document;
+    private T3HtmlRenderer htmlRenderer;
     private Button pressedButton = Button.NONE;
+
+    String html0 = """
+                <html>
+                  <head>
+                      <style>
+                          body { background-color: #ffffff; }
+                          nav { display: flex; flex-direction: row; background-color: #2c2c2c; padding: 10px 15px; }
+                          .nav-link { color: #ffffff; text-decoration: none; margin-right: 15px; }
+                          .container { max-width: 1200px; margin: 0 auto; }
+                          .float-right { float: right; }
+                          .main-content { margin-right: 200px; }
+                      </style>
+                  </head>
+                  <body>                      
+                      <div class="container">
+                          <div class="main-content">                              
+                              <h1>DNS-Web Browser</h1>
+                              <p>                                 
+                                 Aplicación diseñada para navegar en el anonimato.<br>
+                                 Utiliza técnicas de ofuscación avanzadas para proteger tus datos.<br>
+                                 <h2>- Cómo usar -</h2>
+                                 <h3>Navegación segura:</h3>     
+                                 - Escriba en la barra superior la dirección que desea visualizar y presione ENTER.
+                                 <h3>Navegación insegura:</h3>     
+                                 - Escriba en la barra superior la dirección que desea visualizar y presione en el botón "Navegación sin protección".
+                              </p>
+                          </div>
+                          <div class="float-right">                              
+                          </div>
+                      </div>
+                      <footer>
+                          Made by Slam 2024 All Rights Reserved &copy;
+                      </footer>
+                  </body>
+                  </html>                  
+                  """;
 
     private enum Button {
         NONE,
@@ -88,9 +126,7 @@ public final class TUIBrowser extends TUIElement {
         super(x, y, width, height);
 
         if (width < 360 || height < 240) {
-            throw new IllegalArgumentException(
-                    "TUIBrowser requiere al menos 360x240 píxeles"
-            );
+            throw new IllegalArgumentException("TUIBrowser requiere al menos 360x240 píxeles");
         }
 
         addressCursor = address.length();
@@ -115,16 +151,13 @@ public final class TUIBrowser extends TUIElement {
     }
 
     private void drawTitleBar(TUI ui) {
-        ui.fillRect(x + 1, y + 1, width - 2,
-                TITLE_HEIGHT, COLOR_TITLE);
-
+        ui.fillRect(x + 1, y + 1, width - 2, TITLE_HEIGHT, COLOR_TITLE);
         ui.drawText(pageTitle, x + 8, y + 7, COLOR_TEXT);
 
         int closeX = x + width - CLOSE_WIDTH;
         int closeY = y + 1;
 
-        ui.fillRect(closeX, closeY, CLOSE_WIDTH - 1,
-                TITLE_HEIGHT - 1, COLOR_BUTTON);
+        ui.fillRect(closeX, closeY, CLOSE_WIDTH - 1, TITLE_HEIGHT - 1, COLOR_BUTTON);
 
         int cx = closeX + 8;
         int cy = y + 7;
@@ -136,8 +169,7 @@ public final class TUIBrowser extends TUIElement {
     private void drawToolbar(TUI ui) {
         int toolbarY = y + TITLE_HEIGHT;
 
-        ui.fillRect(x + 1, toolbarY, width - 2,
-                TOOLBAR_HEIGHT, COLOR_TOOLBAR);
+        ui.fillRect(x + 1, toolbarY, width - 2, TOOLBAR_HEIGHT, COLOR_TOOLBAR);
 
         int bx = x + 5;
         int by = toolbarY + 4;
@@ -161,8 +193,7 @@ public final class TUIBrowser extends TUIElement {
         }
 
         ui.fillRect(fieldX, by, fieldWidth, bh, COLOR_FIELD);
-        ui.drawRect(fieldX, by, fieldWidth, bh,
-                addressFocused ? COLOR_TEXT : COLOR_BORDER);
+        ui.drawRect(fieldX, by, fieldWidth, bh, addressFocused ? COLOR_TEXT : COLOR_BORDER);
 
         int textX = fieldX + 5;
         int textY = by + 8;
@@ -175,23 +206,14 @@ public final class TUIBrowser extends TUIElement {
 
             int rightLimit = fieldX + fieldWidth - 3;
             if (cursorX <= rightLimit) {
-                ui.drawLine(cursorX, by + 5,
-                        cursorX, by + bh - 5, COLOR_CURSOR);
+                ui.drawLine(cursorX, by + 5, cursorX, by + bh - 5, COLOR_CURSOR);
             }
         }
 
         drawButton(ui, goX, by, GO_WIDTH, bh, "Ir", COLOR_BUTTON);
     }
 
-    private void drawButton(
-            TUI ui,
-            int bx,
-            int by,
-            int bw,
-            int bh,
-            String label,
-            int color
-    ) {
+    private void drawButton(TUI ui, int bx, int by, int bw, int bh, String label, int color) {
         ui.fillRect(bx, by, bw, bh, color);
         ui.drawRect(bx, by, bw, bh, COLOR_BORDER);
 
@@ -203,67 +225,25 @@ public final class TUIBrowser extends TUIElement {
 
     private void drawContent(TUI ui) {
         int contentY = y + TITLE_HEIGHT + TOOLBAR_HEIGHT;
-        int contentHeight = height
-                - TITLE_HEIGHT
-                - TOOLBAR_HEIGHT
-                - STATUS_HEIGHT;
+        int contentHeight = height - TITLE_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT;
 
-        ui.fillRect(
-                x + 1,
-                contentY,
-                width - 2,
-                contentHeight,
-                COLOR_BACKGROUND
-        );
+        ui.fillRect(x + 1, contentY, width - 2, contentHeight, COLOR_BACKGROUND);
+        ui.drawText("T3Browser", x + 12, contentY + 20, COLOR_TEXT);
+        ui.drawText("Direccion: " + address, x + 12, contentY + 44, COLOR_TEXT);
+        ui.drawText(status, x + 12, contentY + 68, COLOR_TEXT);
+        ui.drawText("Motor HTML pendiente de integrar", x + 12, contentY + 92, COLOR_BORDER);
+    }
 
-        ui.drawText(
-                "T3Browser",
-                x + 12,
-                contentY + 20,
-                COLOR_TEXT
-        );
-
-        ui.drawText(
-                "Direccion: " + address,
-                x + 12,
-                contentY + 44,
-                COLOR_TEXT
-        );
-
-        ui.drawText(
-                status,
-                x + 12,
-                contentY + 68,
-                COLOR_TEXT
-        );
-
-        ui.drawText(
-                "Motor HTML pendiente de integrar",
-                x + 12,
-                contentY + 92,
-                COLOR_BORDER
-        );
+    public void loadPage(TUI ui) {
+        T3HtmlParser parser = new T3HtmlParser(html0);
+        this.document = parser.parse();
     }
 
     private void drawStatusBar(TUI ui) {
         int sy = y + height - STATUS_HEIGHT;
 
-        ui.fillRect(
-                x + 1,
-                sy,
-                width - 2,
-                STATUS_HEIGHT - 1,
-                COLOR_STATUS
-        );
-
-        ui.drawLine(
-                x + 1,
-                sy,
-                x + width - 2,
-                sy,
-                COLOR_BORDER
-        );
-
+        ui.fillRect(x + 1, sy, width - 2, STATUS_HEIGHT - 1, COLOR_STATUS);
+        ui.drawLine(x + 1, sy, x + width - 2, sy, COLOR_BORDER);
         ui.drawText(status, x + 7, sy + 3, COLOR_TEXT);
     }
 
@@ -341,10 +321,7 @@ public final class TUIBrowser extends TUIElement {
             addressFocused = true;
 
             int charPosition = (localX - fieldX - 5) / 8;
-            addressCursor = Math.max(
-                    0,
-                    Math.min(charPosition, address.length())
-            );
+            addressCursor = Math.max(0, Math.min(charPosition, address.length()));
         } else {
             addressFocused = false;
         }
@@ -419,8 +396,7 @@ public final class TUIBrowser extends TUIElement {
 
         if (code == KeyEvent.VK_BACK_SPACE || ch == '\b') {
             if (addressCursor > 0 && !address.isEmpty()) {
-                address = address.substring(0, addressCursor - 1)
-                        + address.substring(addressCursor);
+                address = address.substring(0, addressCursor - 1) + address.substring(addressCursor);
                 addressCursor--;
             }
             return;
@@ -428,8 +404,7 @@ public final class TUIBrowser extends TUIElement {
 
         if (code == KeyEvent.VK_DELETE) {
             if (addressCursor < address.length()) {
-                address = address.substring(0, addressCursor)
-                        + address.substring(addressCursor + 1);
+                address = address.substring(0, addressCursor) + address.substring(addressCursor + 1);
             }
             return;
         }
@@ -459,9 +434,7 @@ public final class TUIBrowser extends TUIElement {
         }
 
         if (!Character.isISOControl(ch)) {
-            address = address.substring(0, addressCursor)
-                    + ch
-                    + address.substring(addressCursor);
+            address = address.substring(0, addressCursor) + ch + address.substring(addressCursor);
 
             addressCursor++;
         }
@@ -484,8 +457,7 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
-        if (!address.contains("://")
-                && !address.startsWith("about:")) {
+        if (!address.contains("://") && !address.startsWith("about:")) {
             address = "http://" + address;
             addressCursor = address.length();
         }

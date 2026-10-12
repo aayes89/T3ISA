@@ -68,8 +68,9 @@ public final class T3HtmlRenderer {
 
     /**
      * Renderiza un documento o un fragmento HTML.
+     * @param root
      */
-    public void render(HtmlNode root) {
+    public void render(T3HtmlNode root) {
         if (root == null) {
             return;
         }
@@ -80,7 +81,7 @@ public final class T3HtmlRenderer {
         renderNode(root, false);
     }
 
-    private void renderNode(HtmlNode node, boolean inline) {
+    private void renderNode(T3HtmlNode node, boolean inline) {
         if (node == null || !hasVerticalSpace()) {
             return;
         }
@@ -206,7 +207,7 @@ public final class T3HtmlRenderer {
         } else if (tag.equals("img")) {
             renderImagePlaceholder(node);
         } else {
-            for (HtmlNode child : node.getChildren()) {
+            for (T3HtmlNode child : node.getChildren()) {
                 renderNode(child, !block);
                 if (!hasVerticalSpace()) {
                     break;
@@ -276,7 +277,7 @@ public final class T3HtmlRenderer {
         }
     }
 
-    private void renderPreformatted(HtmlNode node) {
+    private void renderPreformatted(T3HtmlNode node) {
         String text = node.getText();
 
         if (text != null && !text.isEmpty()) {
@@ -293,7 +294,7 @@ public final class T3HtmlRenderer {
             return;
         }
 
-        for (HtmlNode child : node.getChildren()) {
+        for (T3HtmlNode child : node.getChildren()) {
             if (child.isTextNode()) {
                 String[] lines = child.getText().split("\\n", -1);
 
@@ -307,10 +308,10 @@ public final class T3HtmlRenderer {
         }
     }
 
-    private void renderList(HtmlNode node, boolean ordered) {
+    private void renderList(T3HtmlNode node, boolean ordered) {
         int index = 1;
 
-        for (HtmlNode child : node.getChildren()) {
+        for (T3HtmlNode child : node.getChildren()) {
             if (!"li".equalsIgnoreCase(child.getTagName())) {
                 renderNode(child, false);
                 continue;
@@ -324,7 +325,7 @@ public final class T3HtmlRenderer {
 
             renderText(marker);
 
-            for (HtmlNode itemChild : child.getChildren()) {
+            for (T3HtmlNode itemChild : child.getChildren()) {
                 renderNode(itemChild, true);
             }
 
@@ -336,7 +337,7 @@ public final class T3HtmlRenderer {
         }
     }
 
-    private void renderImagePlaceholder(HtmlNode node) {
+    private void renderImagePlaceholder(T3HtmlNode node) {
         int x = context.getCursorX();
         int y = context.getCursorY();
 

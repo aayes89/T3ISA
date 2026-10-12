@@ -33,13 +33,13 @@ import java.util.Map;
  * @author Slam Represents a node in an HTML document tree, which can be an
  * element, text, comment, CDATA section, or DOCTYPE declaration.
  */
-public class HtmlNode {
+public class T3HtmlNode {
 
     public String tagName;
     public String text;
     public Map<String, String> attributes;
-    public List<HtmlNode> children;
-    public HtmlNode parent;
+    public List<T3HtmlNode> children;
+    public T3HtmlNode parent;
 
     /**
      * Constructs a new HtmlNode with the specified tag name.
@@ -47,7 +47,7 @@ public class HtmlNode {
      * @param tagName the name of the tag (e.g., "div", "#text", "#comment")
      * @throws IllegalArgumentException if tagName is null
      */
-    public HtmlNode(String tagName) {
+    public T3HtmlNode(String tagName) {
         if (tagName == null) {
             throw new IllegalArgumentException("Tag name cannot be null");
         }
@@ -58,14 +58,14 @@ public class HtmlNode {
         this.parent = null;
     }
 
-    public HtmlNode getParent() {
+    public T3HtmlNode getParent() {
         return parent;
     }
 
     /*
     * Método para obtener el índice del nodo en su padre
      */
-    public int getChildIndex(HtmlNode node) {
+    public int getChildIndex(T3HtmlNode node) {
         if (parent == null) {
             return -1;
         }
@@ -75,7 +75,7 @@ public class HtmlNode {
     /*
     * Método para agregar hijos de manera segura
      */
-    public void addChild(HtmlNode child) {
+    public void addChild(T3HtmlNode child) {
         if (child != null) {
             child.parent = this; // Asignar referencia al padre
             children.add(child);
@@ -160,7 +160,7 @@ public class HtmlNode {
      *
      * @return an unmodifiable view of the children list
      */
-    public List<HtmlNode> getChildren() {
+    public List<T3HtmlNode> getChildren() {
         return Collections.unmodifiableList(children);
     }
 
