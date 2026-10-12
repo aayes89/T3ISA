@@ -28,11 +28,13 @@ package t3os.APPS.Browser;
  * @author Slam
  *
  */
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
 import java.util.Map;
+import t3os.APPS.Browser.CSS.T3CSSRule;
+import t3os.APPS.Browser.CSS.T3CSSUtils;
+import t3os.APPS.Browser.CSS.T3Style;
+
 import t3os.UI.TUI;
 
 /**
@@ -49,25 +51,53 @@ public final class T3HtmlRenderer {
     private final TUI ui;
     private final T3RenderContext context;
 
-    public T3HtmlRenderer(
-            TUI ui,
-            int x,
-            int y,
-            int width,
-            int height) {
+    private final java.util.List<T3CSSRule> cssRules = new java.util.ArrayList<>();
 
+    public T3HtmlRenderer(TUI ui, int x, int y, int width, int height) {
         if (ui == null) {
             throw new IllegalArgumentException("TUI no puede ser null");
         }
 
         this.ui = ui;
-        this.context = new T3RenderContext(
-                x, y, width, height
-        );
+        this.context = new T3RenderContext(x, y, width, height);
+    }
+
+    private void collectCSSRules(T3HtmlNode node) {
+        if (node == null) {
+            return;
+        }
+
+        String tag = node.getTagName();
+
+        if ("style".equalsIgnoreCase(tag)) {
+            StringBuilder css = new StringBuilder();
+
+            // El parser que compartiste puede guardar el CSS
+            // directamente en node.text.
+            if (node.getText() != null) {
+                css.append(node.getText());
+            }
+
+            // También admitimos el caso en que esté en nodos de texto.
+            for (T3HtmlNode child : node.getChildren()) {
+                if (child.isTextNode() && child.getText() != null) {
+                    css.append('\n').append(child.getText());
+                }
+            }
+
+            if (!css.isEmpty()) {
+                cssRules.addAll(T3CSSUtils.parseT3Stylesheet(css.toString()));
+            }
+        }
+
+        for (T3HtmlNode child : node.getChildren()) {
+            collectCSSRules(child);
+        }
     }
 
     /**
      * Renderiza un documento o un fragmento HTML.
+     *
      * @param root
      */
     public void render(T3HtmlNode root) {
@@ -75,13 +105,16 @@ public final class T3HtmlRenderer {
             return;
         }
 
+        cssRules.clear();
+        collectCSSRules(root);
+
         context.setCursorX(context.getX());
         context.setCursorY(context.getY());
 
-        renderNode(root, false);
+        renderNode(root, false, new T3Style());
     }
 
-    private void renderNode(T3HtmlNode node, boolean inline) {
+    private void renderNode(T3HtmlNode node, boolean inline, T3Style inheritedStyle) {
         if (node == null || !hasVerticalSpace()) {
             return;
         }
@@ -188,6 +221,13 @@ public final class T3HtmlRenderer {
         }
 
         int savedColor = context.getColor();
+
+        T3Style computedStyle = T3CSSUtils.computeT3Style(node, inheritedStyle, cssRules);
+
+        if (computedStyle.getColor() != null) {
+            foreground = computedStyle.getColor().getRGB() & 0xFFFFFF;
+        }
+
         context.setColor(foreground);
 
         if (padding > 0) {
@@ -208,7 +248,7 @@ public final class T3HtmlRenderer {
             renderImagePlaceholder(node);
         } else {
             for (T3HtmlNode child : node.getChildren()) {
-                renderNode(child, !block);
+                renderNode(child, !block, computedStyle);
                 if (!hasVerticalSpace()) {
                     break;
                 }
@@ -303,17 +343,20 @@ public final class T3HtmlRenderer {
                     newLine();
                 }
             } else {
-                renderNode(child, false);
+                T3Style computedStyle = T3CSSUtils.computeT3Style(node, new T3Style(), cssRules);
+                renderNode(child, false, computedStyle);
             }
         }
     }
 
     private void renderList(T3HtmlNode node, boolean ordered) {
         int index = 1;
+        T3Style computedStyle = T3CSSUtils.computeT3Style(node, new T3Style(), cssRules);
 
         for (T3HtmlNode child : node.getChildren()) {
             if (!"li".equalsIgnoreCase(child.getTagName())) {
-                renderNode(child, false);
+
+                renderNode(child, false, computedStyle);
                 continue;
             }
 
@@ -326,7 +369,7 @@ public final class T3HtmlRenderer {
             renderText(marker);
 
             for (T3HtmlNode itemChild : child.getChildren()) {
-                renderNode(itemChild, true);
+                renderNode(itemChild, true, computedStyle);
             }
 
             if (!atLineStart()) {

@@ -1,0 +1,498 @@
+/*
+ * The MIT License
+ *
+ * Copyright 2026 Slam.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+package t3os.APPS.Browser.CSS;
+
+/**
+ *
+ * @author Slam
+ */
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import t3os.APPS.Browser.T3HtmlNode;
+
+/**
+ * Utilidades para parsear y combinar estilos CSS.
+ */
+public class T3CSSUtils {
+
+    private static final Logger LOGGER = Logger.getLogger(T3CSSUtils.class.getName());
+    private static final Pattern MARGIN_PADDING_PATTERN = Pattern.compile(
+            "(\\d+px|auto)(?:\\s+(\\d+px|auto))?(?:\\s+(\\d+px|auto))?(?:\\s+(\\d+px|auto))?"
+    );
+    private static final Pattern COMMENT_PATTERN = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
+    private static final Map<List<T3CSSRule>, List<T3CSSRule>> RULE_CACHE = new HashMap<>();
+
+    /**
+     * Parsea un atributo de estilo inline.
+     *
+     * @param styleAttr Cadena de estilo inline (por ejemplo, "color: red;
+     * font-size: 16px")
+     * @return Objeto T3Style con las propiedades parseadas
+     */
+    public static T3Style parse(String styleAttr) {
+        T3Style style = new T3Style();
+        if (styleAttr == null || styleAttr.trim().isEmpty()) {
+            return style;
+        }
+
+        for (String declaration : styleAttr.split(";")) {
+            declaration = declaration.trim();
+            if (declaration.isEmpty()) {
+                continue;
+            }
+            String[] parts = declaration.split(":");
+            if (parts.length != 2) {
+                LOGGER.warning("Declaración CSS inválida: " + declaration);
+                continue;
+            }
+            applyDeclaration(style, parts[0].trim().toLowerCase(), parts[1].trim());
+        }
+        return style;
+    }
+
+    /**
+     * Parsea una hoja de estilo CSS.
+     *
+     * @param cssContent Contenido de la hoja de estilo
+     * @return Lista de reglas CSS
+     */
+    public static List<T3CSSRule> parseT3Stylesheet(String cssContent) {
+        List<T3CSSRule> rules = new ArrayList<>();
+        if (cssContent == null || cssContent.trim().isEmpty()) {
+            return rules;
+        }
+
+        String cleanedContent = COMMENT_PATTERN.matcher(cssContent).replaceAll("");
+        cleanedContent = cleanedContent.replaceAll("\\s+", " ").trim();
+
+        for (String block : cleanedContent.split("}")) {
+            block = block.trim();
+            if (block.isEmpty()) {
+                continue;
+            }
+            String[] parts = block.split("\\{");
+            if (parts.length != 2) {
+                LOGGER.warning("Bloque CSS inválido: " + block);
+                continue;
+            }
+            String selector = parts[0].trim();
+            String declarationsStr = parts[1].trim();
+            Map<String, String> declarations = new HashMap<>();
+            for (String decl : declarationsStr.split(";")) {
+                decl = decl.trim();
+                if (decl.isEmpty()) {
+                    continue;
+                }
+                String[] declParts = decl.split(":");
+                if (declParts.length == 2) {
+                    declarations.put(declParts[0].trim().toLowerCase(), declParts[1].trim());
+                } else {
+                    LOGGER.warning("Declaración CSS inválida en bloque: " + decl);
+                }
+            }
+            if (!declarations.isEmpty()) {
+                try {
+                    rules.add(new T3CSSRule(selector, declarations));
+                } catch (IllegalArgumentException e) {
+                    LOGGER.warning("No se pudo crear regla CSS para el selector: " + selector + " - " + e.getMessage());
+                }
+            }
+        }
+        return Collections.unmodifiableList(rules);
+    }
+
+    /**
+     * Aplica una declaración CSS a un objeto T3Style.
+     *
+     * @param style Objeto T3Style
+     * @param property Propiedad CSS
+     * @param value Valor de la propiedad
+     */
+    public static void applyDeclaration(T3Style style, String property, String value) {
+        switch (property) {
+            case "color":
+                style.setColor(parseColor(value));
+                break;
+            case "font-size":
+                style.setFontSize(parseDimension(value));
+                break;
+            case "font-weight":
+                style.setFontWeight(parseFontWeight(value));
+                break;
+            case "font-family":
+                style.setFontFamily(value.replace("\"", "").replace("'", ""));
+                break;
+            case "text-align":
+                style.setTextAlign(value);
+                break;
+            case "text-decoration":
+                style.setTextDecoration(value);
+                break;
+            case "background-color":
+                style.setBackgroundColor(parseColor(value));
+                break;
+            case "display":
+                style.setDisplay(value);
+                break;
+            case "margin":
+                parseMarginPadding(style, value, true);
+                break;
+            case "padding":
+                parseMarginPadding(style, value, false);
+                break;
+            case "border-width":
+                style.setBorderWidth(parseDimension(value));
+                break;
+            case "border-color":
+                style.setBorderColor(parseColor(value));
+                break;
+            case "border-radius":
+                style.setBorderRadius(parseDimension(value));
+                break;
+            case "box-shadow":
+                style.setBoxShadow(value);
+                break;
+            case "flex-direction":
+                style.setFlexDirection(value);
+                break;
+            case "justify-content":
+                style.setJustifyContent(value);
+                break;
+            case "width":
+            case "max-width":
+                style.setWidth(value);
+                break;
+            case "height":
+                style.setHeight(value);
+                break;
+            case "float":
+                style.setDisplay("inline-block"); // Simplificado
+                break;
+            default:
+                LOGGER.fine("Propiedad CSS no soportada: " + property + " = " + value);
+        }
+    }
+
+    /**
+     * Parsea un color CSS.
+     *
+     * @param value Valor del color (hex, nombre, rgb, rgba)
+     * @return Objeto Color o null si es inválido
+     */
+    public static Color parseColor(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        value = value.trim().toLowerCase();
+        try {
+            if (value.startsWith("#")) {
+                return Color.decode(value);
+            }
+            if (value.startsWith("rgb(")) {
+                String[] rgb = value.replace("rgb(", "").replace(")", "").split(",");
+                if (rgb.length == 3) {
+                    return new Color(
+                            clamp(Integer.parseInt(rgb[0].trim()), 0, 255),
+                            clamp(Integer.parseInt(rgb[1].trim()), 0, 255),
+                            clamp(Integer.parseInt(rgb[2].trim()), 0, 255)
+                    );
+                }
+            }
+            if (value.startsWith("rgba(")) {
+                String[] rgba = value.replace("rgba(", "").replace(")", "").split(",");
+                if (rgba.length == 4) {
+                    return new Color(
+                            clamp(Integer.parseInt(rgba[0].trim()), 0, 255),
+                            clamp(Integer.parseInt(rgba[1].trim()), 0, 255),
+                            clamp(Integer.parseInt(rgba[2].trim()), 0, 255),
+                            clamp((int) (Float.parseFloat(rgba[3].trim()) * 255), 0, 255)
+                    );
+                }
+            }
+            return switch (value) {
+                case "red" ->
+                    Color.RED;
+                case "blue" ->
+                    Color.BLUE;
+                case "green" ->
+                    Color.GREEN;
+                case "black" ->
+                    Color.BLACK;
+                case "white" ->
+                    Color.WHITE;
+                case "f8f9fa" ->
+                    new Color(248, 249, 250);
+                case "6c757d" ->
+                    new Color(108, 117, 125);
+                case "212529" ->
+                    new Color(33, 37, 41);
+                case "ced4da" ->
+                    new Color(206, 212, 218);
+                case "dc3545" ->
+                    new Color(220, 53, 69);
+                case "0d6efd" ->
+                    new Color(13, 110, 253);
+                default -> {
+                    LOGGER.warning("Color no reconocido: " + value + "; usando null");
+                    yield null;
+                }
+            };
+        } catch (Exception e) {
+            LOGGER.warning("Error al parsear color: " + value + "; usando null - " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Parsea una dimensión CSS.
+     *
+     * @param value Valor de la dimensión (px, rem, %, auto)
+     * @return Valor en píxeles o -1 para auto
+     */
+    public static int parseDimension(String value) {
+        try {
+            if (value == null || value.equals("auto")) {
+                return -1;
+            }
+            if (value.endsWith("%")) {
+                return -1; // Porcentajes manejados en RenderEngine
+            }
+            if (value.endsWith("rem")) {
+                return (int) (Float.parseFloat(value.replace("rem", "").trim()) * 16);
+            }
+            return Integer.parseInt(value.replace("px", "").trim());
+        } catch (NumberFormatException e) {
+            LOGGER.warning("Dimensión no válida: " + value + "; usando 0");
+            return 0;
+        }
+    }
+
+    /**
+     * Parsea el peso de la fuente.
+     *
+     * @param value Valor del peso (bold, normal, 100-900)
+     * @return Valor de Font (BOLD, PLAIN)
+     */
+    private static int parseFontWeight(String value) {
+        value = value.trim().toLowerCase();
+        return switch (value) {
+            case "bold", "700", "800", "900" ->
+                Font.BOLD;
+            case "normal", "400", "500", "600" ->
+                Font.PLAIN;
+            default -> {
+                try {
+                    int weight = Integer.parseInt(value);
+                    yield weight >= 700 ? Font.BOLD : Font.PLAIN;
+                } catch (NumberFormatException e) {
+                    LOGGER.warning("Peso de fuente no válido: " + value + "; usando PLAIN");
+                    yield Font.PLAIN;
+                }
+            }
+        };
+    }
+
+    /**
+     * Limita un valor a un rango.
+     *
+     * @param value Valor
+     * @param min Mínimo
+     * @param max Máximo
+     * @return Valor limitado
+     */
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    /**
+     * Parsea márgenes o paddings.
+     *
+     * @param style Objeto T3Style
+     * @param value Valor CSS
+     * @param isMargin Si es margen (true) o padding (false)
+     */
+    private static void parseMarginPadding(T3Style style, String value, boolean isMargin) {
+        Matcher matcher = MARGIN_PADDING_PATTERN.matcher(value);
+        if (matcher.matches()) {
+            String top = matcher.group(1);
+            String right = matcher.group(2) != null ? matcher.group(2) : top;
+            String bottom = matcher.group(3) != null ? matcher.group(3) : top; // Corregido de "custom" a "bottom"
+            String left = matcher.group(4) != null ? matcher.group(4) : right;
+            if (isMargin) {
+                style.setMarginTop(top.equals("auto") ? -1 : parseDimension(top));
+                style.setMarginRight(right.equals("auto") ? -1 : parseDimension(right));
+                style.setMarginBottom(bottom.equals("auto") ? -1 : parseDimension(bottom)); // Corregido a "bottom"
+                style.setMarginLeft(left.equals("auto") ? -1 : parseDimension(left));
+            } else {
+                style.setPaddingTop(parseDimension(top));
+                style.setPaddingRight(parseDimension(right));
+                style.setPaddingBottom(parseDimension(bottom)); // Corregido a "bottom"
+                style.setPaddingLeft(parseDimension(left));
+            }
+        } else {
+            int dim = parseDimension(value);
+            if (isMargin) {
+                style.setMarginTop(dim);
+                style.setMarginRight(dim);
+                style.setMarginBottom(dim);
+                style.setMarginLeft(dim);
+            } else {
+                style.setPaddingTop(dim);
+                style.setPaddingRight(dim);
+                style.setPaddingBottom(dim);
+                style.setPaddingLeft(dim);
+            }
+        }
+    }
+
+    /**
+     * Calcula el estilo efectivo para un nodo HTML.
+     *
+     * @param node Nodo HTML
+     * @param inherited Estilo heredado
+     * @param rules Reglas CSS aplicables
+     * @return Estilo computado
+     */
+    public static T3Style computeT3Style(T3HtmlNode node, T3Style inherited, List<T3CSSRule> rules) {
+        T3Style computed = new T3Style();
+        if (inherited != null) {
+            computed.setColor(inherited.getColor());
+            computed.setFontSize(inherited.getFontSize());
+            computed.setFontWeight(inherited.getFontWeight());
+            computed.setFontFamily(inherited.getFontFamily());
+            computed.setTextAlign(inherited.getTextAlign());
+        }
+
+        String classAttr = node.getAttributes().get("class");
+        if (classAttr != null) {
+            for (String cls : classAttr.split("\\s+")) {
+                Map<String, String> bootstrapDecls = T3Style.BOOTSTRAP_STYLES.get(cls);
+                if (bootstrapDecls != null) {
+                    for (Map.Entry<String, String> decl : bootstrapDecls.entrySet()) {
+                        applyDeclaration(computed, decl.getKey(), decl.getValue());
+                    }
+                }
+            }
+        }
+
+        List<T3CSSRule> matchingRules = RULE_CACHE.computeIfAbsent(rules, r -> {
+            List<T3CSSRule> sorted = new ArrayList<>(r);
+            sorted.sort(Comparator.comparingInt(T3CSSRule::getSpecificity));
+            return Collections.unmodifiableList(sorted);
+        });
+
+        for (T3CSSRule rule : matchingRules) {
+            if (rule.matches(node)) {
+                for (Map.Entry<String, String> decl : rule.getDeclarations().entrySet()) {
+                    applyDeclaration(computed, decl.getKey(), decl.getValue());
+                }
+            }
+        }
+
+        T3Style inline = parse(node.getAttributes().get("style"));
+        mergeT3Styles(computed, inline);
+
+        return computed;
+    }
+
+    /**
+     * Combina dos estilos, dando prioridad al estilo override.
+     *
+     * @param base Estilo base
+     * @param override Estilo que sobrescribe
+     */
+    public static void mergeT3Styles(T3Style base, T3Style override) {
+        if (override.getColor() != null) {
+            base.setColor(override.getColor());
+        }
+        if (override.getFontSize() >= 0) {
+            base.setFontSize(override.getFontSize());
+        }
+        if (override.getFontWeight() >= 0) {
+            base.setFontWeight(override.getFontWeight());
+        }
+        if (override.getFontFamily() != null) {
+            base.setFontFamily(override.getFontFamily());
+        }
+        if (override.getTextAlign() != null) {
+            base.setTextAlign(override.getTextAlign());
+        }
+        if (!"none".equals(override.getTextDecoration())) {
+            base.setTextDecoration(override.getTextDecoration());
+        }
+        if (override.getBackgroundColor() != null) {
+            base.setBackgroundColor(override.getBackgroundColor());
+        }
+        if (!"block".equals(override.getDisplay())) {
+            base.setDisplay(override.getDisplay());
+        }
+        if (override.getMarginTop() >= 0) {
+            base.setMarginTop(override.getMarginTop());
+        }
+        if (override.getMarginRight() >= 0) {
+            base.setMarginRight(override.getMarginRight());
+        }
+        if (override.getMarginBottom() >= 0) {
+            base.setMarginBottom(override.getMarginBottom());
+        }
+        if (override.getMarginLeft() >= 0) {
+            base.setMarginLeft(override.getMarginLeft());
+        }
+        base.setPaddingTop(override.getPaddingTop());
+        base.setPaddingRight(override.getPaddingRight());
+        base.setPaddingBottom(override.getPaddingBottom());
+        base.setPaddingLeft(override.getPaddingLeft());
+        base.setBorderWidth(override.getBorderWidth());
+        if (override.getBorderColor() != null) {
+            base.setBorderColor(override.getBorderColor());
+        }
+        base.setBorderRadius(override.getBorderRadius());
+        if (!"none".equals(override.getBoxShadow())) {
+            base.setBoxShadow(override.getBoxShadow());
+        }
+        if (!"row".equals(override.getFlexDirection())) {
+            base.setFlexDirection(override.getFlexDirection());
+        }
+        if (!"flex-start".equals(override.getJustifyContent())) {
+            base.setJustifyContent(override.getJustifyContent());
+        }
+        if (override.getWidth() != null) {
+            base.setWidth(override.getWidth());
+        }
+        if (override.getHeight() != null) {
+            base.setHeight(override.getHeight());
+        }
+    }
+
+   
+}
