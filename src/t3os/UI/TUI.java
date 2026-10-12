@@ -27,14 +27,15 @@ package t3os.UI;
  *
  * @author Slam
  */
+import t3os.APPS.Editor.TUIEditor;
 import java.util.ArrayList;
 import java.util.List;
 import t3isa.DEVICE.TKeyboardDevice;
 import t3isa.HARDWARE.TMachine;
 
-public final class TUI {
+public class TUI {
 
-    private final List<TUIElement> elements;
+    private List<TUIElement> elements;
 
     private int mouseX;
     private int mouseY;
@@ -294,17 +295,17 @@ public final class TUI {
     }
 
     // Auxiliar para pintar un rectángulo relleno en pantalla
-    void fillRect(int x, int y, int width, int height, int color) {
+    public void fillRect(int x, int y, int width, int height, int color) {
         machine.graphics(5, x, y, width, height, color, 0);
     }
 
     // Auxiliar para dibujar contorno de un rectángulo en pantalla
-    void drawRect(int x, int y, int width, int height, int color) {
+    public void drawRect(int x, int y, int width, int height, int color) {
         machine.graphics(4, x, y, width, height, color, 0);
     }
 
     // Auxiliar para imprimir texto en pantalla
-    void drawText(String text, int x, int y, int color) {
+    public void drawText(String text, int x, int y, int color) {
         if (text == null) {
             return;
         }
@@ -314,6 +315,11 @@ public final class TUI {
             machine.drawChar(text.charAt(i), cursorX, y, 1, color, -1);
             cursorX += 8;
         }
+    }
+
+    // Auxiliar para dibujar una línea
+    public void drawLine(int cx, int cy, int i, int i0, int color) {
+        machine.graphics(3, cx, cy, i, i0, color, 0);
     }
 
     // GETTERS y SETTERS

@@ -21,14 +21,19 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3os.UI;
+package t3os.APPS.Explorer;
 
 /**
  *
  * @author Slam
  */
+import t3os.APPS.Editor.TUIEditor;
 import t3os.FS.TVFS;
 import t3os.KERNEL.TKernel;
+import t3os.UI.TUI;
+import t3os.UI.TUIElement;
+import t3os.UI.TUIInputDialog;
+import t3os.UI.TUIPopupMenu;
 
 // Explorador de archivos
 public final class TUIFileExplorer extends TUIElement {

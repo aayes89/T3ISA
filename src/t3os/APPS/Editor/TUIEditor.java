@@ -21,10 +21,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3os.UI;
+package t3os.APPS.Editor;
 
 import t3isa.DEVICE.TKeyboardDevice;
 import t3os.KERNEL.TKernel;
+import t3os.UI.TUI;
+import t3os.UI.TUIElement;
+import t3os.UI.TUITextArea;
 
 /**
  *

@@ -23,6 +23,9 @@
  */
 package t3os.UI;
 
+import t3os.APPS.Browser.TUIBrowser;
+import t3os.APPS.Explorer.TUIFileExplorer;
+import t3os.APPS.Editor.TUIEditor;
 import t3os.KERNEL.TKernel;
 import t3os.SHELL.TShell;
 
@@ -39,6 +42,7 @@ public final class TUIDesktop extends TUIElement {
     private final TUIPopupMenu desktopMenu;
     private TUIFileExplorer t3explorer;
     private TUIEditor editor;
+    private TUIBrowser browser;
     private final TKernel kernel;
 
     private int backgroundColor;
@@ -50,7 +54,7 @@ public final class TUIDesktop extends TUIElement {
     private int clockY;
 
     private int clockColor;
-    
+
     private static final int TASKBAR_HEIGHT = 40;
 
     private TUI ui;
@@ -84,6 +88,7 @@ public final class TUIDesktop extends TUIElement {
     // Generar elementos del menu clic derecho
     private void createDesktopMenu() {
         desktopMenu.addItem("Cambiar fondo", this::changeBackground);
+        desktopMenu.addItem("Navegador", this::openNavigator);
         desktopMenu.addItem("Explorador", this::openExplorer);
         desktopMenu.addItem("Editor", this::openEditor);
         desktopMenu.addItem("Terminal", this::openTerminal);
@@ -95,6 +100,12 @@ public final class TUIDesktop extends TUIElement {
     private void createStartMenu() {
         int itemWidth = 220;
         int itemHeight = 32;
+
+        TUIButton btnNavigator = new TUIButton(0, 0, itemWidth, itemHeight, "Navegador");
+        btnNavigator.setAction(() -> {
+            startMenu.close();
+            openNavigator();
+        });
 
         TUIButton btnExplorer = new TUIButton(0, 0, itemWidth, itemHeight, "Explorador");
         btnExplorer.setAction(() -> {
@@ -334,6 +345,21 @@ public final class TUIDesktop extends TUIElement {
         terminal.setKeyboardFocus(true);
     }
 
+    // Abrir el navegador web
+    private void openNavigator() {
+        if (ui == null) {
+            return;
+        }
+        if (browser == null) {
+            browser = new TUIBrowser(80, 80, 500, 400);
+            ui.add(browser);
+        } else {
+            browser.setVisible(true);
+            //browser.refresh();
+        }
+        ui.bringToFront(browser);
+    }
+
     // Reiniciar sistema
     private void reboot() {
         // Se implementará cuando T3OS tenga reinicio completo.
@@ -402,4 +428,5 @@ public final class TUIDesktop extends TUIElement {
     public void setClockColor(int color) {
         clockColor = color;
     }
+
 }
