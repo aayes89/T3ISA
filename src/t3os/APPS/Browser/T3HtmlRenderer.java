@@ -433,38 +433,6 @@ public final class T3HtmlRenderer {
         }
     }
 
-    // Auxiliar para dibujar campo de imagen
-    private void renderImagePlaceholder(T3HtmlNode node) {
-        int x = context.getCursorX();
-        int y = context.getCursorY();
-
-        if (!hasVerticalSpace()) {
-            return;
-        }
-
-        int width = parsePixels(node.getAttributes().get("width"), 64);
-        int height = parsePixels(node.getAttributes().get("height"), 48);
-
-        width = Math.max(16, Math.min(width, context.getWidth()));
-        height = Math.max(16, Math.min(height, context.getHeight()));
-
-        drawRectClipped(x, y, width, height, 0x808080);
-
-        String alt = node.getAttributes().get("alt");
-
-        if (alt != null && !alt.isEmpty()) {
-            if (!measuring && context.getCursorY() >= context.getY() && context.getCursorY() < context.getBottom()) {
-                ui.drawText(alt, x + 2, y + 2, context.getColor());
-            }
-        }
-
-        context.setCursorX(x + width + CHAR_WIDTH);
-
-        if (context.getCursorX() + CHAR_WIDTH > context.getRight()) {
-            newLine();
-        }
-    }
-
     // Auxiliar para saber si es un bloque de elementos
     private boolean isBlockElement(String tag, T3Style style) {
         String display = style.getDisplay();
@@ -621,20 +589,13 @@ public final class T3HtmlRenderer {
             int charX = x + i * CHAR_WIDTH;
 
             if (charX >= left && charX + CHAR_WIDTH <= right) {
-                ui.drawText(
-                        String.valueOf(text.charAt(i)),
-                        charX,
-                        y,
-                        color
-                );
+                ui.drawText(String.valueOf(text.charAt(i)), charX, y, color);
             }
         }
     }
 
     // Auxiliar para pintar rectángulo encuadrado
-    private void fillRectClipped(
-            int x, int y, int width, int height, int color) {
-
+    private void fillRectClipped(int x, int y, int width, int height, int color) {
         if (measuring || width <= 0 || height <= 0) {
             return;
         }
@@ -673,19 +634,31 @@ public final class T3HtmlRenderer {
         String src = node.getAttributes().get("src");
         String alt = node.getAttributes().get("alt");
 
-        int requestedWidth = parsePixels(node.getAttributes().get("width"), 64);
-        int requestedHeight = parsePixels(node.getAttributes().get("height"), 48);
-
-        requestedWidth = Math.max(16, Math.min(requestedWidth, context.getWidth()));
-        requestedHeight = Math.max(16, Math.min(requestedHeight, context.getHeight()));
-
         T3HtmlImage image = src == null ? null : images.get(src);
 
-        if (!measuring && image != null) {
-            int drawWidth = requestedWidth;
-            int drawHeight = requestedHeight;
+        int requestedWidth;
+        int requestedHeight;
 
-            ui.drawImagePixels(imageX, imageY, drawWidth, drawHeight, image.getPixels());
+        if (image != null) {
+            requestedWidth = parsePixels(node.getAttributes().get("width"), image.getWidth());
+            requestedHeight = parsePixels(node.getAttributes().get("height"), image.getHeight());
+        } else {
+            requestedWidth = parsePixels(node.getAttributes().get("width"), 64);
+            requestedHeight = parsePixels(node.getAttributes().get("height"), 48);
+        }
+
+        requestedWidth = Math.max(1, Math.min(requestedWidth, context.getWidth()));
+        requestedHeight = Math.max(1, Math.min(requestedHeight, context.getHeight()));
+
+        if (!measuring && image != null && requestedWidth == image.getWidth() && requestedHeight == image.getHeight()) {
+            ui.drawImagePixels(imageX, imageY, image.getWidth(), image.getHeight(), image.getPixels());
+
+        } else if (!measuring && image != null) {
+            // El escalado debe generar un array nuevo con las
+            // dimensiones solicitadas antes de dibujar la imagen.
+            int[] scaledPixels = scaleNearestNeighbor(image.getPixels(), image.getWidth(), image.getHeight(), requestedWidth, requestedHeight);
+            ui.drawImagePixels(imageX, imageY, requestedWidth, requestedHeight, scaledPixels);
+
         } else {
             drawRectClipped(imageX, imageY, requestedWidth, requestedHeight, 0x808080);
             if (!measuring && alt != null && !alt.isEmpty()) {
@@ -698,6 +671,22 @@ public final class T3HtmlRenderer {
         if (context.getCursorX() + CHAR_WIDTH > context.getRight()) {
             newLine();
         }
+    }
+
+    // Auxiliar para que el escalado produzca el array del tamaño correcto
+    private int[] scaleNearestNeighbor(int[] source, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight) {
+        int[] result = new int[targetWidth * targetHeight];
+
+        for (int y = 0; y < targetHeight; y++) {
+            int sourceY = (int) ((long) y * sourceHeight / targetHeight);
+
+            for (int x = 0; x < targetWidth; x++) {
+                int sourceX = (int) ((long) x * sourceWidth / targetWidth);
+                result[y * targetWidth + x] = source[sourceY * sourceWidth + sourceX];
+            }
+        }
+
+        return result;
     }
 
     // Getter y Setters
