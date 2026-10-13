@@ -184,7 +184,7 @@ public final class TUIBrowser extends TUIElement {
         drawTitleBar(ui);
         drawToolbar(ui);
         drawContent(ui);
-        drawStatusBar(ui);        
+        drawStatusBar(ui);
     }
 
     private void drawWindow(TUI ui) {
@@ -271,26 +271,26 @@ public final class TUIBrowser extends TUIElement {
         int contentWidth = width - 4 - SCROLLBAR_WIDTH;
         int viewportHeight = height - TITLE_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT - 3;
 
-        ui.fillRect(contentX, contentY, contentWidth, viewportHeight, COLOR_BACKGROUND);
-
-        // Cargar el HTML de prueba una sola vez.
-        if (document == null) {
-            T3HtmlParser parser = new T3HtmlParser(html);
-            document = parser.parse();
-
-            pageTitle = "DNS-Web Browser";
-            status = "Documento HTML cargado";
-        }
-
-        if (document == null) {
-            ui.drawText("No hay documento HTML cargado", contentX + 8, contentY + 20, COLOR_TEXT);
-
-            contentHeight = viewportHeight;
-            scrollY = 0;
+        if (contentWidth <= 0 || viewportHeight <= 0) {
             return;
         }
 
-        // Recrear el renderizador solo si cambia el área de contenido.
+        ui.fillRect(contentX, contentY, contentWidth, viewportHeight, COLOR_BACKGROUND);
+
+        // Si todavía no se ha recibido el documento, no hay nada que renderizar.
+        if (document == null) {
+            String message = "about:blank".equalsIgnoreCase(address) ? "Página en blanco" : "Descargando página...";
+
+            ui.drawText(message, contentX + 8, contentY + 20, COLOR_TEXT);
+
+            contentHeight = viewportHeight;
+            scrollY = 0;
+
+            drawScrollbar(ui, contentX + contentWidth, contentY, SCROLLBAR_WIDTH, viewportHeight);
+            return;
+        }
+
+        // Crear o recrear el renderer si aún no existe o cambió el viewport.
         if (htmlRenderer == null
                 || rendererX != contentX
                 || rendererY != contentY
@@ -304,26 +304,28 @@ public final class TUIBrowser extends TUIElement {
             rendererWidth = contentWidth;
             rendererHeight = viewportHeight;
 
-            // Restaurar las imágenes al crear el renderizador.
-            for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
-                htmlRenderer.setImage(entry.getKey(), entry.getValue());
+            // Restaurar las imágenes descargadas antes de crear el renderer.
+            synchronized (loadedImages) {
+                for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
+                    htmlRenderer.setImage(entry.getKey(), entry.getValue());
+                }
             }
         }
 
-        // Obtener la altura total calculada por el renderizador.
+        // Calcular primero la altura total de la página sin desplazamiento.
         htmlRenderer.setScrollY(0);
         htmlRenderer.render(document);
+
         contentHeight = Math.max(viewportHeight, htmlRenderer.getContentHeight());
 
-        // Limitar el desplazamiento al rango válido.
+        // Mantener el desplazamiento dentro de los límites.
         int maxScroll = Math.max(0, contentHeight - viewportHeight);
         scrollY = Math.max(0, Math.min(scrollY, maxScroll));
 
-        // Renderizar la página con el desplazamiento actual.
+        // Dibujar la página en su posición desplazada.
         htmlRenderer.setScrollY(scrollY);
         htmlRenderer.render(document);
 
-        // Dibujar la barra de desplazamiento vertical.
         drawScrollbar(ui, contentX + contentWidth, contentY, SCROLLBAR_WIDTH, viewportHeight);
     }
 

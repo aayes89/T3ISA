@@ -33,6 +33,7 @@ import java.util.Comparator;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -86,48 +87,294 @@ public class T3CSSUtils {
      * @return Lista de reglas CSS
      */
     public static List<T3CSSRule> parseT3Stylesheet(String cssContent) {
+        // Compatibilidad con las llamadas existentes.
+        return parseT3Stylesheet(cssContent, 1024);
+    }
+
+    /**
+     * Parsea CSS aplicando las condiciones @media según el ancho disponible.
+     * Métodos auxiliares debajo
+     *
+     * @param cssContent
+     * @param viewportWidth
+     * @return
+     */
+    public static List<T3CSSRule> parseT3Stylesheet(String cssContent, int viewportWidth) {
         List<T3CSSRule> rules = new ArrayList<>();
+
         if (cssContent == null || cssContent.trim().isEmpty()) {
-            return rules;
+            return Collections.unmodifiableList(rules);
         }
 
-        String cleanedContent = COMMENT_PATTERN.matcher(cssContent).replaceAll("");
-        cleanedContent = cleanedContent.replaceAll("\\s+", " ").trim();
+        String cleaned = COMMENT_PATTERN.matcher(cssContent).replaceAll("");
 
-        for (String block : cleanedContent.split("}")) {
-            block = block.trim();
-            if (block.isEmpty()) {
-                continue;
-            }
-            String[] parts = block.split("\\{");
-            if (parts.length != 2) {
-                LOGGER.warning("Bloque CSS inválido: " + block);
-                continue;
-            }
-            String selector = parts[0].trim();
-            String declarationsStr = parts[1].trim();
-            Map<String, String> declarations = new HashMap<>();
-            for (String decl : declarationsStr.split(";")) {
-                decl = decl.trim();
-                if (decl.isEmpty()) {
-                    continue;
-                }
-                String[] declParts = decl.split(":");
-                if (declParts.length == 2) {
-                    declarations.put(declParts[0].trim().toLowerCase(), declParts[1].trim());
-                } else {
-                    LOGGER.warning("Declaración CSS inválida en bloque: " + decl);
-                }
-            }
-            if (!declarations.isEmpty()) {
-                try {
-                    rules.add(new T3CSSRule(selector, declarations));
-                } catch (IllegalArgumentException e) {
-                    LOGGER.warning("No se pudo crear regla CSS para el selector: " + selector + " - " + e.getMessage());
-                }
-            }
-        }
+        parseCssBlocks(cleaned, viewportWidth, true, rules);
+
         return Collections.unmodifiableList(rules);
+    }
+
+    private static void parseCssBlocks(String css, int viewportWidth, boolean mediaApplies, List<T3CSSRule> rules) {
+        int pos = 0;
+
+        while (pos < css.length()) {
+            pos = skipWhitespace(css, pos);
+
+            if (pos >= css.length()) {
+                break;
+            }
+
+            int open = findCssChar(css, '{', pos);
+
+            if (open < 0) {
+                break;
+            }
+
+            String header = css.substring(pos, open).trim();
+
+            int close = findMatchingBrace(css, open);
+
+            if (close < 0) {
+                LOGGER.warning("Bloque CSS sin cerrar: " + header);
+                break;
+            }
+
+            String body = css.substring(open + 1, close);
+
+            if (header.isEmpty()) {
+                pos = close + 1;
+                continue;
+            }
+
+            if (header.regionMatches(true, 0, "@media", 0, 6)) {
+                boolean applies = mediaApplies && mediaQueryMatches(header.substring(6).trim(), viewportWidth);
+
+                if (applies) {
+                    parseCssBlocks(body, viewportWidth, true, rules);
+                }
+            } else if (header.startsWith("@")) {
+                // Otras directivas (@supports, @keyframes, etc.)
+                // todavía no se implementan.
+                LOGGER.fine("Directiva CSS no soportada: " + header);
+            } else if (mediaApplies) {
+                Map<String, String> declarations = parseCssDeclarations(body);
+
+                if (!declarations.isEmpty()) {
+                    for (String selector : header.split(",")) {
+                        selector = selector.trim();
+
+                        if (selector.isEmpty()) {
+                            continue;
+                        }
+
+                        try {
+                            rules.add(new T3CSSRule(selector, declarations));
+                        } catch (IllegalArgumentException ex) {
+                            LOGGER.fine("Selector CSS no compatible: " + selector + " - " + ex.getMessage());
+                        }
+                    }
+                }
+            }
+
+            pos = close + 1;
+        }
+    }
+
+    private static int skipWhitespace(String text, int pos) {
+        while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
+            pos++;
+        }
+        return pos;
+    }
+
+    private static int findCssChar(String text, char target, int start) {
+        char quote = 0;
+        boolean escaped = false;
+        int parentheses = 0;
+        int brackets = 0;
+
+        for (int i = start; i < text.length(); i++) {
+            char c = text.charAt(i);
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (quote != 0) {
+                if (c == quote) {
+                    quote = 0;
+                }
+                continue;
+            }
+
+            if (c == '\'' || c == '"') {
+                quote = c;
+            } else if (c == '(') {
+                parentheses++;
+            } else if (c == ')') {
+                parentheses = Math.max(0, parentheses - 1);
+            } else if (c == '[') {
+                brackets++;
+            } else if (c == ']') {
+                brackets = Math.max(0, brackets - 1);
+            } else if (c == target && parentheses == 0 && brackets == 0) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int findMatchingBrace(String text, int open) {
+        int depth = 1;
+        char quote = 0;
+        boolean escaped = false;
+
+        for (int i = open + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (quote != 0) {
+                if (c == quote) {
+                    quote = 0;
+                }
+                continue;
+            }
+
+            if (c == '\'' || c == '"') {
+                quote = c;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    private static Map<String, String> parseCssDeclarations(String body) {
+        Map<String, String> declarations = new HashMap<>();
+
+        for (String declaration : splitCss(body, ';')) {
+            declaration = declaration.trim();
+
+            if (declaration.isEmpty()) {
+                continue;
+            }
+
+            int colon = findCssChar(declaration, ':', 0);
+
+            if (colon <= 0) {
+                LOGGER.fine("Declaración CSS inválida: " + declaration);
+                continue;
+            }
+
+            String property = declaration.substring(0, colon).trim().toLowerCase(Locale.ROOT);
+
+            String value = declaration.substring(colon + 1).trim();
+
+            if (!property.isEmpty() && !value.isEmpty()) {
+                declarations.put(property, value);
+            }
+        }
+
+        return declarations;
+    }
+
+    private static List<String> splitCss(String text, char separator) {
+        List<String> result = new ArrayList<>();
+        char quote = 0;
+        boolean escaped = false;
+        int parentheses = 0;
+        int start = 0;
+
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (quote != 0) {
+                if (c == quote) {
+                    quote = 0;
+                }
+                continue;
+            }
+
+            if (c == '\'' || c == '"') {
+                quote = c;
+            } else if (c == '(') {
+                parentheses++;
+            } else if (c == ')') {
+                parentheses = Math.max(0, parentheses - 1);
+            } else if (c == separator && parentheses == 0) {
+                result.add(text.substring(start, i));
+                start = i + 1;
+            }
+        }
+
+        result.add(text.substring(start));
+        return result;
+    }
+
+    private static boolean mediaQueryMatches(String query, int viewportWidth) {
+        String normalized = query.toLowerCase(Locale.ROOT);
+
+        // Un navegador sin soporte de medios impresos solo aplica screen.
+        if (normalized.contains("print")) {
+            return false;
+        }
+
+        Matcher min = Pattern.compile("\\(\\s*min-width\\s*:\\s*(\\d+)\\s*(px)?\\s*\\)").matcher(normalized);
+
+        while (min.find()) {
+            if (viewportWidth < Integer.parseInt(min.group(1))) {
+                return false;
+            }
+        }
+
+        Matcher max = Pattern.compile("\\(\\s*max-width\\s*:\\s*(\\d+)\\s*(px)?\\s*\\)").matcher(normalized);
+
+        while (max.find()) {
+            if (viewportWidth > Integer.parseInt(max.group(1))) {
+                return false;
+            }
+        }
+
+        // No aceptar condiciones que este parser todavía no entiende.
+        String remaining = normalized
+                .replaceAll("\\(\\s*(min-width|max-width)\\s*:\\s*\\d+\\s*(px)?\\s*\\)", "")
+                .replaceAll("\\bonly\\b|\\bscreen\\b|\\band\\b", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        return remaining.isEmpty();
     }
 
     /**
@@ -292,8 +539,48 @@ public class T3CSSUtils {
         if (value == null || value.trim().isEmpty()) {
             return null;
         }
-        value = value.trim().toLowerCase();
+
+        value = value.trim().toLowerCase(Locale.ROOT);
+
+        // !important no forma parte del valor del color.
+        value = value.replaceFirst("\\s*!\\s*important\\s*$", "").trim();
+
+        if ("transparent".equals(value)) {
+            return new Color(0, 0, 0, 0);
+        }
+
+        // Los colores heredados requieren resolución en el motor CSS.
+        if ("inherit".equals(value)
+                || "initial".equals(value)
+                || "unset".equals(value)
+                || "currentcolor".equals(value)) {
+            return null;
+        }
+
         try {
+            if (value.matches("#[0-9a-f]{3}")) {
+                int r = Integer.parseInt(value.substring(1, 2), 16) * 17;
+                int g = Integer.parseInt(value.substring(2, 3), 16) * 17;
+                int b = Integer.parseInt(value.substring(3, 4), 16) * 17;
+                return new Color(r, g, b);
+            }
+
+            if (value.matches("#[0-9a-f]{6}")) {
+                return new Color(
+                        Integer.parseInt(value.substring(1), 16)
+                );
+            }
+
+            if (value.matches("#[0-9a-f]{8}")) {
+                long rgba = Long.parseLong(value.substring(1), 16);
+                return new Color(
+                        (int) ((rgba >> 24) & 0xFF),
+                        (int) ((rgba >> 16) & 0xFF),
+                        (int) ((rgba >> 8) & 0xFF),
+                        (int) (rgba & 0xFF)
+                );
+            }
+
             if (value.startsWith("#")) {
                 return Color.decode(value);
             }
@@ -341,8 +628,6 @@ public class T3CSSUtils {
                     new Color(220, 53, 69);
                 case "0d6efd" ->
                     new Color(13, 110, 253);
-                case "inherit" ->
-                    new Color(0, 0, 0);
                 default -> {
                     LOGGER.warning("Color no reconocido: " + value + "; usando null");
                     yield null;

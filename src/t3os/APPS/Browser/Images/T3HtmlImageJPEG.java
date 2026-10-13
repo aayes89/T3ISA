@@ -68,7 +68,7 @@ public final class T3HtmlImageJPEG {
     };
 
     private static final int[][] STD_DC_BITS = {
-        {0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 5, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0},
         {0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0}
     };
 
@@ -443,7 +443,14 @@ public final class T3HtmlImageJPEG {
                 components[i] = c;
             }
 
-            if (maxH * maxV * componentCount > 10) {
+            int blocksPerMCU = 0;
+
+            for (int i = 0; i < componentCount; i++) {
+                Component c = components[i];
+                blocksPerMCU += c.h * c.v;
+            }
+
+            if (blocksPerMCU > 10) {
                 throw new IOException("Cantidad de bloques JPEG excesiva");
             }
 
