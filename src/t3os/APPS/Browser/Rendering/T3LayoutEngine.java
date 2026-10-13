@@ -235,15 +235,37 @@ public class T3LayoutEngine {
             box.height = resolveHeight(style.getHeight(), maxChildBottom - box.y) + paddingBottom;
         }
 
+        // Manejo de Inputs(Ocultos, Cajas de texto y Botones)
         if ("input".equals(tag)) {
-            if (box.width == 0) {
-                box.width = 150;
+            String type = node.getAttributes().getOrDefault("type", "").toLowerCase();
+
+            // Ignorar completamente los inputs ocultos
+            if ("hidden".equals(type)) {
+                return null;
             }
-            if (box.height == 0) {
-                box.height = 24;
+
+            // Ajustar tamaños según el tipo
+            if ("submit".equals(type) || "button".equals(type)) {
+                String val = node.getAttributes().getOrDefault("value", "Botón");
+                if (box.width == 0) {
+                    box.width = Math.max(100, (val.length() * CHAR_WIDTH) + 24); // Ajustar al texto
+                }
+                if (box.height == 0) {
+                    box.height = 24;
+                }
+                box.style.setBackgroundColor(new java.awt.Color(240, 240, 240)); // Gris claro para botones
+            } else {
+                // Caja de texto normal (search, text, password)
+                if (box.width == 0) {
+                    box.width = 250; // Un poco más ancha para búsquedas
+                }
+                if (box.height == 0) {
+                    box.height = 24;
+                }
+                box.style.setBackgroundColor(java.awt.Color.WHITE);
             }
+
             box.style.setBorderWidth(1);
-            box.style.setBackgroundColor(java.awt.Color.WHITE);
         }
 
         if (isFlex) {
