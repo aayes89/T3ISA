@@ -45,10 +45,14 @@ public final class TUIBrowser extends TUIElement {
     private static final int TITLE_HEIGHT = 24;
     private static final int TOOLBAR_HEIGHT = 32;
     private static final int STATUS_HEIGHT = 20;
+    private int rendererX = Integer.MIN_VALUE;
+    private int rendererY = Integer.MIN_VALUE;
+    private int rendererWidth = -1;
+    private int rendererHeight = -1;
 
     private static final int COLOR_TITLE = 0x00303030;
     private static final int COLOR_TOOLBAR = 0x00404040;
-    private static final int COLOR_BACKGROUND = 0x00181818;
+    private static final int COLOR_BACKGROUND = 0x00FFFFFF;
     private static final int COLOR_BORDER = 0x00808080;
     private static final int COLOR_TEXT = 0x00FFFFFF;
     private static final int COLOR_FIELD = 0x00080808;
@@ -81,7 +85,7 @@ public final class TUIBrowser extends TUIElement {
                 <html>
                   <head>
                       <style>
-                          body { background-color: #ffffff; }
+                          body {   background-color: #ffffff; color: #202020; }
                           nav { display: flex; flex-direction: row; background-color: #2c2c2c; padding: 10px 15px; }
                           .nav-link { color: #ffffff; text-decoration: none; margin-right: 15px; }
                           .container { max-width: 1200px; margin: 0 auto; }
@@ -224,19 +228,37 @@ public final class TUIBrowser extends TUIElement {
     }
 
     private void drawContent(TUI ui) {
-        int contentY = y + TITLE_HEIGHT + TOOLBAR_HEIGHT;
-        int contentHeight = height - TITLE_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT;
+        int contentX = x + 2;
+        int contentY = y + TITLE_HEIGHT + TOOLBAR_HEIGHT + 1;
+        int contentWidth = width - 4;
+        int contentHeight = height - TITLE_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT - 3;
 
-        ui.fillRect(x + 1, contentY, width - 2, contentHeight, COLOR_BACKGROUND);
-        ui.drawText("T3Browser", x + 12, contentY + 20, COLOR_TEXT);
-        ui.drawText("Direccion: " + address, x + 12, contentY + 44, COLOR_TEXT);
-        ui.drawText(status, x + 12, contentY + 68, COLOR_TEXT);
-        ui.drawText("Motor HTML pendiente de integrar", x + 12, contentY + 92, COLOR_BORDER);
-    }
+        ui.fillRect(contentX, contentY, contentWidth, contentHeight, COLOR_BACKGROUND);
 
-    public void loadPage(TUI ui) {
-        T3HtmlParser parser = new T3HtmlParser(html0);
-        this.document = parser.parse();
+        // Cargar el HTML de prueba una sola vez.
+        if (document == null) {
+            T3HtmlParser parser = new T3HtmlParser(html0);
+            document = parser.parse();
+
+            pageTitle = "DNS-Web Browser";
+            status = "Documento HTML cargado";
+        }
+
+        if (document == null) {
+            ui.drawText("No hay documento HTML cargado", contentX + 8, contentY + 20, COLOR_TEXT);
+            return;
+        }
+
+        // Recrear el renderizador solo si cambia el área de contenido.
+        if (htmlRenderer == null || rendererX != contentX || rendererY != contentY || rendererWidth != contentWidth || rendererHeight != contentHeight) {
+            htmlRenderer = new T3HtmlRenderer(ui, contentX, contentY, contentWidth, contentHeight);
+            rendererX = contentX;
+            rendererY = contentY;
+            rendererWidth = contentWidth;
+            rendererHeight = contentHeight;
+        }
+
+        htmlRenderer.render(document);
     }
 
     private void drawStatusBar(TUI ui) {

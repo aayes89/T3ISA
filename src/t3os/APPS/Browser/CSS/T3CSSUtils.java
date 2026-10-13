@@ -29,7 +29,6 @@ package t3os.APPS.Browser.CSS;
  */
 import java.awt.*;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.Collections;
 import java.util.HashMap;
@@ -139,67 +138,147 @@ public class T3CSSUtils {
      * @param value Valor de la propiedad
      */
     public static void applyDeclaration(T3Style style, String property, String value) {
+        if (style == null || property == null || value == null) {
+            return;
+        }
+
+        property = property.trim().toLowerCase();
+        value = value.trim();
+
         switch (property) {
             case "color":
                 style.setColor(parseColor(value));
                 break;
+
             case "font-size":
                 style.setFontSize(parseDimension(value));
                 break;
+
             case "font-weight":
                 style.setFontWeight(parseFontWeight(value));
                 break;
+
             case "font-family":
                 style.setFontFamily(value.replace("\"", "").replace("'", ""));
                 break;
+
             case "text-align":
                 style.setTextAlign(value);
                 break;
+
             case "text-decoration":
                 style.setTextDecoration(value);
                 break;
+
+            case "background":
             case "background-color":
                 style.setBackgroundColor(parseColor(value));
                 break;
+
             case "display":
                 style.setDisplay(value);
                 break;
+
             case "margin":
                 parseMarginPadding(style, value, true);
                 break;
+
             case "padding":
                 parseMarginPadding(style, value, false);
                 break;
+
+            case "margin-top":
+            case "margin-right":
+            case "margin-bottom":
+            case "margin-left": {
+                int dimension = parseDimension(value);
+                if (dimension >= 0) {
+                    switch (property) {
+                        case "margin-top":
+                            style.setMarginTop(dimension);
+                            break;
+                        case "margin-right":
+                            style.setMarginRight(dimension);
+                            break;
+                        case "margin-bottom":
+                            style.setMarginBottom(dimension);
+                            break;
+                        case "margin-left":
+                            style.setMarginLeft(dimension);
+                            break;
+                    }
+                }
+                break;
+            }
+
+            case "padding-top":
+            case "padding-right":
+            case "padding-bottom":
+            case "padding-left": {
+                int dimension = parseDimension(value);
+                if (dimension >= 0) {
+                    switch (property) {
+                        case "padding-top":
+                            style.setPaddingTop(dimension);
+                            break;
+                        case "padding-right":
+                            style.setPaddingRight(dimension);
+                            break;
+                        case "padding-bottom":
+                            style.setPaddingBottom(dimension);
+                            break;
+                        case "padding-left":
+                            style.setPaddingLeft(dimension);
+                            break;
+                    }
+                }
+                break;
+            }
+
             case "border-width":
                 style.setBorderWidth(parseDimension(value));
                 break;
+
             case "border-color":
                 style.setBorderColor(parseColor(value));
                 break;
+
             case "border-radius":
                 style.setBorderRadius(parseDimension(value));
                 break;
+
             case "box-shadow":
                 style.setBoxShadow(value);
                 break;
+
             case "flex-direction":
                 style.setFlexDirection(value);
                 break;
+
             case "justify-content":
                 style.setJustifyContent(value);
                 break;
+
+            case "align-items":
+                style.setAlignItems(value);
+                break;
+
             case "width":
             case "max-width":
                 style.setWidth(value);
                 break;
+
             case "height":
                 style.setHeight(value);
                 break;
+
             case "float":
-                style.setDisplay("inline-block"); // Simplificado
+                style.setDisplay("inline-block");
                 break;
+
             default:
-                LOGGER.fine("Propiedad CSS no soportada: " + property + " = " + value);
+                LOGGER.fine("Propiedad CSS no soportada: "
+                        + property + " = " + value);
         }
     }
 
@@ -280,19 +359,44 @@ public class T3CSSUtils {
      * @return Valor en píxeles o -1 para auto
      */
     public static int parseDimension(String value) {
+        if (value == null) {
+            return 0;
+        }
+
+        value = value.trim().toLowerCase();
+
+        if (value.isEmpty()) {
+            return 0;
+        }
+
+        if ("auto".equals(value)) {
+            return -1;
+        }
+
+        // Los porcentajes se resuelven en el motor de renderizado.
+        if (value.endsWith("%")) {
+            return -1;
+        }
+
+        // Para no interpretar valores shorthand, como "0 auto",
+        // como si fueran una dimensión individual.
+        if (value.matches(".*\\s+.*")) {
+            LOGGER.fine("Valor CSS compuesto ignorado como dimensión: " + value);
+            return 0;
+        }
+
         try {
-            if (value == null || value.equals("auto")) {
-                return -1;
-            }
-            if (value.endsWith("%")) {
-                return -1; // Porcentajes manejados en RenderEngine
-            }
             if (value.endsWith("rem")) {
-                return (int) (Float.parseFloat(value.replace("rem", "").trim()) * 16);
+                return Math.round(Float.parseFloat(value.substring(0, value.length() - 3).trim()) * 16);
             }
-            return Integer.parseInt(value.replace("px", "").trim());
+
+            if (value.endsWith("px")) {
+                value = value.substring(0, value.length() - 2).trim();
+            }
+
+            return Math.round(Float.parseFloat(value));
         } catch (NumberFormatException e) {
-            LOGGER.warning("Dimensión no válida: " + value + "; usando 0");
+            LOGGER.fine("Dimensión CSS no compatible: " + value);
             return 0;
         }
     }
@@ -494,5 +598,4 @@ public class T3CSSUtils {
         }
     }
 
-   
 }

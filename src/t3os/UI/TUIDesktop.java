@@ -355,7 +355,6 @@ public final class TUIDesktop extends TUIElement {
             ui.add(browser);
         } else {
             browser.setVisible(true);
-            //browser.refresh();
         }
         ui.bringToFront(browser);
     }

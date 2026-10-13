@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import t3os.APPS.Browser.T3HtmlNode;
 
@@ -77,22 +78,34 @@ public class T3CSSRule {
      * @return Valor de especificidad
      */
     private int calculateSpecificity(String selector) {
-        int[] specificity = new int[3]; // [IDs, Clases/Atributos, Elementos]
-        String[] parts = selector.split("\\s*[:>~+]?\\s*");
+        int ids = 0;
+        int classes = 0;
+        int elements = 0;
 
-        for (String part : parts) {
-            if (part.contains(":")) {
-                part = part.substring(0, part.indexOf(":")); // Ignorar pseudo-clases
-            }
-            if (part.startsWith("#")) {
-                specificity[0]++; // ID
-            } else if (part.startsWith(".") || part.contains("[")) {
-                specificity[1]++; // Clase o atributo
-            } else if (!part.isEmpty()) {
-                specificity[2]++; // Elemento
-            }
+        String cleaned = selector.trim();
+
+        Matcher idMatcher = Pattern.compile("#[\\w-]+").matcher(cleaned);
+        while (idMatcher.find()) {
+            ids++;
         }
-        return specificity[0] * 100 + specificity[1] * 10 + specificity[2];
+
+        Matcher classMatcher = Pattern.compile("\\.[\\w-]+|\\[[^\\]]+\\]|:[\\w-]+(?:\\([^)]*\\))?").matcher(cleaned);
+        while (classMatcher.find()) {
+            classes++;
+        }
+
+        String withoutSpecificity = cleaned.replaceAll("#[\\w-]+", " ")
+                .replaceAll("\\.[\\w-]+", " ")
+                .replaceAll("\\[[^\\]]+\\]", " ")
+                .replaceAll(":[\\w-]+(?:\\([^)]*\\))?", " ")
+                .replaceAll("[>+~*]", " ");
+
+        Matcher elementMatcher = Pattern.compile("(?<![\\w-])[a-zA-Z][\\w-]*").matcher(withoutSpecificity);
+        while (elementMatcher.find()) {
+            elements++;
+        }
+
+        return ids * 100 + classes * 10 + elements;
     }
 
     /**
@@ -102,50 +115,128 @@ public class T3CSSRule {
      * @return true si el selector coincide con el nodo
      */
     public boolean matches(T3HtmlNode node) {
-        String[] selectorParts = selector.split("\\s*[:>~+]?\\s*");
-        if (selectorParts.length == 0 || selectorParts[0].trim().isEmpty()) {
+        if (node == null || selector == null || selector.trim().isEmpty()) {
             return false;
         }
 
-        // Verificar el selector principal
-        String mainSelector = selectorParts[0].replaceAll(":.*", "").trim();
-        String idAttr = node.getAttributes().getOrDefault("id", "");
-        String classAttr = node.getAttributes().getOrDefault("class", "");
-        boolean mainMatch;
+        String cleaned = selector.trim();
 
-        if (mainSelector.contains(".")) {
-            String[] classParts = mainSelector.split("\\.");
-            String base = classParts[0].isEmpty() ? node.getTagName() : classParts[0];
-            List<String> classes = classParts.length > 1 ? Arrays.asList(classParts).subList(1, classParts.length) : Collections.emptyList();
-            mainMatch = base.equals(node.getTagName()) || (base.startsWith("#") && base.substring(1).equals(idAttr));
-            if (!classes.isEmpty()) {
-                mainMatch &= Arrays.asList(classAttr.split("\\s+")).containsAll(classes);
+        // Separar los componentes del selector conservando sus combinadores.
+        Matcher matcher = Pattern.compile("([^\\s>+~]+)\\s*([>+~]?)\\s*").matcher(cleaned);
+
+        List<String> parts = new java.util.ArrayList<>();
+        List<String> combinators = new java.util.ArrayList<>();
+
+        while (matcher.find()) {
+            String part = matcher.group(1).trim();
+            if (!part.isEmpty()) {
+                parts.add(part);
+                combinators.add(matcher.group(2));
             }
-        } else if (mainSelector.startsWith("#")) {
-            mainMatch = mainSelector.substring(1).equals(idAttr);
-        } else if (mainSelector.contains("[")) {
-            mainMatch = matchesAttributeSelector(mainSelector, node);
-        } else {
-            mainMatch = mainSelector.equals(node.getTagName());
         }
 
-        // Soporte básico para pseudo-clases
-        if (selector.contains(":nth-child(") && mainMatch) {
-            try {
-                int index = Integer.parseInt(selector.replaceAll("[^0-9]", ""));
-                return node.getParent() != null && node.getParent().getChildIndex(node) == index - 1;
-            } catch (NumberFormatException e) {
+        if (parts.isEmpty()) {
+            return false;
+        }
+
+        int last = parts.size() - 1;
+        if (!matchesSimpleSelector(parts.get(last), node)) {
+            return false;
+        }
+
+        T3HtmlNode current = node;
+
+        for (int i = last - 1; i >= 0; i--) {
+            String combinator = combinators.get(i);
+
+            if (">".equals(combinator)) {
+                current = current.getParent();
+                if (current == null || !matchesSimpleSelector(parts.get(i), current)) {
+                    return false;
+                }
+            } else {
+                // Descendiente: buscar un ancestro coincidente.
+                T3HtmlNode ancestor = current.getParent();
+                while (ancestor != null && !matchesSimpleSelector(parts.get(i), ancestor)) {
+                    ancestor = ancestor.getParent();
+                }
+
+                if (ancestor == null) {
+                    return false;
+                }
+                current = ancestor;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean matchesSimpleSelector(String simple, T3HtmlNode node) {
+        if (simple == null || simple.isEmpty() || node == null) {
+            return false;
+        }
+
+        String tag = node.getTagName();
+        Map<String, String> attributes = node.getAttributes();
+
+        Matcher tagMatcher = Pattern.compile("^[a-zA-Z][\\w-]*").matcher(simple);
+
+        if (tagMatcher.find() && !tagMatcher.group().equalsIgnoreCase(tag)) {
+            return false;
+        }
+
+        Matcher idMatcher = Pattern.compile("#([\\w-]+)").matcher(simple);
+        while (idMatcher.find()) {
+            if (!idMatcher.group(1).equals(attributes.getOrDefault("id", ""))) {
                 return false;
             }
         }
 
-        // Verificar selectores combinados (por ejemplo, div > p)
-        if (selectorParts.length > 1 && mainMatch) {
-            String combinator = selector.contains(">") ? ">" : " ";
-            return matchesAncestor(node.getParent(), Arrays.asList(selectorParts).subList(1, selectorParts.length), combinator);
+        Matcher classMatcher = Pattern.compile("\\.([\\w-]+)").matcher(simple);
+
+        List<String> nodeClasses = Arrays.asList(
+                attributes.getOrDefault("class", "").trim().isEmpty()
+                ? new String[0]
+                : attributes.get("class").trim().split("\\s+")
+        );
+
+        while (classMatcher.find()) {
+            if (!nodeClasses.contains(classMatcher.group(1))) {
+                return false;
+            }
         }
 
-        return mainMatch;
+        Matcher attrMatcher = Pattern.compile("\\[([\\w-]+)(?:\\s*=\\s*[\"']?([^\\]\"']+)[\"']?)?\\]").matcher(simple);
+
+        while (attrMatcher.find()) {
+            String name = attrMatcher.group(1);
+            String expected = attrMatcher.group(2);
+
+            if (!attributes.containsKey(name)) {
+                return false;
+            }
+
+            if (expected != null && !expected.trim().equals(attributes.get(name))) {
+                return false;
+            }
+        }
+
+        if (simple.contains(":nth-child(")) {
+            Matcher nthMatcher = Pattern.compile(":nth-child\\((\\d+)\\)").matcher(simple);
+
+            if (nthMatcher.find()) {
+                if (node.getParent() == null) {
+                    return false;
+                }
+
+                int expectedIndex = Integer.parseInt(nthMatcher.group(1)) - 1;
+                if (node.getParent().getChildIndex(node) != expectedIndex) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /**
