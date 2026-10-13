@@ -1315,7 +1315,7 @@ public final class TShell {
                     machine.getMouseButtons()
             );
 
-            machine.graphics(2, 0x00FFFFFF, 0, 0, 0, 0, 0);
+            machine.graphics(2, 0x00FFFFFF, 0, 0, 0, 0, 0, new int[]{0});
 
             ui.draw();
             gb.presentFrame();

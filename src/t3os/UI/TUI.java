@@ -307,12 +307,12 @@ public class TUI {
 
     // Auxiliar para pintar un rectángulo relleno en pantalla
     public void fillRect(int x, int y, int width, int height, int color) {
-        machine.graphics(5, x, y, width, height, color, 0);
+        machine.graphics(5, x, y, width, height, color, 0, new int[]{0});
     }
 
     // Auxiliar para dibujar contorno de un rectángulo en pantalla
     public void drawRect(int x, int y, int width, int height, int color) {
-        machine.graphics(4, x, y, width, height, color, 0);
+        machine.graphics(4, x, y, width, height, color, 0, new int[]{0});
     }
 
     // Auxiliar para imprimir texto en pantalla
@@ -330,7 +330,7 @@ public class TUI {
 
     // Auxiliar para dibujar una línea
     public void drawLine(int cx, int cy, int i, int i0, int color) {
-        machine.graphics(3, cx, cy, i, i0, color, 0);
+        machine.graphics(3, cx, cy, i, i0, color, 0, new int[]{0});
     }
 
     // GETTERS y SETTERS

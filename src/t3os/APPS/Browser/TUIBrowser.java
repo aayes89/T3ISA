@@ -61,6 +61,18 @@ public final class TUIBrowser extends TUIElement {
     private static final int COLOR_STATUS = 0x00282828;
     private static final int COLOR_CURSOR = 0x00FFFFFF;
 
+    private static final int SCROLLBAR_WIDTH = 12;
+    private static final int SCROLL_MIN_THUMB = 24;
+
+    private static final int COLOR_SCROLL_TRACK = 0x00D0D0D0;
+    private static final int COLOR_SCROLL_THUMB = 0x00606060;
+    private static final int COLOR_SCROLL_BORDER = 0x00808080;
+
+    private int scrollY;
+    private int contentHeight;
+    private boolean draggingScrollbar;
+    private int scrollbarDragOffset;
+
     private static final int BUTTON_WIDTH = 32;
     private static final int GO_WIDTH = 36;
     private static final int CLOSE_WIDTH = 24;
@@ -110,6 +122,7 @@ public final class TUIBrowser extends TUIElement {
                           <div class="float-right">                              
                           </div>
                       </div>
+                   <br><br><br><br><br><br><br><br><br><br><br><br><br><br>
                       <footer>
                           Made by Slam 2024 All Rights Reserved &copy;
                       </footer>
@@ -230,10 +243,10 @@ public final class TUIBrowser extends TUIElement {
     private void drawContent(TUI ui) {
         int contentX = x + 2;
         int contentY = y + TITLE_HEIGHT + TOOLBAR_HEIGHT + 1;
-        int contentWidth = width - 4;
-        int contentHeight = height - TITLE_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT - 3;
+        int contentWidth = width - 4 - SCROLLBAR_WIDTH;
+        int viewportHeight = height - TITLE_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT - 3;
 
-        ui.fillRect(contentX, contentY, contentWidth, contentHeight, COLOR_BACKGROUND);
+        ui.fillRect(contentX, contentY, contentWidth, viewportHeight, COLOR_BACKGROUND);
 
         // Cargar el HTML de prueba una sola vez.
         if (document == null) {
@@ -246,19 +259,42 @@ public final class TUIBrowser extends TUIElement {
 
         if (document == null) {
             ui.drawText("No hay documento HTML cargado", contentX + 8, contentY + 20, COLOR_TEXT);
+
+            contentHeight = viewportHeight;
+            scrollY = 0;
             return;
         }
 
         // Recrear el renderizador solo si cambia el área de contenido.
-        if (htmlRenderer == null || rendererX != contentX || rendererY != contentY || rendererWidth != contentWidth || rendererHeight != contentHeight) {
-            htmlRenderer = new T3HtmlRenderer(ui, contentX, contentY, contentWidth, contentHeight);
+        if (htmlRenderer == null
+                || rendererX != contentX
+                || rendererY != contentY
+                || rendererWidth != contentWidth
+                || rendererHeight != viewportHeight) {
+
+            htmlRenderer = new T3HtmlRenderer(ui, contentX, contentY, contentWidth, viewportHeight);
+
             rendererX = contentX;
             rendererY = contentY;
             rendererWidth = contentWidth;
-            rendererHeight = contentHeight;
+            rendererHeight = viewportHeight;
         }
 
+        // Obtener la altura total calculada por el renderizador.
+        htmlRenderer.setScrollY(0);
         htmlRenderer.render(document);
+        contentHeight = Math.max(viewportHeight, htmlRenderer.getContentHeight());
+
+        // Limitar el desplazamiento al rango válido.
+        int maxScroll = Math.max(0, contentHeight - viewportHeight);
+        scrollY = Math.max(0, Math.min(scrollY, maxScroll));
+
+        // Renderizar la página con el desplazamiento actual.
+        htmlRenderer.setScrollY(scrollY);
+        htmlRenderer.render(document);
+
+        // Dibujar la barra de desplazamiento vertical.
+        drawScrollbar(ui, contentX + contentWidth, contentY, SCROLLBAR_WIDTH, viewportHeight);
     }
 
     private void drawStatusBar(TUI ui) {
@@ -301,9 +337,7 @@ public final class TUIBrowser extends TUIElement {
 
         int toolbarY = TITLE_HEIGHT;
 
-        if (localY >= toolbarY
-                && localY < toolbarY + TOOLBAR_HEIGHT) {
-
+        if (localY >= toolbarY && localY < toolbarY + TOOLBAR_HEIGHT) {
             int by = toolbarY + 4;
             int bh = TOOLBAR_HEIGHT - 8;
 
@@ -357,17 +391,76 @@ public final class TUIBrowser extends TUIElement {
             addressFocused = false;
             return;
         }
+        int contentTop = TITLE_HEIGHT + TOOLBAR_HEIGHT + 1;
+        int contentBottom = height - STATUS_HEIGHT - 2;
+        int scrollbarX = width - 2 - SCROLLBAR_WIDTH;
+
+        if (localY >= contentTop && localY < contentBottom && localX >= scrollbarX && localX < width - 2) {
+
+            int trackHeight = contentBottom - contentTop;
+            int thumbHeight = contentHeight <= trackHeight ? trackHeight : Math.max(SCROLL_MIN_THUMB, trackHeight * trackHeight / contentHeight);
+
+            thumbHeight = Math.min(trackHeight, thumbHeight);
+
+            int maxScroll = Math.max(0, contentHeight - trackHeight);
+            int thumbRange = trackHeight - thumbHeight;
+
+            int thumbY = contentTop;
+            if (maxScroll > 0) {
+                thumbY += (int) ((long) scrollY * thumbRange / maxScroll);
+            }
+
+            if (localY >= thumbY && localY < thumbY + thumbHeight) {
+                draggingScrollbar = true;
+                scrollbarDragOffset = localY - thumbY;
+            } else {
+                int targetThumbY = localY - thumbHeight / 2;
+                targetThumbY = Math.max(contentTop, Math.min(targetThumbY, contentBottom - thumbHeight));
+
+                scrollY = thumbRange > 0 ? (int) ((long) (targetThumbY - contentTop) * maxScroll / thumbRange) : 0;
+            }
+
+            addressFocused = false;
+            return;
+        }
 
         addressFocused = false;
     }
 
     @Override
     public void mouseMove(int mx, int my) {
-        if (!dragging) {
+        if (draggingScrollbar) {
+            int contentTop = TITLE_HEIGHT + TOOLBAR_HEIGHT + 1;
+            int contentBottom = height - STATUS_HEIGHT - 2;
+            int trackHeight = contentBottom - contentTop;
+
+            if (trackHeight <= 0) {
+                return;
+            }
+
+            int thumbHeight = contentHeight <= trackHeight ? trackHeight : Math.max(SCROLL_MIN_THUMB, (int) ((long) trackHeight * trackHeight / Math.max(1, contentHeight)));
+
+            thumbHeight = Math.min(trackHeight, thumbHeight);
+
+            int thumbRange = trackHeight - thumbHeight;
+            int maxScroll = Math.max(0, contentHeight - trackHeight);
+
+            if (thumbRange <= 0 || maxScroll <= 0) {
+                scrollY = 0;
+                return;
+            }
+
+            int targetThumbY = my - y - scrollbarDragOffset;
+            targetThumbY = Math.max(contentTop, Math.min(targetThumbY, contentBottom - thumbHeight));
+
+            scrollY = (int) ((long) (targetThumbY - contentTop) * maxScroll / thumbRange);
+
             return;
         }
 
-        setPosition(mx - dragOffsetX, my - dragOffsetY);
+        if (dragging) {
+            setPosition(mx - dragOffsetX, my - dragOffsetY);
+        }
     }
 
     @Override
@@ -377,6 +470,7 @@ public final class TUIBrowser extends TUIElement {
         }
 
         dragging = false;
+        draggingScrollbar = false;
 
         Button action = pressedButton;
         pressedButton = Button.NONE;
@@ -436,8 +530,7 @@ public final class TUIBrowser extends TUIElement {
 
             case KeyEvent.VK_DELETE:
                 if (addressCursor < address.length()) {
-                    address = address.substring(0, addressCursor)
-                            + address.substring(addressCursor + 1);
+                    address = address.substring(0, addressCursor) + address.substring(addressCursor + 1);
                 }
                 return;
 
@@ -471,15 +564,22 @@ public final class TUIBrowser extends TUIElement {
             case KeyEvent.VK_INSERT:
                 return;
 
+            case KeyEvent.VK_SPACE:
+                insertAddressCharacter(' ');
+                return;
+
             default:
                 break;
         }
 
-        // No insertar caracteres de control ni espacios espurios.
         if (Character.isISOControl(ch) || Character.isWhitespace(ch)) {
             return;
         }
 
+        insertAddressCharacter(ch);
+    }
+
+    private void insertAddressCharacter(char ch) {
         address = address.substring(0, addressCursor) + ch + address.substring(addressCursor);
         addressCursor++;
     }
@@ -488,30 +588,129 @@ public final class TUIBrowser extends TUIElement {
         String target = address.trim();
 
         if (target.isEmpty()) {
-            status = "Introduce una direccion";
+            status = "Introduce una dirección";
             return;
         }
 
-        address = target;
-        addressCursor = address.length();
-
-        if ("about:blank".equalsIgnoreCase(address)) {
-            pageTitle = "T3Browser";
-            status = "Pagina en blanco";
-            return;
-        }
-
-        if (!address.contains("://") && !address.startsWith("about:")) {
-            address = "http://" + address;
+        if ("about:blank".equalsIgnoreCase(target)) {
+            address = "about:blank";
             addressCursor = address.length();
+            document = null;
+            htmlRenderer = null;
+            scrollY = 0;
+            contentHeight = 0;
+            pageTitle = "T3Browser";
+            status = "Página en blanco";
+            return;
         }
 
-        status = "Solicitud pendiente: " + address;
+        if (!target.matches("(?i)^https?://.*")) {
+            target = "http://" + target;
+        }
+
+        final String url = target;
+
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+
+            if (uri.getHost() == null
+                    || (!"http".equalsIgnoreCase(uri.getScheme())
+                    && !"https".equalsIgnoreCase(uri.getScheme()))) {
+                status = "URL no válida";
+                return;
+            }
+        } catch (IllegalArgumentException ex) {
+            status = "URL no válida";
+            return;
+        }
+
+        address = url;
+        addressCursor = address.length();
+        status = "Descargando página...";
         pageTitle = "T3Browser";
+
+        Thread downloader = new Thread(() -> {
+            try {
+                String html = t3isa.NETWORKING.THostNetwork.wget(url);
+
+                if (html == null || html.isBlank()) {
+                    throw new java.io.IOException("La página no contiene HTML");
+                }
+
+                T3HtmlParser parser = new T3HtmlParser(html);
+                T3HtmlNode parsedDocument = parser.parse();
+
+                if (parsedDocument == null) {
+                    throw new java.io.IOException("No se pudo interpretar el HTML");
+                }
+
+                synchronized (this) {
+                    document = parsedDocument;
+                    htmlRenderer = null;
+                    rendererX = Integer.MIN_VALUE;
+                    rendererY = Integer.MIN_VALUE;
+                    rendererWidth = -1;
+                    rendererHeight = -1;
+
+                    scrollY = 0;
+                    contentHeight = 0;
+                    status = "Página cargada";
+                    pageTitle = uriTitle(url);
+                }
+
+            } catch (Exception ex) {
+                synchronized (this) {
+                    status = "Error al cargar: " + ex.getMessage();
+                }
+            }
+        }, "T3Browser-Wget");
+
+        downloader.setDaemon(true);
+        downloader.start();
+    }
+
+    private String uriTitle(String url) {
+        try {
+            String host = java.net.URI.create(url).getHost();
+            return host != null ? host : "T3Browser";
+        } catch (IllegalArgumentException ex) {
+            return "T3Browser";
+        }
     }
 
     public void refresh() {
         System.out.println("Refrescando");
+    }
+
+    // Auxiliar para dibujar el scrollbar
+    private void drawScrollbar(TUI ui, int sx, int sy, int sw, int sh) {
+        ui.fillRect(sx, sy, sw, sh, COLOR_SCROLL_TRACK);
+        ui.drawRect(sx, sy, sw, sh, COLOR_SCROLL_BORDER);
+
+        int maxScroll = Math.max(0, contentHeight - sh);
+        int thumbHeight;
+
+        if (contentHeight <= sh || contentHeight <= 0) {
+            thumbHeight = sh;
+        } else {
+            thumbHeight = Math.max(SCROLL_MIN_THUMB, sh * sh / contentHeight);
+            thumbHeight = Math.min(sh, thumbHeight);
+        }
+
+        int thumbRange = sh - thumbHeight;
+        int thumbY = sy;
+
+        if (maxScroll > 0) {
+            thumbY += (int) ((long) scrollY * thumbRange / maxScroll);
+        }
+
+        ui.fillRect(sx + 2, thumbY, sw - 4, thumbHeight, COLOR_SCROLL_THUMB);
+        ui.drawRect(sx + 2, thumbY, sw - 4, thumbHeight, COLOR_SCROLL_BORDER);
+    }
+
+    // Auxiliar para calcular contenido visible
+    private int contentHeightVisible() {
+        return Math.max(1, height - TITLE_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT - 3);
     }
 
     public boolean hasAddressFocus() {

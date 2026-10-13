@@ -146,7 +146,7 @@ public interface TMachine {
 
     public int getCurrentPid();
 
-    void graphics(int command, int a, int b, int c, int d, int e, int f);
+    void graphics(int command, int a, int b, int c, int d, int e, int f, int[] g);
 
     void drawChar(int character, int x, int y, int scale, int foreground, int background);
 

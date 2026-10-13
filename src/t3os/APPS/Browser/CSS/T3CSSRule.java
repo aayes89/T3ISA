@@ -43,7 +43,7 @@ import t3os.APPS.Browser.T3HtmlNode;
 public class T3CSSRule {
 
     private static final Pattern SELECTOR_PATTERN = Pattern.compile(
-            "^[#.\\w-][#.\\w-]*(?:\\s*[:>~+]?\\s*[#.\\w-\\[\\]=\\*~\\|]+)*$"
+            "(?s)^\\s*[^{}]+\\s*$"
     );
 
     private final String selector;
@@ -59,16 +59,24 @@ public class T3CSSRule {
      */
     public T3CSSRule(String selector, Map<String, String> declarations) {
         Objects.requireNonNull(selector, "El selector no puede ser nulo");
-        String cleanedSelector = selector.trim().toLowerCase();
-        if (cleanedSelector.isEmpty()) {
-            throw new IllegalArgumentException("El selector no puede estar vacío");
-        }
-        if (!SELECTOR_PATTERN.matcher(cleanedSelector).matches()) {
+
+        String cleanedSelector = selector.trim().toLowerCase(java.util.Locale.ROOT);
+
+        if (cleanedSelector.isEmpty() || !SELECTOR_PATTERN.matcher(cleanedSelector).matches()) {
             throw new IllegalArgumentException("Selector inválido: " + cleanedSelector);
         }
+
+        for (String part : cleanedSelector.split(",")) {
+            if (part.trim().isEmpty()) {
+                throw new IllegalArgumentException("Selector vacío en lista: " + cleanedSelector);
+            }
+        }
+
         this.selector = cleanedSelector;
-        this.declarations = declarations != null ? Collections.unmodifiableMap(new HashMap<>(declarations)) : Collections.emptyMap();
-        this.specificity = calculateSpecificity(cleanedSelector);
+        this.declarations = declarations != null
+                ? Collections.unmodifiableMap(new HashMap<>(declarations)) : Collections.emptyMap();
+
+        this.specificity = Arrays.stream(cleanedSelector.split(",")).map(String::trim).mapToInt(this::calculateSpecificity).max().orElse(0);
     }
 
     /**
@@ -119,9 +127,20 @@ public class T3CSSRule {
             return false;
         }
 
-        String cleaned = selector.trim();
+        for (String alternative : selector.split(",")) {
+            if (matchesSingleSelector(alternative.trim(), node)) {
+                return true;
+            }
+        }
 
-        // Separar los componentes del selector conservando sus combinadores.
+        return false;
+    }
+
+    private boolean matchesSingleSelector(String cleaned, T3HtmlNode node) {
+        if (cleaned.isEmpty()) {
+            return false;
+        }
+
         Matcher matcher = Pattern.compile("([^\\s>+~]+)\\s*([>+~]?)\\s*").matcher(cleaned);
 
         List<String> parts = new java.util.ArrayList<>();
@@ -129,33 +148,33 @@ public class T3CSSRule {
 
         while (matcher.find()) {
             String part = matcher.group(1).trim();
+
             if (!part.isEmpty()) {
                 parts.add(part);
                 combinators.add(matcher.group(2));
             }
         }
 
-        if (parts.isEmpty()) {
-            return false;
-        }
-
-        int last = parts.size() - 1;
-        if (!matchesSimpleSelector(parts.get(last), node)) {
+        if (parts.isEmpty() || !matchesSimpleSelector(parts.get(parts.size() - 1), node)) {
             return false;
         }
 
         T3HtmlNode current = node;
 
-        for (int i = last - 1; i >= 0; i--) {
+        for (int i = parts.size() - 2; i >= 0; i--) {
             String combinator = combinators.get(i);
 
             if (">".equals(combinator)) {
                 current = current.getParent();
+
                 if (current == null || !matchesSimpleSelector(parts.get(i), current)) {
                     return false;
                 }
+            } else if ("+".equals(combinator) || "~".equals(combinator)) {
+                // Los selectores de hermanos requieren acceso a los hijos del padre.
+                // T3HtmlNode debe exponer esa relación para implementarlos correctamente.
+                return false;
             } else {
-                // Descendiente: buscar un ancestro coincidente.
                 T3HtmlNode ancestor = current.getParent();
                 while (ancestor != null && !matchesSimpleSelector(parts.get(i), ancestor)) {
                     ancestor = ancestor.getParent();
@@ -164,6 +183,7 @@ public class T3CSSRule {
                 if (ancestor == null) {
                     return false;
                 }
+
                 current = ancestor;
             }
         }

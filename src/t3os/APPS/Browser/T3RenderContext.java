@@ -42,6 +42,7 @@ public final class T3RenderContext {
 
     private int color = 0x000000;
     private int background = -1;
+    private int scrollY;
 
     public T3RenderContext(int x, int y, int width, int height) {
         if (width <= 0 || height <= 0) {
@@ -123,5 +124,13 @@ public final class T3RenderContext {
 
     public boolean isInside(int px, int py) {
         return px >= x && px < getRight() && py >= y && py < getBottom();
+    }
+
+    public int getScrollY() {
+        return scrollY;
+    }
+
+    public void setScrollY(int value) {
+        scrollY = Math.max(0, value);
     }
 }

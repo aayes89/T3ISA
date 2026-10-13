@@ -52,6 +52,9 @@ public final class T3HtmlRenderer {
     private final TUI ui;
     private final T3RenderContext context;
     private final List<T3CSSRule> cssRules = new ArrayList<>();
+    private int scrollY;
+    private int contentHeight;
+    private boolean measuring;
 
     public T3HtmlRenderer(TUI ui, int x, int y, int width, int height) {
         if (ui == null) {
@@ -62,23 +65,46 @@ public final class T3HtmlRenderer {
         this.context = new T3RenderContext(x, y, width, height);
     }
 
+    // Dibuja el nodo raiz
     public void render(T3HtmlNode root) {
         if (root == null) {
+            contentHeight = 0;
             return;
         }
 
         cssRules.clear();
         collectCSSRules(root);
 
+        // Primera pasada: calcular la altura total sin dibujar.
+        measuring = true;
         context.setCursorX(context.getX());
         context.setCursorY(context.getY());
+        renderNode(root, false, new T3Style());
+
+        contentHeight = Math.max(
+                context.getHeight(),
+                context.getCursorY() - context.getY() + LINE_HEIGHT
+        );
+
+        // Segunda pasada: limpiar el área visible antes de dibujar.
+        measuring = false;
+
+        ui.fillRect(
+                context.getX(),
+                context.getY(),
+                context.getWidth(),
+                context.getHeight(),
+                0xFFFFFF
+        );
+
+        context.setCursorX(context.getX());
+        context.setCursorY(context.getY() - scrollY);
+        context.setScrollY(scrollY);
 
         renderNode(root, false, new T3Style());
     }
 
-    /*
-     * Recopila las reglas antes de dibujar el documento.
-     */
+    // Recopila las reglas antes de dibujar el documento.
     private void collectCSSRules(T3HtmlNode node) {
         if (node == null) {
             return;
@@ -110,6 +136,7 @@ public final class T3HtmlRenderer {
         }
     }
 
+    // Auxiliar para dibujar nodo
     private void renderNode(T3HtmlNode node, boolean inline, T3Style inheritedStyle) {
         if (node == null || !hasVerticalSpace()) {
             return;
@@ -144,7 +171,7 @@ public final class T3HtmlRenderer {
         }
 
         if (tag.equals("hr")) {
-            ui.fillRect(context.getX(), context.getCursorY(), context.getWidth(), 1, 0x808080);
+            fillRectClipped(context.getX(), context.getCursorY(), context.getWidth(), 1, 0x808080);
             newLine();
             return;
         }
@@ -197,7 +224,7 @@ public final class T3HtmlRenderer {
         Color backgroundColor = style.getBackgroundColor();
 
         if (backgroundColor != null && boxWidth > 0 && boxHeight > 0) {
-            ui.fillRect(boxX, contentY, boxWidth, boxHeight, toRGB(backgroundColor));
+            fillRectClipped(boxX, contentY, boxWidth, boxHeight, toRGB(backgroundColor));
         }
 
         int borderWidth = style.getBorderWidth();
@@ -213,7 +240,7 @@ public final class T3HtmlRenderer {
                     break;
                 }
 
-                ui.drawRect(boxX + i, contentY + i, width, height, borderColor);
+                drawRectClipped(boxX + i, contentY + i, width, height, borderColor);
             }
         }
 
@@ -259,9 +286,8 @@ public final class T3HtmlRenderer {
         }
     }
 
-    /*
-     * Renderiza texto normal: colapsa espacios consecutivos y ajusta
-     * las palabras al ancho disponible.
+    /* Renderiza texto normal: 
+     * colapsa espacios consecutivos y ajusta las palabras al ancho disponible.
      */
     private void renderText(String text) {
         if (text == null || text.isEmpty()) {
@@ -300,8 +326,12 @@ public final class T3HtmlRenderer {
                     newLine();
                 }
 
-                ui.drawText(String.valueOf(word.charAt(i)), context.getCursorX(), context.getCursorY(), context.getColor());
-                context.setCursorX(context.getCursorX() + CHAR_WIDTH);
+                int drawX = context.getCursorX();
+                int drawY = context.getCursorY();
+
+                drawTextClipped(String.valueOf(word.charAt(i)), drawX, drawY, context.getColor());
+
+                context.setCursorX(drawX + CHAR_WIDTH);
             }
 
             if (context.getCursorX() + CHAR_WIDTH <= context.getRight()) {
@@ -310,9 +340,7 @@ public final class T3HtmlRenderer {
         }
     }
 
-    /*
-     * <pre> conserva espacios y saltos de línea.
-     */
+    // <pre> conserva espacios y saltos de línea.
     private void renderPreformatted(T3HtmlNode node, T3Style inheritedStyle) {
         String text = node.getText();
 
@@ -334,6 +362,7 @@ public final class T3HtmlRenderer {
         }
     }
 
+    // Auxiliar para dibujar texto con formato
     private void renderPreformattedText(String text) {
         if (text == null) {
             return;
@@ -357,11 +386,13 @@ public final class T3HtmlRenderer {
                 newLine();
             }
 
-            ui.drawText(String.valueOf(c), context.getCursorX(), context.getCursorY(), context.getColor());
+            drawTextClipped(String.valueOf(c), context.getCursorX(), context.getCursorY(), context.getColor());
+
             context.setCursorX(context.getCursorX() + CHAR_WIDTH);
         }
     }
 
+    // Auxiliar para dibujar lista
     private void renderList(T3HtmlNode node, boolean ordered, T3Style inheritedStyle) {
         int index = 1;
 
@@ -397,6 +428,7 @@ public final class T3HtmlRenderer {
         }
     }
 
+    // Auxiliar para dibujar campo de imagen
     private void renderImagePlaceholder(T3HtmlNode node) {
         int x = context.getCursorX();
         int y = context.getCursorY();
@@ -411,12 +443,14 @@ public final class T3HtmlRenderer {
         width = Math.max(16, Math.min(width, context.getWidth()));
         height = Math.max(16, Math.min(height, context.getHeight()));
 
-        ui.drawRect(x, y, width, height, 0x808080);
+        drawRectClipped(x, y, width, height, 0x808080);
 
         String alt = node.getAttributes().get("alt");
 
         if (alt != null && !alt.isEmpty()) {
-            ui.drawText(alt, x + 2, y + 2, context.getColor());
+            if (!measuring && context.getCursorY() >= context.getY() && context.getCursorY() < context.getBottom()) {
+                ui.drawText(alt, x + 2, y + 2, context.getColor());
+            }
         }
 
         context.setCursorX(x + width + CHAR_WIDTH);
@@ -426,6 +460,7 @@ public final class T3HtmlRenderer {
         }
     }
 
+    // Auxiliar para saber si es un bloque de elementos
     private boolean isBlockElement(String tag, T3Style style) {
         String display = style.getDisplay();
 
@@ -475,19 +510,29 @@ public final class T3HtmlRenderer {
         }
     }
 
+    // Auxiliar para saber si está al principio
     private boolean atLineStart() {
         return context.getCursorX() <= context.getX();
     }
 
+    // Auxiliar para saber si hay espacio vertical
     private boolean hasVerticalSpace() {
+        // La medición debe recorrer el documento completo.
+        if (measuring) {
+            return true;
+        }
+
+        // En el dibujo real se detiene al llegar al final visible.
         return context.getCursorY() < context.getBottom();
     }
 
+    // Auxiliar para añadir nueva línea
     private void newLine() {
         context.setCursorX(context.getX());
         context.advanceY(LINE_HEIGHT);
     }
 
+    // Auxiliar para resolver ancho
     private int resolveWidth(String value, int fallback) {
         if (value == null || "auto".equals(value)) {
             return fallback;
@@ -507,6 +552,7 @@ public final class T3HtmlRenderer {
         }
     }
 
+    // Auxiliar para resolver altura
     private int resolveHeight(String value, int fallback) {
         if (value == null || "auto".equals(value)) {
             return fallback;
@@ -526,6 +572,7 @@ public final class T3HtmlRenderer {
         }
     }
 
+    // Auxiliar para parser de pixeles
     private int parsePixels(String value, int fallback) {
         if (value == null) {
             return fallback;
@@ -546,7 +593,79 @@ public final class T3HtmlRenderer {
         }
     }
 
+    // Auxiliar para convertir el color a RGB
     private int toRGB(Color color) {
         return color == null ? 0 : color.getRGB() & 0xFFFFFF;
+    }
+
+    // Auxiliar para scrollbar
+    private boolean isVisibleY(int y) {
+        return y >= context.getY() && y < context.getBottom();
+    }
+
+    // Auxiliar para dibujar letras según tamaño de ventana
+    private void drawTextClipped(String text, int x, int y, int color) {
+        if (text == null || !isVisibleY(y)) {
+            return;
+        }
+
+        int left = context.getX();
+        int right = context.getRight();
+
+        for (int i = 0; i < text.length(); i++) {
+            int charX = x + i * CHAR_WIDTH;
+
+            if (charX >= left && charX + CHAR_WIDTH <= right) {
+                ui.drawText(
+                        String.valueOf(text.charAt(i)),
+                        charX,
+                        y,
+                        color
+                );
+            }
+        }
+    }
+
+    // Auxiliar para pintar rectángulo encuadrado
+    private void fillRectClipped(
+            int x, int y, int width, int height, int color) {
+
+        if (measuring || width <= 0 || height <= 0) {
+            return;
+        }
+
+        int left = Math.max(x, context.getX());
+        int top = Math.max(y, context.getY());
+        int right = Math.min(x + width, context.getRight());
+        int bottom = Math.min(y + height, context.getBottom());
+
+        if (right > left && bottom > top) {
+            ui.fillRect(left, top, right - left, bottom - top, color);
+        }
+    }
+
+    // Auxiliar para dibujar rectángulo encuadrado
+    private void drawRectClipped(int x, int y, int width, int height, int color) {
+        if (measuring || width <= 0 || height <= 0) {
+            return;
+        }
+
+        int left = Math.max(x, context.getX());
+        int top = Math.max(y, context.getY());
+        int right = Math.min(x + width, context.getRight());
+        int bottom = Math.min(y + height, context.getBottom());
+
+        if (right > left && bottom > top) {
+            ui.drawRect(left, top, right - left, bottom - top, color);
+        }
+    }
+
+    // Getter y Setters
+    public int getContentHeight() {
+        return contentHeight;
+    }
+
+    public void setScrollY(int value) {
+        scrollY = Math.max(0, value);
     }
 }

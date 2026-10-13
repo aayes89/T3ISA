@@ -125,6 +125,18 @@ public final class TGraphicsDevice implements TDevice, TMMIODevice {
         }
     }
 
+    public void drawImagePixels(int x, int y, int width, int height, int[] pixels) {
+        if (pixels == null || width <= 0 || height <= 0 || pixels.length < width * height) {
+            return;
+        }
+
+        for (int iy = 0; iy < height; iy++) {
+            for (int ix = 0; ix < width; ix++) {
+                setPixel(x + ix, y + iy, pixels[iy * width + ix]);
+            }
+        }
+    }
+
     public void setPixel(int x, int y, int value) {
         if (x < 0 || x >= width || y < 0 || y >= height) {
             return;
@@ -847,8 +859,9 @@ public final class TGraphicsDevice implements TDevice, TMMIODevice {
      * 6  = circle
      * 7  = fill circle
      * 8  = drawChar
+     * 9  = drawImagePixels
      */
-    public void graphics(int command, int a, int b, int c, int d, int e, int f) {
+    public void graphics(int command, int a, int b, int c, int d, int e, int f, int[] g) {
 
         switch (command) {
             case 1:
@@ -887,6 +900,13 @@ public final class TGraphicsDevice implements TDevice, TMMIODevice {
                         e, // foreground
                         f // background
                 );
+                break;
+            case 9:
+                drawImagePixels(a, // x
+                        b, // y
+                        c, // width
+                        d, // height
+                        g); // pixels
                 break;
         }
     }

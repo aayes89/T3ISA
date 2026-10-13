@@ -1523,8 +1523,8 @@ public final class TCPU implements TMachine {
     }
 
     @Override
-    public void graphics(int command, int a, int b, int c, int d, int e, int f) {
-        graphicsDevice.graphics(command, a, b, c, d, e, f);
+    public void graphics(int command, int a, int b, int c, int d, int e, int f, int[] g) {
+        graphicsDevice.graphics(command, a, b, c, d, e, f, g);
     }
 
     @Override
