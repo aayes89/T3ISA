@@ -28,6 +28,7 @@ package t3os.APPS.Browser;
  * @author Slam
  *
  */
+import t3os.APPS.Browser.Images.T3HtmlImage;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.HashMap;

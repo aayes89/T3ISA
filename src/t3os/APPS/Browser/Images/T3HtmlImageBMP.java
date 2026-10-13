@@ -28,7 +28,6 @@ package t3os.APPS.Browser.Images;
  * @author Slam
  */
 import java.io.IOException;
-import t3os.APPS.Browser.T3HtmlImage;
 
 public final class T3HtmlImageBMP {
 

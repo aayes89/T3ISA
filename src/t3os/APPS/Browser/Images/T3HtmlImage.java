@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package t3os.APPS.Browser;
+package t3os.APPS.Browser.Images;
 
 /**
  *
@@ -42,6 +42,8 @@ public final class T3HtmlImage {
         this.height = height;
         this.pixels = pixels.clone();
     }
+
+    
 
     public int getWidth() {
         return width;
