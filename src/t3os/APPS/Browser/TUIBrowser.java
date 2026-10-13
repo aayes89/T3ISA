@@ -120,6 +120,9 @@ public final class TUIBrowser extends TUIElement {
     private T3HtmlNode document;
     private final Set<String> requestedImages = new HashSet<>();
     private final Map<String, T3HtmlImage> loadedImages = new ConcurrentHashMap<>();
+    private final List<String> history = new ArrayList<>();
+    private int historyIndex = -1;
+    private boolean isHistoryNavigation = false;
     private T3LayoutBox currentRenderTree;
     private volatile long navigationId = 0;
     private Button pressedButton = Button.NONE;
@@ -305,7 +308,12 @@ public final class TUIBrowser extends TUIElement {
         collectCSSRules(document, cssRules);
 
         // Paso loadedImages directamente al Layout Engine
-        T3LayoutEngine engine = new T3LayoutEngine(contentWidth, cssRules, loadedImages);
+        URI baseUri = null;
+        try {
+            baseUri = URI.create(address);
+        } catch (Exception ignored) {
+        }
+        T3LayoutEngine engine = new T3LayoutEngine(contentWidth, contentHeight, cssRules, loadedImages, baseUri);
         currentRenderTree = engine.buildLayoutTree(document);
         // Actualizar el Scroll y la altura total
         contentHeight = Math.max(viewportHeight, engine.getContentHeight());
@@ -576,11 +584,27 @@ public final class TUIBrowser extends TUIElement {
                 break;
 
             case BACK:
-                status = "Historial anterior pendiente";
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    address = history.get(historyIndex);
+                    addressCursor = address.length();
+                    isHistoryNavigation = true;
+                    navigate();
+                } else {
+                    status = "No hay historial anterior";
+                }
                 break;
 
             case FORWARD:
-                status = "Historial siguiente pendiente";
+                if (historyIndex < history.size() - 1) {
+                    historyIndex++;
+                    address = history.get(historyIndex);
+                    addressCursor = address.length();
+                    isHistoryNavigation = true;
+                    navigate();
+                } else {
+                    status = "No hay historial siguiente";
+                }
                 break;
 
             case RELOAD:
@@ -683,6 +707,17 @@ public final class TUIBrowser extends TUIElement {
 
         // Página de inicio o dirección vacía.
         if (target.isEmpty() || "about:home".equalsIgnoreCase(target)) {
+            if (!isHistoryNavigation) {
+                if (historyIndex < history.size() - 1) {
+                    history.subList(historyIndex + 1, history.size()).clear();
+                }
+                if (history.isEmpty() || !history.get(history.size() - 1).equals("about:home")) {
+                    history.add("about:home");
+                    historyIndex = history.size() - 1;
+                }
+            }
+            isHistoryNavigation = false;
+
             synchronized (this) {
                 ++navigationId;
 
@@ -708,6 +743,17 @@ public final class TUIBrowser extends TUIElement {
 
         // Página completamente en blanco.
         if ("about:blank".equalsIgnoreCase(target)) {
+            if (!isHistoryNavigation) {
+                if (historyIndex < history.size() - 1) {
+                    history.subList(historyIndex + 1, history.size()).clear();
+                }
+                if (history.isEmpty() || !history.get(history.size() - 1).equals("about:blank")) {
+                    history.add("about:blank");
+                    historyIndex = history.size() - 1;
+                }
+            }
+            isHistoryNavigation = false;
+
             synchronized (this) {
                 ++navigationId;
 
@@ -721,7 +767,6 @@ public final class TUIBrowser extends TUIElement {
                 address = "about:blank";
                 addressCursor = address.length();
 
-                // No parsear el HTML de inicio.
                 document = null;
 
                 scrollY = 0;
@@ -756,6 +801,19 @@ public final class TUIBrowser extends TUIElement {
         }
 
         final String url = uri.toString();
+
+        // Bloque de Historial de navegación
+        if (!isHistoryNavigation) {
+            if (historyIndex < history.size() - 1) {
+                history.subList(historyIndex + 1, history.size()).clear();
+            }
+            if (history.isEmpty() || !history.get(history.size() - 1).equals(url)) {
+                history.add(url);
+                historyIndex = history.size() - 1;
+            }
+        }
+        isHistoryNavigation = false;
+
         final long currentNavigation;
 
         synchronized (this) {
@@ -801,7 +859,6 @@ public final class TUIBrowser extends TUIElement {
                 }
 
                 synchronized (this) {
-                    // Ignorar respuestas de navegaciones anteriores.
                     if (navigationId != currentNavigation) {
                         return;
                     }
@@ -817,7 +874,7 @@ public final class TUIBrowser extends TUIElement {
 
                 loadImages(parsedDocument, uri, currentNavigation);
 
-            } catch (Exception ex) {
+            } catch (IOException | InterruptedException ex) {
                 synchronized (this) {
                     if (navigationId != currentNavigation) {
                         return;
@@ -843,7 +900,13 @@ public final class TUIBrowser extends TUIElement {
 
             if (src != null && !src.isBlank()) {
                 try {
-                    URI imageUri = pageUri.resolve(src.trim()).normalize();
+                    String baseStr = pageUri.toString();
+                    // Si la ruta base no termina en barra y no es solo el dominio, añádesela
+                    if (!baseStr.endsWith("/") && baseStr.lastIndexOf('/') > 8) {
+                        baseStr += "/";
+                    }
+                    URI baseDirUri = URI.create(baseStr);
+                    URI imageUri = baseDirUri.resolve(src.trim()).normalize();
 
                     String scheme = imageUri.getScheme();
 

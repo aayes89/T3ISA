@@ -43,6 +43,7 @@ public class T3HtmlParser {
             "li", "p", "dt", "dd", "option", "tr", "td", "th"
     ));
 
+    // TODO - lógica de preservación de espacios <pre>
     private static final Set<String> WHITESPACE_PRESERVING_TAGS = new HashSet<>(Arrays.asList(
             "pre", "code", "textarea"
     ));
@@ -92,7 +93,7 @@ public class T3HtmlParser {
         if (content.startsWith("<![CDATA[", pos)) {
             return parseCDATA();
         }
-        if (content.startsWith("<!DOCTYPE", pos)) {
+        if (content.regionMatches(true, pos, "<!DOCTYPE", 0, 9)) {
             return parseDoctype();
         }
         if (content.startsWith("</", pos)) {
@@ -310,6 +311,8 @@ public class T3HtmlParser {
                 return "'";
             case "nbsp":
                 return "\u00A0";
+            case "times":
+                return "\u00D7";
             case "copy":
                 return "\u00A9";
             case "reg":
