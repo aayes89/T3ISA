@@ -30,6 +30,7 @@ package t3os.APPS.Browser;
  */
 import t3os.APPS.Browser.Images.T3HtmlImage;
 import java.awt.Color;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -59,6 +60,7 @@ public final class T3HtmlRenderer {
     private int scrollY;
     private int contentHeight;
     private boolean measuring;
+    private String baseUrl = "";
 
     public T3HtmlRenderer(TUI ui, int x, int y, int width, int height) {
         if (ui == null) {
@@ -79,27 +81,17 @@ public final class T3HtmlRenderer {
         cssRules.clear();
         collectCSSRules(root);
 
-        // Primera pasada: calcular la altura total sin dibujar.
         measuring = true;
         context.setCursorX(context.getX());
         context.setCursorY(context.getY());
+        context.setScrollY(0);
+
         renderNode(root, false, new T3Style());
 
-        contentHeight = Math.max(
-                context.getHeight(),
-                context.getCursorY() - context.getY() + LINE_HEIGHT
-        );
-
-        // Segunda pasada: limpiar el área visible antes de dibujar.
+        contentHeight = Math.max(context.getHeight(), context.getCursorY() - context.getY() + LINE_HEIGHT);
         measuring = false;
 
-        ui.fillRect(
-                context.getX(),
-                context.getY(),
-                context.getWidth(),
-                context.getHeight(),
-                0xFFFFFF
-        );
+        ui.fillRect(context.getX(), context.getY(), context.getWidth(), context.getHeight(), 0xFFFFFF);
 
         context.setCursorX(context.getX());
         context.setCursorY(context.getY() - scrollY);
@@ -634,7 +626,22 @@ public final class T3HtmlRenderer {
         String src = node.getAttributes().get("src");
         String alt = node.getAttributes().get("alt");
 
-        T3HtmlImage image = src == null ? null : images.get(src);
+        T3HtmlImage image = null;
+
+        if (src != null && !src.isBlank()) {
+            image = images.get(src);
+
+            if (image == null && baseUrl != null && !baseUrl.isBlank()) {
+                try {
+                    URI base = URI.create(baseUrl);
+                    String absoluteSrc = base.resolve(src.trim()).normalize().toString();
+
+                    image = images.get(absoluteSrc);
+                } catch (IllegalArgumentException ignored) {
+                    // URL inválida: se mostrará el marcador de imagen.
+                }
+            }
+        }
 
         int requestedWidth;
         int requestedHeight;
@@ -650,18 +657,26 @@ public final class T3HtmlRenderer {
         requestedWidth = Math.max(1, Math.min(requestedWidth, context.getWidth()));
         requestedHeight = Math.max(1, Math.min(requestedHeight, context.getHeight()));
 
-        if (!measuring && image != null && requestedWidth == image.getWidth() && requestedHeight == image.getHeight()) {
-            ui.drawImagePixels(imageX, imageY, image.getWidth(), image.getHeight(), image.getPixels());
+        if (measuring) {
+            context.setCursorX(imageX + requestedWidth + CHAR_WIDTH);
 
-        } else if (!measuring && image != null) {
-            // El escalado debe generar un array nuevo con las
-            // dimensiones solicitadas antes de dibujar la imagen.
-            int[] scaledPixels = scaleNearestNeighbor(image.getPixels(), image.getWidth(), image.getHeight(), requestedWidth, requestedHeight);
-            ui.drawImagePixels(imageX, imageY, requestedWidth, requestedHeight, scaledPixels);
+            if (context.getCursorX() + CHAR_WIDTH > context.getRight()) {
+                newLine();
+            }
+            return;
+        }
 
+        if (image != null) {
+            if (requestedWidth == image.getWidth() && requestedHeight == image.getHeight()) {
+                ui.drawImagePixels(imageX, imageY, image.getWidth(), image.getHeight(), image.getPixels());
+            } else {
+                int[] scaledPixels = scaleNearestNeighbor(image.getPixels(), image.getWidth(), image.getHeight(), requestedWidth, requestedHeight);
+                ui.drawImagePixels(imageX, imageY, requestedWidth, requestedHeight, scaledPixels);
+            }
         } else {
             drawRectClipped(imageX, imageY, requestedWidth, requestedHeight, 0x808080);
-            if (!measuring && alt != null && !alt.isEmpty()) {
+
+            if (alt != null && !alt.isEmpty()) {
                 drawTextClipped(alt, imageX + 2, imageY + 2, context.getColor());
             }
         }
@@ -707,6 +722,12 @@ public final class T3HtmlRenderer {
             images.remove(src);
         } else {
             images.put(src, image);
+        }
+    }
+
+    public void setBaseUrl(String url) {
+        if (url != null) {
+            baseUrl = url;
         }
     }
 }

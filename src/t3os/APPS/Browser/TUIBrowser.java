@@ -277,12 +277,10 @@ public final class TUIBrowser extends TUIElement {
 
         ui.fillRect(contentX, contentY, contentWidth, viewportHeight, COLOR_BACKGROUND);
 
-        // Si todavía no se ha recibido el documento, no hay nada que renderizar.
         if (document == null) {
             String message = "about:blank".equalsIgnoreCase(address) ? "Página en blanco" : "Descargando página...";
 
             ui.drawText(message, contentX + 8, contentY + 20, COLOR_TEXT);
-
             contentHeight = viewportHeight;
             scrollY = 0;
 
@@ -290,7 +288,6 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
-        // Crear o recrear el renderer si aún no existe o cambió el viewport.
         if (htmlRenderer == null
                 || rendererX != contentX
                 || rendererY != contentY
@@ -304,7 +301,6 @@ public final class TUIBrowser extends TUIElement {
             rendererWidth = contentWidth;
             rendererHeight = viewportHeight;
 
-            // Restaurar las imágenes descargadas antes de crear el renderer.
             synchronized (loadedImages) {
                 for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
                     htmlRenderer.setImage(entry.getKey(), entry.getValue());
@@ -312,19 +308,13 @@ public final class TUIBrowser extends TUIElement {
             }
         }
 
-        // Calcular primero la altura total de la página sin desplazamiento.
-        htmlRenderer.setScrollY(0);
+        htmlRenderer.setScrollY(scrollY);
         htmlRenderer.render(document);
 
         contentHeight = Math.max(viewportHeight, htmlRenderer.getContentHeight());
 
-        // Mantener el desplazamiento dentro de los límites.
         int maxScroll = Math.max(0, contentHeight - viewportHeight);
         scrollY = Math.max(0, Math.min(scrollY, maxScroll));
-
-        // Dibujar la página en su posición desplazada.
-        htmlRenderer.setScrollY(scrollY);
-        htmlRenderer.render(document);
 
         drawScrollbar(ui, contentX + contentWidth, contentY, SCROLLBAR_WIDTH, viewportHeight);
     }
@@ -669,22 +659,30 @@ public final class TUIBrowser extends TUIElement {
             target = "http://" + target;
         }
 
+        // Página en blanco explícita.
         if ("about:blank".equalsIgnoreCase(target)) {
             synchronized (this) {
                 ++navigationId;
+
                 synchronized (requestedImages) {
                     requestedImages.clear();
                 }
-                loadedImages.clear();
+
+                synchronized (loadedImages) {
+                    loadedImages.clear();
+                }
 
                 address = "about:blank";
                 addressCursor = address.length();
+
                 document = null;
                 htmlRenderer = null;
+
                 rendererX = Integer.MIN_VALUE;
                 rendererY = Integer.MIN_VALUE;
                 rendererWidth = -1;
                 rendererHeight = -1;
+
                 scrollY = 0;
                 contentHeight = 0;
                 pageTitle = "T3Browser";
@@ -694,12 +692,13 @@ public final class TUIBrowser extends TUIElement {
         }
 
         final URI uri;
+
         try {
             uri = URI.create(target);
 
-            if (uri.getHost() == null
-                    || (!"http".equalsIgnoreCase(uri.getScheme())
-                    && !"https".equalsIgnoreCase(uri.getScheme()))) {
+            String scheme = uri.getScheme();
+
+            if (uri.getHost() == null || scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
                 status = "URL no válida";
                 return;
             }
@@ -717,12 +716,25 @@ public final class TUIBrowser extends TUIElement {
             synchronized (requestedImages) {
                 requestedImages.clear();
             }
-            loadedImages.clear();
+
+            synchronized (loadedImages) {
+                loadedImages.clear();
+            }
 
             address = url;
             addressCursor = address.length();
             status = "Descargando página...";
             pageTitle = "T3Browser";
+
+            // Invalidar el renderer anterior sin perder la nueva navegación.
+            htmlRenderer = null;
+            rendererX = Integer.MIN_VALUE;
+            rendererY = Integer.MIN_VALUE;
+            rendererWidth = -1;
+            rendererHeight = -1;
+
+            scrollY = 0;
+            contentHeight = 0;
         }
 
         Thread downloader = new Thread(() -> {
@@ -741,6 +753,7 @@ public final class TUIBrowser extends TUIElement {
                 }
 
                 synchronized (this) {
+                    // Ignorar respuestas de navegaciones anteriores.
                     if (navigationId != currentNavigation) {
                         return;
                     }
@@ -759,6 +772,7 @@ public final class TUIBrowser extends TUIElement {
                     status = "Página cargada";
                 }
 
+                // Las imágenes se cargan después de aceptar el documento.
                 loadImages(parsedDocument, uri, currentNavigation);
 
             } catch (Exception ex) {
@@ -822,12 +836,18 @@ public final class TUIBrowser extends TUIElement {
 
                 T3HtmlImage image = T3HtmlImageDecoder.decode(data, imageUrl);
 
+                if (image == null) {
+                    throw new IOException("El decodificador devolvió null");
+                }
+
                 synchronized (this) {
                     if (navigationId != currentNavigation) {
                         return;
                     }
 
-                    loadedImages.put(imageUrl, image);
+                    synchronized (loadedImages) {
+                        loadedImages.put(imageUrl, image);
+                    }
 
                     if (htmlRenderer != null) {
                         htmlRenderer.setImage(imageUrl, image);
