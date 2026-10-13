@@ -28,20 +28,21 @@ package t3os.APPS.Browser;
  * @author Slam
  *
  */
+import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
-import java.util.Map;
 import t3os.APPS.Browser.CSS.T3CSSRule;
 import t3os.APPS.Browser.CSS.T3CSSUtils;
 import t3os.APPS.Browser.CSS.T3Style;
-
 import t3os.UI.TUI;
 
 /**
- * Port of HTMLRender from jWebView project Renderizador HTML básico para T3OS.
+ * Renderizador HTML básico para T3OS.
  *
- * No utiliza AWT, Swing, FontMetrics ni BufferedImage. Dibuja a través de las
- * primitivas gráficas de TUI.
+ * El dibujo se realiza mediante TUI. No utiliza Swing, Graphics, FontMetrics ni
+ * BufferedImage.
  */
 public final class T3HtmlRenderer {
 
@@ -50,8 +51,7 @@ public final class T3HtmlRenderer {
 
     private final TUI ui;
     private final T3RenderContext context;
-
-    private final java.util.List<T3CSSRule> cssRules = new java.util.ArrayList<>();
+    private final List<T3CSSRule> cssRules = new ArrayList<>();
 
     public T3HtmlRenderer(TUI ui, int x, int y, int width, int height) {
         if (ui == null) {
@@ -62,44 +62,6 @@ public final class T3HtmlRenderer {
         this.context = new T3RenderContext(x, y, width, height);
     }
 
-    private void collectCSSRules(T3HtmlNode node) {
-        if (node == null) {
-            return;
-        }
-
-        String tag = node.getTagName();
-
-        if ("style".equalsIgnoreCase(tag)) {
-            StringBuilder css = new StringBuilder();
-
-            // El parser que compartiste puede guardar el CSS
-            // directamente en node.text.
-            if (node.getText() != null) {
-                css.append(node.getText());
-            }
-
-            // También admitimos el caso en que esté en nodos de texto.
-            for (T3HtmlNode child : node.getChildren()) {
-                if (child.isTextNode() && child.getText() != null) {
-                    css.append('\n').append(child.getText());
-                }
-            }
-
-            if (!css.isEmpty()) {
-                cssRules.addAll(T3CSSUtils.parseT3Stylesheet(css.toString()));
-            }
-        }
-
-        for (T3HtmlNode child : node.getChildren()) {
-            collectCSSRules(child);
-        }
-    }
-
-    /**
-     * Renderiza un documento o un fragmento HTML.
-     *
-     * @param root
-     */
     public void render(T3HtmlNode root) {
         if (root == null) {
             return;
@@ -112,6 +74,40 @@ public final class T3HtmlRenderer {
         context.setCursorY(context.getY());
 
         renderNode(root, false, new T3Style());
+    }
+
+    /*
+     * Recopila las reglas antes de dibujar el documento.
+     */
+    private void collectCSSRules(T3HtmlNode node) {
+        if (node == null) {
+            return;
+        }
+
+        String tag = node.getTagName();
+
+        if ("style".equalsIgnoreCase(tag)) {
+            StringBuilder css = new StringBuilder();
+
+            String nodeText = node.getText();
+            if (nodeText != null && !nodeText.isEmpty()) {
+                css.append(nodeText);
+            } else {
+                for (T3HtmlNode child : node.getChildren()) {
+                    if (child.isTextNode() && child.getText() != null) {
+                        css.append(child.getText());
+                    }
+                }
+            }
+
+            if (!css.isEmpty()) {
+                cssRules.addAll(T3CSSUtils.parseT3Stylesheet(css.toString()));
+            }
+        }
+
+        for (T3HtmlNode child : node.getChildren()) {
+            collectCSSRules(child);
+        }
     }
 
     private void renderNode(T3HtmlNode node, boolean inline, T3Style inheritedStyle) {
@@ -132,7 +128,6 @@ public final class T3HtmlRenderer {
 
         tag = tag.toLowerCase(Locale.ROOT);
 
-        // Estos elementos no se muestran como contenido de página.
         if (tag.equals("head")
                 || tag.equals("script")
                 || tag.equals("style")
@@ -149,106 +144,101 @@ public final class T3HtmlRenderer {
         }
 
         if (tag.equals("hr")) {
-            int oldY = context.getCursorY();
-            ui.fillRect(context.getX(), oldY, context.getWidth(), 1, 0x808080);
-            context.advanceY(LINE_HEIGHT);
+            ui.fillRect(context.getX(), context.getCursorY(), context.getWidth(), 1, 0x808080);
+            newLine();
             return;
         }
 
-        boolean block = isBlockElement(tag);
+        /*
+         * El estilo se calcula antes de dibujar para
+         * incluir las reglas CSS, las clases y el estilo inline.
+         */
+        T3Style style = T3CSSUtils.computeT3Style(node, inheritedStyle, cssRules);
+
+        boolean block = isBlockElement(tag, style);
 
         if (block && !atLineStart()) {
             newLine();
         }
 
         int oldX = context.getCursorX();
-        int oldY = context.getCursorY();
 
-        int marginTop = 0;
-        int marginBottom = 0;
-        int padding = 0;
+        int marginTop = Math.max(0, style.getMarginTop());
+        int marginRight = Math.max(0, style.getMarginRight());
+        int marginBottom = Math.max(0, style.getMarginBottom());
+        int marginLeft = Math.max(0, style.getMarginLeft());
 
-        Map<String, String> attributes = node.getAttributes();
-        String inlineStyle = attributes.get("style");
-
-        if (inlineStyle != null) {
-            Map<String, String> styles = parseInlineStyle(inlineStyle);
-
-            marginTop = parsePixels(styles.get("margin-top"), 0);
-            marginBottom = parsePixels(styles.get("margin-bottom"), 0);
-            padding = parsePixels(styles.get("padding"), 0);
-
-            String margin = styles.get("margin");
-            if (margin != null) {
-                int[] values = parseMargin(margin);
-                marginTop = values[0];
-                marginBottom = values[2];
-            }
-        }
+        int paddingTop = style.getPaddingTop();
+        int paddingRight = style.getPaddingRight();
+        int paddingBottom = style.getPaddingBottom();
+        int paddingLeft = style.getPaddingLeft();
 
         if (block) {
             context.advanceY(marginTop);
-            oldY = context.getCursorY();
-            context.setCursorX(context.getX());
+            context.setCursorX(context.getX() + marginLeft);
+        } else {
+            context.advanceY(0);
         }
 
         int contentX = context.getCursorX();
         int contentY = context.getCursorY();
 
-        int background = -1;
-        int foreground = 0x000000;
-        boolean hasBorder = false;
+        int boxX = block ? context.getX() + marginLeft : contentX;
+        int boxWidth = resolveWidth(style.getWidth(), block ? context.getWidth() - marginLeft - marginRight : context.getRight() - contentX);
+        boxWidth = Math.max(0, Math.min(boxWidth, context.getRight() - boxX));
 
-        if (inlineStyle != null) {
-            Map<String, String> styles = parseInlineStyle(inlineStyle);
+        int boxHeight = resolveHeight(style.getHeight(), LINE_HEIGHT + paddingTop + paddingBottom);
 
-            background = parseColor(styles.get("background-color"), parseColor(styles.get("background"), -1));
-            foreground = parseColor(styles.get("color"), 0x000000);
+        /*
+         * Dibujo el fondo y el borde con el estilo computado.
+         * El renderizador actual no realiza un cálculo de layout previo;
+         * por eso el alto automático inicial es una línea.
+         */
+        Color backgroundColor = style.getBackgroundColor();
 
-            String border = styles.get("border");
-            hasBorder = border != null && !border.equalsIgnoreCase("none") && !border.equals("0");
+        if (backgroundColor != null && boxWidth > 0 && boxHeight > 0) {
+            ui.fillRect(boxX, contentY, boxWidth, boxHeight, toRGB(backgroundColor));
         }
 
-        int boxX = block ? context.getX() : contentX;
-        int boxWidth = block ? context.getWidth() : Math.max(CHAR_WIDTH, context.getRight() - contentX);
+        int borderWidth = style.getBorderWidth();
 
-        if (background >= 0) {
-            ui.fillRect(boxX, contentY, boxWidth, LINE_HEIGHT + padding * 2, background);
-        }
+        if (borderWidth > 0 && boxWidth > 0 && boxHeight > 0) {
+            int borderColor = toRGB(style.getBorderColor());
 
-        if (hasBorder) {
-            ui.drawRect(boxX, contentY, boxWidth, LINE_HEIGHT + padding * 2, 0x808080);
+            for (int i = 0; i < borderWidth; i++) {
+                int width = boxWidth - i * 2;
+                int height = boxHeight - i * 2;
+
+                if (width <= 0 || height <= 0) {
+                    break;
+                }
+
+                ui.drawRect(boxX + i, contentY + i, width, height, borderColor);
+            }
         }
 
         int savedColor = context.getColor();
 
-        T3Style computedStyle = T3CSSUtils.computeT3Style(node, inheritedStyle, cssRules);
-
-        if (computedStyle.getColor() != null) {
-            foreground = computedStyle.getColor().getRGB() & 0xFFFFFF;
+        if (style.getColor() != null) {
+            context.setColor(toRGB(style.getColor()));
         }
 
-        context.setColor(foreground);
-
-        if (padding > 0) {
-            context.setCursorX(contentX + padding);
-            context.setCursorY(contentY + padding);
-        }
+        context.setCursorX(contentX + paddingLeft);
+        context.setCursorY(contentY + paddingTop);
 
         if (tag.matches("h[1-6]")) {
             context.setColor(0x000080);
-            context.advanceY(2);
         }
 
         if (tag.equals("pre")) {
-            renderPreformatted(node);
+            renderPreformatted(node, style);
         } else if (tag.equals("ul") || tag.equals("ol")) {
-            renderList(node, tag.equals("ol"));
+            renderList(node, tag.equals("ol"), style);
         } else if (tag.equals("img")) {
             renderImagePlaceholder(node);
         } else {
             for (T3HtmlNode child : node.getChildren()) {
-                renderNode(child, !block, computedStyle);
+                renderNode(child, !block, style);
                 if (!hasVerticalSpace()) {
                     break;
                 }
@@ -262,21 +252,25 @@ public final class T3HtmlRenderer {
                 newLine();
             }
 
-            context.advanceY(marginBottom);
+            context.advanceY(paddingBottom + marginBottom);
             context.setCursorX(context.getX());
         } else {
             context.setCursorX(oldX);
         }
     }
 
+    /*
+     * Renderiza texto normal: colapsa espacios consecutivos y ajusta
+     * las palabras al ancho disponible.
+     */
     private void renderText(String text) {
         if (text == null || text.isEmpty()) {
             return;
         }
 
         String normalized = text.replace('\t', ' ');
-
-        // En texto normal se colapsan los espacios consecutivos.
+        normalized = normalized.replace('\r', ' ');
+        normalized = normalized.replace('\n', ' ');
         normalized = normalized.replaceAll("\\s+", " ");
 
         String[] words = normalized.split(" ");
@@ -286,16 +280,17 @@ public final class T3HtmlRenderer {
                 continue;
             }
 
-            int available = context.getRight()
-                    - context.getCursorX();
+            if (!hasVerticalSpace()) {
+                return;
+            }
 
+            int available = context.getRight() - context.getCursorX();
             int wordWidth = word.length() * CHAR_WIDTH;
 
             if (wordWidth > available && !atLineStart()) {
                 newLine();
             }
 
-            // Si una palabra supera todo el ancho, se corta.
             for (int i = 0; i < word.length(); i++) {
                 if (!hasVerticalSpace()) {
                     return;
@@ -306,70 +301,92 @@ public final class T3HtmlRenderer {
                 }
 
                 ui.drawText(String.valueOf(word.charAt(i)), context.getCursorX(), context.getCursorY(), context.getColor());
-
                 context.setCursorX(context.getCursorX() + CHAR_WIDTH);
             }
 
-            // Separación entre palabras.
             if (context.getCursorX() + CHAR_WIDTH <= context.getRight()) {
                 context.setCursorX(context.getCursorX() + CHAR_WIDTH);
             }
         }
     }
 
-    private void renderPreformatted(T3HtmlNode node) {
+    /*
+     * <pre> conserva espacios y saltos de línea.
+     */
+    private void renderPreformatted(T3HtmlNode node, T3Style inheritedStyle) {
         String text = node.getText();
 
         if (text != null && !text.isEmpty()) {
-            String[] lines = text.split("\\n", -1);
-
-            for (String line : lines) {
-                if (!hasVerticalSpace()) {
-                    return;
-                }
-
-                renderText(line);
-                newLine();
-            }
+            renderPreformattedText(text);
             return;
         }
 
         for (T3HtmlNode child : node.getChildren()) {
             if (child.isTextNode()) {
-                String[] lines = child.getText().split("\\n", -1);
-
-                for (String line : lines) {
-                    renderText(line);
-                    newLine();
-                }
+                renderPreformattedText(child.getText());
             } else {
-                T3Style computedStyle = T3CSSUtils.computeT3Style(node, new T3Style(), cssRules);
-                renderNode(child, false, computedStyle);
+                renderNode(child, false, inheritedStyle);
+            }
+
+            if (!hasVerticalSpace()) {
+                return;
             }
         }
     }
 
-    private void renderList(T3HtmlNode node, boolean ordered) {
-        int index = 1;
-        T3Style computedStyle = T3CSSUtils.computeT3Style(node, new T3Style(), cssRules);
+    private void renderPreformattedText(String text) {
+        if (text == null) {
+            return;
+        }
 
-        for (T3HtmlNode child : node.getChildren()) {
-            if (!"li".equalsIgnoreCase(child.getTagName())) {
+        String normalized = text.replace("\r\n", "\n").replace('\r', '\n').replace('\t', ' ');
 
-                renderNode(child, false, computedStyle);
+        for (int i = 0; i < normalized.length(); i++) {
+            if (!hasVerticalSpace()) {
+                return;
+            }
+
+            char c = normalized.charAt(i);
+
+            if (c == '\n') {
+                newLine();
                 continue;
             }
 
-            String marker = ordered
-                    ? index + ". "
-                    : "* ";
+            if (context.getCursorX() + CHAR_WIDTH > context.getRight()) {
+                newLine();
+            }
+
+            ui.drawText(String.valueOf(c), context.getCursorX(), context.getCursorY(), context.getColor());
+            context.setCursorX(context.getCursorX() + CHAR_WIDTH);
+        }
+    }
+
+    private void renderList(T3HtmlNode node, boolean ordered, T3Style inheritedStyle) {
+        int index = 1;
+
+        for (T3HtmlNode child : node.getChildren()) {
+            if (!"li".equalsIgnoreCase(child.getTagName())) {
+                renderNode(child, false, inheritedStyle);
+                continue;
+            }
+
+            if (!atLineStart()) {
+                newLine();
+            }
+
+            T3Style itemStyle = T3CSSUtils.computeT3Style(child, inheritedStyle, cssRules);
+            String marker = ordered ? index + ". " : "* ";
 
             context.setCursorX(context.getX() + CHAR_WIDTH);
-
             renderText(marker);
 
             for (T3HtmlNode itemChild : child.getChildren()) {
-                renderNode(itemChild, true, computedStyle);
+                renderNode(itemChild, true, itemStyle);
+
+                if (!hasVerticalSpace()) {
+                    return;
+                }
             }
 
             if (!atLineStart()) {
@@ -388,13 +405,8 @@ public final class T3HtmlRenderer {
             return;
         }
 
-        int width = parsePixels(
-                node.getAttributes().get("width"), 64
-        );
-
-        int height = parsePixels(
-                node.getAttributes().get("height"), 48
-        );
+        int width = parsePixels(node.getAttributes().get("width"), 64);
+        int height = parsePixels(node.getAttributes().get("height"), 48);
 
         width = Math.max(16, Math.min(width, context.getWidth()));
         height = Math.max(16, Math.min(height, context.getHeight()));
@@ -402,17 +414,32 @@ public final class T3HtmlRenderer {
         ui.drawRect(x, y, width, height, 0x808080);
 
         String alt = node.getAttributes().get("alt");
+
         if (alt != null && !alt.isEmpty()) {
             ui.drawText(alt, x + 2, y + 2, context.getColor());
         }
 
         context.setCursorX(x + width + CHAR_WIDTH);
+
         if (context.getCursorX() + CHAR_WIDTH > context.getRight()) {
             newLine();
         }
     }
 
-    private boolean isBlockElement(String tag) {
+    private boolean isBlockElement(String tag, T3Style style) {
+        String display = style.getDisplay();
+
+        if ("inline".equals(display) || "inline-block".equals(display)) {
+            return false;
+        }
+
+        /*
+         * El layout flex real requiere distribuir los hijos (no lo implemento aún)
+         */
+        if ("flex".equals(display)) {
+            return true;
+        }
+
         switch (tag) {
             case "document":
             case "html":
@@ -461,25 +488,42 @@ public final class T3HtmlRenderer {
         context.advanceY(LINE_HEIGHT);
     }
 
-    private Map<String, String> parseInlineStyle(String style) {
-        Map<String, String> result = new java.util.HashMap<>();
-
-        for (String declaration : style.split(";")) {
-            int colon = declaration.indexOf(':');
-
-            if (colon <= 0) {
-                continue;
-            }
-
-            String property = declaration.substring(0, colon).trim().toLowerCase(Locale.ROOT);
-            String value = declaration.substring(colon + 1).trim();
-
-            if (!property.isEmpty() && !value.isEmpty()) {
-                result.put(property, value);
-            }
+    private int resolveWidth(String value, int fallback) {
+        if (value == null || "auto".equals(value)) {
+            return fallback;
         }
 
-        return result;
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+
+        try {
+            if (normalized.endsWith("%")) {
+                int percent = Integer.parseInt(normalized.substring(0, normalized.length() - 1));
+                return Math.max(0, fallback * percent / 100);
+            }
+
+            return Math.max(0, parsePixels(normalized, fallback));
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private int resolveHeight(String value, int fallback) {
+        if (value == null || "auto".equals(value)) {
+            return fallback;
+        }
+
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+
+        try {
+            if (normalized.endsWith("%")) {
+                int percent = Integer.parseInt(normalized.substring(0, normalized.length() - 1));
+                return Math.max(0, context.getHeight() * percent / 100);
+            }
+
+            return Math.max(0, parsePixels(normalized, fallback));
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
     }
 
     private int parsePixels(String value, int fallback) {
@@ -492,7 +536,7 @@ public final class T3HtmlRenderer {
         try {
             if (cleaned.endsWith("px")) {
                 cleaned = cleaned.substring(0, cleaned.length() - 2).trim();
-            } else if (cleaned.endsWith("%") || cleaned.endsWith("em") || cleaned.endsWith("rem")) {
+            } else if (cleaned.endsWith("%") || cleaned.endsWith("em") || cleaned.endsWith("rem") || cleaned.equals("auto")) {
                 return fallback;
             }
 
@@ -502,82 +546,7 @@ public final class T3HtmlRenderer {
         }
     }
 
-    private int[] parseMargin(String value) {
-        String[] parts = value.trim().split("\\s+");
-        int[] result = {0, 0, 0, 0};
-
-        if (parts.length == 1) {
-            int v = parsePixels(parts[0], 0);
-            result[0] = result[1] = result[2] = result[3] = v;
-        } else if (parts.length == 2) {
-            result[0] = result[2] = parsePixels(parts[0], 0);
-            result[1] = result[3] = parsePixels(parts[1], 0);
-        } else if (parts.length == 3) {
-            result[0] = parsePixels(parts[0], 0);
-            result[1] = result[3] = parsePixels(parts[1], 0);
-            result[2] = parsePixels(parts[2], 0);
-        } else if (parts.length >= 4) {
-            for (int i = 0; i < 4; i++) {
-                result[i] = parsePixels(parts[i], 0);
-            }
-        }
-
-        return result;
-    }
-
-    private int parseColor(String value, int fallback) {
-        if (value == null) {
-            return fallback;
-        }
-
-        String color = value.trim().toLowerCase(Locale.ROOT);
-
-        switch (color) {
-            case "black":
-                return 0x000000;
-            case "white":
-                return 0xFFFFFF;
-            case "red":
-                return 0xFF0000;
-            case "green":
-                return 0x008000;
-            case "blue":
-                return 0x0000FF;
-            case "yellow":
-                return 0xFFFF00;
-            case "gray":
-            case "grey":
-                return 0x808080;
-            case "silver":
-                return 0xC0C0C0;
-            case "navy":
-                return 0x000080;
-            case "purple":
-                return 0x800080;
-            case "orange":
-                return 0xFFA500;
-            case "transparent":
-                return -1;
-            default:
-                break;
-        }
-
-        if (color.matches("#[0-9a-f]{3}")) {
-            int r = Character.digit(color.charAt(1), 16);
-            int g = Character.digit(color.charAt(2), 16);
-            int b = Character.digit(color.charAt(3), 16);
-
-            return (r * 17 << 16) | (g * 17 << 8) | (b * 17);
-        }
-
-        if (color.matches("#[0-9a-f]{6}")) {
-            try {
-                return Integer.parseInt(color.substring(1), 16);
-            } catch (NumberFormatException ex) {
-                return fallback;
-            }
-        }
-
-        return fallback;
+    private int toRGB(Color color) {
+        return color == null ? 0 : color.getRGB() & 0xFFFFFF;
     }
 }
