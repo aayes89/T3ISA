@@ -629,17 +629,20 @@ public final class T3HtmlRenderer {
         T3HtmlImage image = null;
 
         if (src != null && !src.isBlank()) {
-            image = images.get(src);
+            String imageUrl = src.trim();
 
-            if (image == null && baseUrl != null && !baseUrl.isBlank()) {
-                try {
-                    URI base = URI.create(baseUrl);
-                    String absoluteSrc = base.resolve(src.trim()).normalize().toString();
-
-                    image = images.get(absoluteSrc);
-                } catch (IllegalArgumentException ignored) {
-                    // URL inválida: se mostrará el marcador de imagen.
+            try {
+                if (baseUrl != null && !baseUrl.isBlank()) {
+                    imageUrl = URI.create(baseUrl).resolve(imageUrl).normalize().toString();
                 }
+
+                image = images.get(imageUrl);
+
+                if (image == null) {
+                    image = images.get(src.trim());
+                }
+            } catch (IllegalArgumentException ignored) {
+                image = images.get(src.trim());
             }
         }
 
@@ -671,6 +674,7 @@ public final class T3HtmlRenderer {
                 ui.drawImagePixels(imageX, imageY, image.getWidth(), image.getHeight(), image.getPixels());
             } else {
                 int[] scaledPixels = scaleNearestNeighbor(image.getPixels(), image.getWidth(), image.getHeight(), requestedWidth, requestedHeight);
+
                 ui.drawImagePixels(imageX, imageY, requestedWidth, requestedHeight, scaledPixels);
             }
         } else {

@@ -296,15 +296,15 @@ public final class TUIBrowser extends TUIElement {
 
             htmlRenderer = new T3HtmlRenderer(ui, contentX, contentY, contentWidth, viewportHeight);
 
+            htmlRenderer.setBaseUrl(address);
+
             rendererX = contentX;
             rendererY = contentY;
             rendererWidth = contentWidth;
             rendererHeight = viewportHeight;
 
-            synchronized (loadedImages) {
-                for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
-                    htmlRenderer.setImage(entry.getKey(), entry.getValue());
-                }
+            for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
+                htmlRenderer.setImage(entry.getKey(), entry.getValue());
             }
         }
 
@@ -728,6 +728,8 @@ public final class TUIBrowser extends TUIElement {
 
             // Invalidar el renderer anterior sin perder la nueva navegación.
             htmlRenderer = null;
+            address = url;
+            addressCursor = address.length();
             rendererX = Integer.MIN_VALUE;
             rendererY = Integer.MIN_VALUE;
             rendererWidth = -1;
@@ -844,15 +846,7 @@ public final class TUIBrowser extends TUIElement {
                     if (navigationId != currentNavigation) {
                         return;
                     }
-
-                    synchronized (loadedImages) {
-                        loadedImages.put(imageUrl, image);
-                    }
-
-                    if (htmlRenderer != null) {
-                        htmlRenderer.setImage(imageUrl, image);
-                    }
-
+                    loadedImages.put(imageUrl, image);
                     status = "Página cargada";
                 }
 
@@ -978,11 +972,6 @@ public final class TUIBrowser extends TUIElement {
         ui.drawRect(sx + 2, thumbY, sw - 4, thumbHeight, COLOR_SCROLL_BORDER);
     }
 
-    // Auxiliar para calcular contenido visible
-    private int contentHeightVisible() {
-        return Math.max(1, height - TITLE_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT - 3);
-    }
-
     public boolean hasAddressFocus() {
         return addressFocused;
     }
@@ -1002,5 +991,9 @@ public final class TUIBrowser extends TUIElement {
 
         this.address = address;
         this.addressCursor = address.length();
+
+        if (this.htmlRenderer != null) {
+            this.htmlRenderer.setBaseUrl(address);
+        }
     }
 }

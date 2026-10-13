@@ -29,6 +29,7 @@ package t3os.APPS.Browser;
  */
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -41,6 +42,9 @@ public class T3HtmlParser {
     private static final Set<String> SELF_CLOSING_TAGS = new HashSet<>(Arrays.asList(
             "area", "base", "br", "col", "embed", "hr", "img", "input",
             "link", "meta", "param", "source", "track", "wbr"
+    ));
+    private static final Set<String> AUTO_CLOSE_TAGS = new HashSet<>(Arrays.asList(
+            "li", "p", "dt", "dd", "option", "tr", "td", "th"
     ));
 
     private static final Set<String> WHITESPACE_PRESERVING_TAGS = new HashSet<>(Arrays.asList(
@@ -105,49 +109,129 @@ public class T3HtmlParser {
 
     private T3HtmlNode parseElement() {
         int startPos = pos;
-        pos++; // Skip '<'
-        String tagName = readTagName();
+        pos++;
+
+        String tagName = readTagName().toLowerCase(java.util.Locale.ROOT);
         if (tagName.isEmpty()) {
-            throw new ParseException("Invalid tag name at position " + startPos);
+            // Evitar bucles infinitos ante un '<' que no inicia una etiqueta.
+            pos = startPos + 1;
+            T3HtmlNode textNode = new T3HtmlNode("#text");
+            textNode.setText("<");
+            return textNode;
         }
 
         T3HtmlNode node = new T3HtmlNode(tagName);
         parseAttributes(node);
 
         if (pos >= contentLength) {
-            throw new ParseException("Unclosed tag: " + tagName + " at position " + startPos);
-        }
-
-        if (content.charAt(pos - 1) == '/' || isSelfClosing(node.getTagName())) {
-            skip('>');
             return node;
         }
 
+        boolean selfClosing = content.charAt(pos) == '/' || isSelfClosing(tagName);
+
+        if (content.charAt(pos) == '/') {
+            pos++;
+            skipWhitespace();
+        }
+
         skip('>');
-        // Special handling for script and style tags
-        if (node.getTagName().equals("script") || node.getTagName().equals("style")) {
+
+        if (selfClosing) {
+            return node;
+        }
+
+        if (tagName.equals("script") || tagName.equals("style")) {
             node.setText(readRawContentUntil("</" + tagName + ">"));
-            if (pos < contentLength && content.regionMatches(true, pos, "</" + tagName, 0, tagName.length() + 2)) {
+            if (pos < contentLength) {
                 skipTag();
             }
             return node;
         }
 
-        while (pos < contentLength && !content.regionMatches(true, pos, "</" + tagName, 0, tagName.length() + 2)) {
+        while (pos < contentLength) {
+            if (content.regionMatches(true, pos, "</", 0, 2)) {
+                int closeStart = pos;
+                pos += 2;
+                String closeName = readTagName().toLowerCase(Locale.ROOT);
+                skipTag();
+
+                if (closeName.equals(tagName)) {
+                    return node;
+                }
+
+                // Un cierre de otro elemento no debe consumir el resto del documento.
+                if (AUTO_CLOSE_TAGS.contains(tagName)) {
+                    pos = closeStart;
+                    return node;
+                }
+
+                continue;
+            }
+
+            if (content.charAt(pos) == '<' && AUTO_CLOSE_TAGS.contains(tagName) && startsAutoCloseTag(tagName, pos)) {
+                return node;
+            }
+
             T3HtmlNode child = parseNode();
             if (child != null) {
                 node.addChild(child);
             }
         }
 
-        if (pos >= contentLength) {
-            throw new ParseException("Unclosed tag: " + tagName + " at position " + startPos);
+        // HTML tolerante: acepta elementos que no tienen etiqueta de cierre.
+        return node;
+    }
+
+    private boolean startsAutoCloseTag(String currentTag, int at) {
+        if (content.charAt(at) != '<' || at + 1 >= contentLength) {
+            return false;
         }
 
-        if (content.regionMatches(true, pos, "</" + tagName, 0, tagName.length() + 2)) {
-            skipTag();
+        int nameStart = at + 1;
+        if (content.charAt(nameStart) == '/') {
+            return false;
         }
-        return node;
+
+        int end = nameStart;
+        while (end < contentLength && (Character.isLetterOrDigit(content.charAt(end)) || content.charAt(end) == '-' || content.charAt(end) == ':')) {
+            end++;
+        }
+
+        if (end == nameStart) {
+            return false;
+        }
+
+        String nextTag = content.substring(nameStart, end).toLowerCase(java.util.Locale.ROOT);
+
+        if (currentTag.equals("li")) {
+            return nextTag.equals("li");
+        }
+        if (currentTag.equals("p")) {
+            return nextTag.equals("p") || isBlockTag(nextTag);
+        }
+        if (currentTag.equals("dt") || currentTag.equals("dd")) {
+            return nextTag.equals("dt") || nextTag.equals("dd");
+        }
+        if (currentTag.equals("option")) {
+            return nextTag.equals("option") || nextTag.equals("optgroup");
+        }
+        if (currentTag.equals("tr")) {
+            return nextTag.equals("tr");
+        }
+        if (currentTag.equals("td") || currentTag.equals("th")) {
+            return nextTag.equals("td") || nextTag.equals("th") || nextTag.equals("tr");
+        }
+
+        return false;
+    }
+
+    private boolean isBlockTag(String tag) {
+        return new HashSet<>(Arrays.asList(
+                "address", "article", "aside", "blockquote", "div", "dl",
+                "fieldset", "footer", "form", "h1", "h2", "h3", "h4",
+                "h5", "h6", "header", "hr", "main", "nav", "ol",
+                "p", "pre", "section", "table", "ul"
+        )).contains(tag);
     }
 
     private T3HtmlNode parseTextNode() {
@@ -364,26 +448,38 @@ public class T3HtmlParser {
     private void parseAttributes(T3HtmlNode node) {
         while (pos < contentLength && content.charAt(pos) != '>' && content.charAt(pos) != '/') {
             skipWhitespace();
+
             if (pos >= contentLength || content.charAt(pos) == '>' || content.charAt(pos) == '/') {
                 break;
             }
+
+            int oldPos = pos;
             String key = readAttributeName();
-            String value = "";
+
+            if (key.isEmpty()) {
+                pos++;
+                continue;
+            }
+
             skipWhitespace();
+            String value = "";
+
             if (pos < contentLength && content.charAt(pos) == '=') {
-                skip('=');
+                pos++;
                 value = readAttributeValue();
             }
-            node.attributes.put(key.toLowerCase(), value);
+
+            node.attributes.put(key.toLowerCase(java.util.Locale.ROOT), value);
+
+            if (pos <= oldPos) {
+                pos = oldPos + 1;
+            }
         }
     }
 
     private String readAttributeName() {
         int start = pos;
-        while (pos < contentLength
-                && (Character.isLetterOrDigit(content.charAt(pos))
-                || content.charAt(pos) == '-'
-                || content.charAt(pos) == ':')) {
+        while (pos < contentLength && (Character.isLetterOrDigit(content.charAt(pos)) || content.charAt(pos) == '-' || content.charAt(pos) == ':')) {
             pos++;
         }
         return content.substring(start, pos);
