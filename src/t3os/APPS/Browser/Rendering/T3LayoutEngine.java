@@ -50,7 +50,7 @@ public class T3LayoutEngine {
     private final URI baseUrl;
     private int contentHeight = 0;
 
-    // ACTUALIZADO: Añadido baseUrl al constructor para resolver URLs relativas
+    // Constructor
     public T3LayoutEngine(int viewportWidth, int viewportHeight, List<T3CSSRule> cssRules, Map<String, T3HtmlImage> loadedImages, URI baseUrl) {
         this.viewportWidth = viewportWidth;
         this.viewportHeight = viewportHeight;
@@ -80,7 +80,7 @@ public class T3LayoutEngine {
 
         T3Style style = T3CSSUtils.computeT3Style(node, inheritedStyle != null ? inheritedStyle : new T3Style(), cssRules);
 
-        // NUEVO: Traducir atributos HTML de los 90s a reglas CSS
+        // Traducir atributos HTML de los 90s a reglas CSS
         mapLegacyAttributes(tag, node, style);
 
         T3LayoutBox box = new T3LayoutBox(node, style);
@@ -122,7 +122,7 @@ public class T3LayoutEngine {
             return box;
         }
 
-        // ACTUALIZADO: Búsqueda precisa de imágenes resolviendo la URL
+        // Búsqueda precisa de imágenes resolviendo la URL
         if (tag.equals("img")) {
             String src = node.getAttributes().get("src");
             if (src != null && baseUrl != null) {
@@ -176,6 +176,28 @@ public class T3LayoutEngine {
 
             if (childBox != null) {
                 box.addChild(childBox);
+
+                // Evaluar Tablas
+                if ("table".equals(tag)) {
+                    T3TableLayout.apply(box, box.width);
+                    maxChildBottom = box.y;
+                    for (T3LayoutBox c : box.children) {
+                        maxChildBottom = Math.max(maxChildBottom, c.y + c.height + Math.max(0, c.style.getMarginBottom()));
+                    }
+                    box.height = resolveHeight(style.getHeight(), maxChildBottom - box.y) + paddingBottom;
+                }
+
+                // Asignar tamaño mínimo a los Inputs si no tienen por CSS
+                if ("input".equals(tag)) {
+                    if (box.width == 0) {
+                        box.width = 150; // Ancho por defecto
+                    }
+                    if (box.height == 0) {
+                        box.height = 24; // Alto por defecto
+                    }
+                    box.style.setBorderWidth(1); // Forzar borde para que se vea
+                    box.style.setBackgroundColor(java.awt.Color.WHITE); // Fondo blanco
+                }
 
                 if (!isFlex) {
                     boolean childIsBlock = isBlockElement(childNode.getTagName(), childBox.style) || "block".equals(childBox.style.getDisplay());
@@ -247,7 +269,7 @@ public class T3LayoutEngine {
         return box;
     }
 
-    // NUEVO MÉTIDO: Soporte para atributos de HTML de 1996
+    // Soporte para atributos de HTML de 1996 (para mi ejemplo de spacejam.com/1996)
     private void mapLegacyAttributes(String tag, T3HtmlNode node, T3Style style) {
         Map<String, String> attrs = node.getAttributes();
 

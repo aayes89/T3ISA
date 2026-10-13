@@ -89,6 +89,20 @@ public class T3Painter {
                     }
                 }
             }
+            // Dibujar el texto de los Inputs
+            if ("input".equals(box.node.getTagName())) {
+                String val = box.node.getAttributes().getOrDefault("value", "");
+                String type = box.node.getAttributes().getOrDefault("type", "text");
+                int textColor = context.getColor(); // Negro por defecto
+
+                // Si es un botón, centrar el texto aproximadamente
+                if ("submit".equals(type) || "button".equals(type)) {
+                    int txtX = screenX + (box.width - (val.length() * CHAR_WIDTH)) / 2;
+                    drawTextClipped(val, Math.max(screenX + 2, txtX), screenY + 4, textColor);
+                } else {
+                    drawTextClipped(val, screenX + 4, screenY + 4, textColor);
+                }
+            }
 
             if (box.image != null) {
                 drawImageClipped(box, screenX, screenY);

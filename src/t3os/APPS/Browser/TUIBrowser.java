@@ -121,6 +121,7 @@ public final class TUIBrowser extends TUIElement {
     private final Set<String> requestedImages = new HashSet<>();
     private final Map<String, T3HtmlImage> loadedImages = new ConcurrentHashMap<>();
     private final List<String> history = new ArrayList<>();
+    private T3HtmlNode focusedInputNode = null;
     private int historyIndex = -1;
     private boolean isHistoryNavigation = false;
     private T3LayoutBox currentRenderTree;
@@ -456,23 +457,39 @@ public final class TUIBrowser extends TUIElement {
                     int docX = localX - contentX;
                     int docY = localY - contentTop + scrollY;
 
-                    t3os.APPS.Browser.Rendering.T3LayoutBox clickedBox = findBoxAt(currentRenderTree, docX, docY);
+                    T3LayoutBox clickedBox = findBoxAt(currentRenderTree, docX, docY);
 
                     if (clickedBox != null && clickedBox.node != null) {
-                        String href = getHrefFromNode(clickedBox.node);
+                        String tag = clickedBox.node.getTagName();
+                        String type = clickedBox.node.getAttributes().getOrDefault("type", "").toLowerCase();
 
+                        // Si hicimos clic en una caja de texto, capturar el Foco
+                        if ("input".equals(tag) && ("text".equals(type) || type.isEmpty() || "search".equals(type))) {
+                            focusedInputNode = clickedBox.node;
+                            return; // Termina aquí para empezar a escribir
+                        } else {
+                            focusedInputNode = null; // Pierde el foco
+                        }
+
+                        // Si hicimos clic en un Submit, enviar formulario
+                        if (("input".equals(tag) && "submit".equals(type)) || "button".equals(tag)) {
+                            submitForm(clickedBox.node);
+                            return;
+                        }
+
+                        // Manejo normal de enlaces (href)
+                        String href = getHrefFromNode(clickedBox.node);
                         if (href != null && !href.isBlank()) {
                             try {
                                 URI currentUri = URI.create(address);
                                 URI targetUri = currentUri.resolve(href.trim()).normalize();
-
                                 setAddress(targetUri.toString());
                                 navigate();
-
                             } catch (IllegalArgumentException ex) {
-                                System.err.println("URL de enlace inválida: " + href);
                             }
                         }
+                    } else {
+                        focusedInputNode = null;
                     }
                 }
                 return;
@@ -622,12 +639,31 @@ public final class TUIBrowser extends TUIElement {
     }
 
     public void keyPressed(TKeyboardDevice.Key key) {
-        if (key == null || !visible || !enabled || !addressFocused) {
+        if (key == null || !visible || !enabled) {
             return;
         }
 
         int code = key.getCode();
         char ch = key.getCharacter();
+
+        // Interceptar el input web ANTES del switch y del return
+        if (focusedInputNode != null) {
+            String currentVal = focusedInputNode.getAttributes().getOrDefault("value", "");
+
+            if (code == KeyEvent.VK_BACK_SPACE && currentVal.length() > 0) {
+                focusedInputNode.getAttributes().put("value", currentVal.substring(0, currentVal.length() - 1));
+            } else if (code == KeyEvent.VK_ENTER) {
+                submitForm(focusedInputNode);
+            } else if (!Character.isISOControl(ch)) {
+                focusedInputNode.getAttributes().put("value", currentVal + ch);
+            }
+            return; // Detener ejecución para no escribir en la barra de URL
+        }
+
+        // Si no estamos en un input web ni en la barra de direcciones, ignorar
+        if (!addressFocused) {
+            return;
+        }
 
         switch (code) {
             case KeyEvent.VK_ENTER:
@@ -695,6 +731,54 @@ public final class TUIBrowser extends TUIElement {
         }
 
         insertAddressCharacter(ch);
+    }
+
+    private void submitForm(T3HtmlNode sourceNode) {
+        // Buscar el <form> padre
+        T3HtmlNode form = sourceNode;
+        while (form != null && !"form".equalsIgnoreCase(form.getTagName())) {
+            form = form.getParent();
+        }
+        if (form == null) {
+            return;
+        }
+
+        // Recolectar datos de los inputs
+        StringBuilder query = new StringBuilder();
+        collectFormData(form, query);
+
+        // Construir la URL y navegar (Simulando método GET)
+        String action = form.getAttributes().getOrDefault("action", "");
+        try {
+            URI currentUri = URI.create(address);
+            String targetUrl = currentUri.resolve(action).normalize().toString();
+
+            if (query.length() > 0) {
+                targetUrl += (targetUrl.contains("?") ? "&" : "?") + query.toString();
+            }
+
+            setAddress(targetUrl);
+            navigate();
+        } catch (Exception ex) {
+            System.err.println("Error al procesar formulario: " + ex.getMessage());
+        }
+    }
+
+    private void collectFormData(T3HtmlNode node, StringBuilder query) {
+        if ("input".equalsIgnoreCase(node.getTagName())) {
+            String name = node.getAttributes().get("name");
+            String value = node.getAttributes().getOrDefault("value", "");
+            if (name != null && !name.isEmpty()) {
+                if (query.length() > 0) {
+                    query.append("&");
+                }
+                // Codificación básica URL
+                query.append(name).append("=").append(value.replace(" ", "+"));
+            }
+        }
+        for (T3HtmlNode child : node.getChildren()) {
+            collectFormData(child, query);
+        }
     }
 
     private void insertAddressCharacter(char ch) {
