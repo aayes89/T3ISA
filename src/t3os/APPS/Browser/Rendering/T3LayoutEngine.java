@@ -71,7 +71,6 @@ public class T3LayoutEngine {
 
         String tag = node.getTagName() != null ? node.getTagName().toLowerCase(Locale.ROOT) : "";
 
-        // Si es un doctype, comentario, CDATA o una etiqueta no visual de la cabecera, lo ignoro
         if (node.isDoctypeNode() || node.isCommentNode() || node.isCDataNode()
                 || tag.equals("head") || tag.equals("script") || tag.equals("style")
                 || tag.equals("meta") || tag.equals("link") || tag.equals("title")) {
@@ -79,8 +78,6 @@ public class T3LayoutEngine {
         }
 
         T3Style style = T3CSSUtils.computeT3Style(node, inheritedStyle != null ? inheritedStyle : new T3Style(), cssRules);
-
-        // Traducir atributos HTML de los 90s a reglas CSS
         mapLegacyAttributes(tag, node, style);
 
         T3LayoutBox box = new T3LayoutBox(node, style);
@@ -122,7 +119,6 @@ public class T3LayoutEngine {
             return box;
         }
 
-        // Búsqueda precisa de imágenes resolviendo la URL
         if (tag.equals("img")) {
             String src = node.getAttributes().get("src");
             if (src != null && baseUrl != null) {
@@ -177,28 +173,6 @@ public class T3LayoutEngine {
             if (childBox != null) {
                 box.addChild(childBox);
 
-                // Evaluar Tablas
-                if ("table".equals(tag)) {
-                    T3TableLayout.apply(box, box.width);
-                    maxChildBottom = box.y;
-                    for (T3LayoutBox c : box.children) {
-                        maxChildBottom = Math.max(maxChildBottom, c.y + c.height + Math.max(0, c.style.getMarginBottom()));
-                    }
-                    box.height = resolveHeight(style.getHeight(), maxChildBottom - box.y) + paddingBottom;
-                }
-
-                // Asignar tamaño mínimo a los Inputs si no tienen por CSS
-                if ("input".equals(tag)) {
-                    if (box.width == 0) {
-                        box.width = 150; // Ancho por defecto
-                    }
-                    if (box.height == 0) {
-                        box.height = 24; // Alto por defecto
-                    }
-                    box.style.setBorderWidth(1); // Forzar borde para que se vea
-                    box.style.setBackgroundColor(java.awt.Color.WHITE); // Fondo blanco
-                }
-
                 if (!isFlex) {
                     boolean childIsBlock = isBlockElement(childNode.getTagName(), childBox.style) || "block".equals(childBox.style.getDisplay());
 
@@ -210,7 +184,6 @@ public class T3LayoutEngine {
                             childBox.shift(childX - childBox.x, childY - childBox.y);
                         }
 
-                        // Centrado legacy con margin: auto
                         if ("center".equals(childBox.style.getTextAlign()) || "center".equals(childNode.getTagName())) {
                             int shiftX = (childAvailableWidth - childBox.width) / 2;
                             if (shiftX > 0) {
@@ -251,6 +224,27 @@ public class T3LayoutEngine {
         int calculatedWidth = isBlock ? childAvailableWidth : (maxChildRight - box.x - paddingLeft);
         box.width = resolveWidth(style.getWidth(), calculatedWidth) + paddingLeft + paddingRight;
         box.height = resolveHeight(style.getHeight(), maxChildBottom - box.y) + paddingBottom;
+
+        // La evaluación de Tablas e Inputs va fuera del ciclo for
+        if ("table".equals(tag)) {
+            T3TableLayout.apply(box, box.width);
+            maxChildBottom = box.y;
+            for (T3LayoutBox c : box.children) {
+                maxChildBottom = Math.max(maxChildBottom, c.y + c.height + Math.max(0, c.style.getMarginBottom()));
+            }
+            box.height = resolveHeight(style.getHeight(), maxChildBottom - box.y) + paddingBottom;
+        }
+
+        if ("input".equals(tag)) {
+            if (box.width == 0) {
+                box.width = 150;
+            }
+            if (box.height == 0) {
+                box.height = 24;
+            }
+            box.style.setBorderWidth(1);
+            box.style.setBackgroundColor(java.awt.Color.WHITE);
+        }
 
         if (isFlex) {
             T3FlexLayout.apply(box, box.width);
