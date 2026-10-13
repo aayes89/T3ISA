@@ -146,6 +146,24 @@ public final class THostNetwork {
         }
     }
 
+    public static byte[] wgetBytes(String url) throws Exception {
+        HttpClient client = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL).build();
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(java.net.URI.create(url))
+                .GET()
+                .build();
+
+        HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new java.io.IOException("Error HTTP: " + response.statusCode());
+        }
+
+        return response.body();
+    }
+
     public static String wget(String url) throws IOException, InterruptedException {
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)

@@ -333,6 +333,19 @@ public class TUI {
         machine.graphics(3, cx, cy, i, i0, color, 0, new int[]{0});
     }
 
+    // Auxiliar para dibujar una imagen directamente en el framebuffer
+    public void drawImagePixels(int x, int y, int width, int height, int[] pixels) {
+        if (pixels == null || width <= 0 || height <= 0) {
+            return;
+        }
+
+        if ((long) width * height > pixels.length) {
+            return;
+        }
+
+        machine.graphics(9, x, y, width, height, 0, 0, pixels);
+    }
+
     // GETTERS y SETTERS
     // Establecer un Menu Popup
     public void setPopupMenu(TUIPopupMenu popupMenu) {
