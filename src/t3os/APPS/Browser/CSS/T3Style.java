@@ -335,15 +335,31 @@ public class T3Style {
     }
 
     public void setWidth(String width) {
-        this.width = width != null && (width.matches("\\d+(px|%)") || width.equals("auto")) ? width : null;
+        this.width = normalizeDimension(width);
+    }
+
+    public void setHeight(String height) {
+        this.height = normalizeDimension(height);
+    }
+
+    private static String normalizeDimension(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        value = value.trim().toLowerCase(java.util.Locale.ROOT);
+
+        if (value.equals("auto")
+                || value.matches("\\d+(\\.\\d+)?(px|%)")
+                || value.matches("\\d+(\\.\\d+)?rem")) {
+            return value;
+        }
+
+        return null;
     }
 
     public String getHeight() {
         return height;
-    }
-
-    public void setHeight(String height) {
-        this.height = height != null && (height.matches("\\d+(px|%)") || height.equals("auto")) ? height : null;
     }
 
     public String getPosition() {

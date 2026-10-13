@@ -172,6 +172,9 @@ public final class TUIBrowser extends TUIElement {
         }
 
         addressCursor = address.length();
+        this.document = new T3HtmlParser(html).parse();
+        this.status = "Página de inicio";
+        this.htmlRenderer = null;
     }
 
     @Override
@@ -675,8 +678,9 @@ public final class TUIBrowser extends TUIElement {
                 address = "about:blank";
                 addressCursor = address.length();
 
-                document = null;
+                document = new T3HtmlParser(html).parse();
                 htmlRenderer = null;
+                status = "Página de inicio";
 
                 rendererX = Integer.MIN_VALUE;
                 rendererY = Integer.MIN_VALUE;
@@ -721,8 +725,6 @@ public final class TUIBrowser extends TUIElement {
                 loadedImages.clear();
             }
 
-            address = url;
-            addressCursor = address.length();
             status = "Descargando página...";
             pageTitle = "T3Browser";
 
@@ -744,14 +746,19 @@ public final class TUIBrowser extends TUIElement {
                 String html = THostNetwork.wget(url);
 
                 if (html == null || html.isBlank()) {
-                    throw new IOException("La página no contiene HTML");
+                    throw new IOException("Respuesta HTTP vacía");
                 }
 
-                T3HtmlParser parser = new T3HtmlParser(html);
-                T3HtmlNode parsedDocument = parser.parse();
+                T3HtmlNode parsedDocument;
 
-                if (parsedDocument == null) {
-                    throw new IOException("No se pudo interpretar el HTML");
+                try {
+                    parsedDocument = new T3HtmlParser(html).parse();
+                } catch (RuntimeException ex) {
+                    throw new IOException("Error al interpretar HTML: " + ex.getMessage(), ex);
+                }
+
+                if (parsedDocument == null || parsedDocument.getChildren().isEmpty()) {
+                    throw new IOException("El documento HTML no contiene nodos");
                 }
 
                 synchronized (this) {
@@ -778,12 +785,16 @@ public final class TUIBrowser extends TUIElement {
                 loadImages(parsedDocument, uri, currentNavigation);
 
             } catch (Exception ex) {
+                ex.printStackTrace();
+
                 synchronized (this) {
                     if (navigationId != currentNavigation) {
                         return;
                     }
 
-                    status = "Error al cargar: " + ex.getMessage();
+                    String message = ex.getMessage();
+                    status = "Error al cargar: "
+                            + (message == null ? ex.getClass().getSimpleName() : message);
                 }
             }
         }, "T3Browser-Wget");

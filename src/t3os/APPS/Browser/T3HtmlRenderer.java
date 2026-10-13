@@ -184,8 +184,6 @@ public final class T3HtmlRenderer {
             newLine();
         }
 
-        int oldX = context.getCursorX();
-
         int marginTop = Math.max(0, style.getMarginTop());
         int marginRight = Math.max(0, style.getMarginRight());
         int marginBottom = Math.max(0, style.getMarginBottom());
@@ -278,8 +276,6 @@ public final class T3HtmlRenderer {
 
             context.advanceY(paddingBottom + marginBottom);
             context.setCursorX(context.getX());
-        } else {
-            context.setCursorX(oldX);
         }
     }
 
@@ -296,7 +292,7 @@ public final class T3HtmlRenderer {
         normalized = normalized.replace('\n', ' ');
         normalized = normalized.replaceAll("\\s+", " ");
 
-        String[] words = normalized.split(" ");
+        String[] words = normalized.split(" ", -1);
 
         for (String word : words) {
             if (word.isEmpty()) {

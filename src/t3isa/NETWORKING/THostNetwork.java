@@ -146,35 +146,37 @@ public final class THostNetwork {
         }
     }
 
-    public static byte[] wgetBytes(String url) throws Exception {
+    public static byte[] wgetBytes(String url) throws IOException, InterruptedException {
+
         HttpClient client = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL).build();
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(java.time.Duration.ofSeconds(15))
+                .build();
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(java.net.URI.create(url))
+                .uri(URI.create(url))
+                .timeout(java.time.Duration.ofSeconds(30))
+                .header("User-Agent", "T3OS-Browser/1.0")
                 .GET()
                 .build();
 
         HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
 
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new java.io.IOException("Error HTTP: " + response.statusCode());
+            throw new IOException("Error HTTP: " + response.statusCode()
+                    + " al solicitar " + url);
         }
 
         return response.body();
     }
 
-    public static String wget(String url) throws IOException, InterruptedException {
-        HttpClient client = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+    public static String wget(String url)
+            throws IOException, InterruptedException {
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET()
-                .build();
+        byte[] data = wgetBytes(url);
 
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        return response.body();
+        // Decodificación inicial UTF-8 para HTML.
+        // Más adelante se puede detectar el charset declarado por la página.
+        return new String(data, java.nio.charset.StandardCharsets.UTF_8);
     }
 }

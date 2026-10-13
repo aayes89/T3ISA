@@ -70,12 +70,19 @@ public class T3CSSUtils {
             if (declaration.isEmpty()) {
                 continue;
             }
-            String[] parts = declaration.split(":");
-            if (parts.length != 2) {
-                LOGGER.warning("Declaración CSS inválida: " + declaration);
+            int colon = declaration.indexOf(':');
+
+            if (colon <= 0) {
+                LOGGER.fine("Declaración CSS inválida: " + declaration);
                 continue;
             }
-            applyDeclaration(style, parts[0].trim().toLowerCase(), parts[1].trim());
+
+            String property = declaration.substring(0, colon)
+                    .trim().toLowerCase(Locale.ROOT);
+
+            String value = declaration.substring(colon + 1).trim();
+
+            applyDeclaration(style, property, value);
         }
         return style;
     }
@@ -417,9 +424,15 @@ public class T3CSSUtils {
                 style.setTextDecoration(value);
                 break;
 
-            case "background":
             case "background-color":
                 style.setBackgroundColor(parseColor(value));
+                break;
+
+            case "background":
+                Color background = extractBackgroundColor(value);
+                if (background != null) {
+                    style.setBackgroundColor(background);
+                }
                 break;
 
             case "display":
@@ -566,9 +579,7 @@ public class T3CSSUtils {
             }
 
             if (value.matches("#[0-9a-f]{6}")) {
-                return new Color(
-                        Integer.parseInt(value.substring(1), 16)
-                );
+                return new Color(Integer.parseInt(value.substring(1), 16));
             }
 
             if (value.matches("#[0-9a-f]{8}")) {
@@ -604,6 +615,9 @@ public class T3CSSUtils {
                             clamp((int) (Float.parseFloat(rgba[3].trim()) * 255), 0, 255)
                     );
                 }
+            }
+            if (value.matches("[0-9a-f]{6}")) {
+                return new Color(Integer.parseInt(value, 16));
             }
             return switch (value) {
                 case "red" ->
@@ -689,25 +703,40 @@ public class T3CSSUtils {
     }
 
     /**
-     * Parsea el peso de la fuente.
+     * Parsea el peso de fuente CSS.
      *
-     * @param value Valor del peso (bold, normal, 100-900)
-     * @return Valor de Font (BOLD, PLAIN)
+     * @param value normal, bold, bolder, lighter o 100-900
+     * @return Peso CSS normalizado entre 100 y 900
      */
     private static int parseFontWeight(String value) {
-        value = value.trim().toLowerCase();
+        if (value == null) {
+            return -1;
+        }
+
+        value = value.trim().toLowerCase(Locale.ROOT);
+
         return switch (value) {
-            case "bold", "700", "800", "900" ->
-                Font.BOLD;
-            case "normal", "400", "500", "600" ->
-                Font.PLAIN;
+            case "normal" ->
+                400;
+            case "bold" ->
+                700;
+            case "bolder" ->
+                700;
+            case "lighter" ->
+                300;
             default -> {
                 try {
                     int weight = Integer.parseInt(value);
-                    yield weight >= 700 ? Font.BOLD : Font.PLAIN;
+
+                    if (weight >= 100 && weight <= 900 && weight % 100 == 0) {
+                        yield weight;
+                    }
+
+                    LOGGER.fine("Peso de fuente CSS no válido: " + value);
+                    yield -1;
                 } catch (NumberFormatException e) {
-                    LOGGER.warning("Peso de fuente no válido: " + value + "; usando PLAIN");
-                    yield Font.PLAIN;
+                    LOGGER.fine("Peso de fuente CSS no compatible: " + value);
+                    yield -1;
                 }
             }
         };
@@ -885,4 +914,32 @@ public class T3CSSUtils {
         }
     }
 
+    // Auxiliar para extraer color de fondo
+    private static Color extractBackgroundColor(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+
+        // Una imagen de fondo no es un color.
+        if (normalized.contains("url(")) {
+            return null;
+        }
+
+        // Busca un color hexadecimal dentro del shorthand.
+        Matcher matcher = Pattern.compile("(?i)(#[0-9a-f]{3,8})\\b").matcher(normalized);
+
+        if (matcher.find()) {
+            return parseColor(matcher.group(1));
+        }
+
+        // No enviar posiciones, repeticiones ni otros valores a parseColor.
+        if (normalized.matches("(transparent|#[0-9a-f]{3}|#[0-9a-f]{6}|#[0-9a-f]{8}"
+                + "|red|blue|green|black|white|yellow|gray|grey|orange|purple)")) {
+            return parseColor(normalized);
+        }
+
+        return null;
+    }
 }
