@@ -64,14 +64,13 @@ public class T3Painter {
             return;
         }
 
-        // Dibujar múltiples líneas
         if (box.isText && box.textLines != null && !box.textLines.isEmpty()) {
             int color = box.style.getColor() != null ? toRGB(box.style.getColor()) : context.getColor();
             int lineY = screenY;
 
             for (String line : box.textLines) {
                 drawTextClipped(line, screenX, lineY, color);
-                lineY += 16; // Avanzar LINE_HEIGHT píxeles hacia abajo
+                lineY += 16;
             }
         } else {
             if (box.style.getBackgroundColor() != null && box.width > 0 && box.height > 0) {
@@ -89,13 +88,13 @@ public class T3Painter {
                     }
                 }
             }
-            // Dibujar el texto de los Inputs
-            if ("input".equals(box.node.getTagName())) {
+
+            // Comprobación de seguridad para evitar NullPointerExceptions
+            if (box.node != null && "input".equals(box.node.getTagName())) {
                 String val = box.node.getAttributes().getOrDefault("value", "");
                 String type = box.node.getAttributes().getOrDefault("type", "text");
-                int textColor = context.getColor(); // Negro por defecto
+                int textColor = context.getColor();
 
-                // Si es un botón, centrar el texto aproximadamente
                 if ("submit".equals(type) || "button".equals(type)) {
                     int txtX = screenX + (box.width - (val.length() * CHAR_WIDTH)) / 2;
                     drawTextClipped(val, Math.max(screenX + 2, txtX), screenY + 4, textColor);
