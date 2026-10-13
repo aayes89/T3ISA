@@ -29,10 +29,16 @@ package t3os.APPS.Browser;
  */
 import java.awt.event.KeyEvent;
 import java.io.IOException;
+import java.net.URI;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import t3isa.DEVICE.TKeyboardDevice;
 import t3isa.NETWORKING.THostNetwork;
 import t3os.APPS.Browser.Images.T3HtmlImage;
 import t3os.APPS.Browser.Images.T3HtmlImageBMP;
+import t3os.APPS.Browser.Images.T3HtmlImageDecoder;
 import t3os.APPS.Browser.Images.T3HtmlImageGIF;
 import t3os.APPS.Browser.Images.T3HtmlImagePNG;
 import t3os.UI.TUI;
@@ -78,6 +84,16 @@ public final class TUIBrowser extends TUIElement {
     private int contentHeight;
     private boolean draggingScrollbar;
     private int scrollbarDragOffset;
+    private boolean resizing = false;
+
+    private int resizeStartX;
+    private int resizeStartY;
+    private int resizeStartWidth;
+    private int resizeStartHeight;
+
+    private static final int RESIZE_SIZE = 12;
+    private static final int MIN_WIDTH = 360;
+    private static final int MIN_HEIGHT = 240;
 
     private static final int BUTTON_WIDTH = 32;
     private static final int GO_WIDTH = 36;
@@ -97,6 +113,9 @@ public final class TUIBrowser extends TUIElement {
 
     private T3HtmlNode document;
     private T3HtmlRenderer htmlRenderer;
+    private final Set<String> requestedImages = new HashSet<>();
+    private final Map<String, T3HtmlImage> loadedImages = new ConcurrentHashMap<>();
+    private volatile long navigationId = 0;
     private Button pressedButton = Button.NONE;
 
     String html0 = """
@@ -168,7 +187,7 @@ public final class TUIBrowser extends TUIElement {
         drawStatusBar(ui);
         //testBMP("", ui);
         //testPNG("", ui);
-        testGIF("", ui);
+        //testGIF("", ui);
     }
 
     private void drawWindow(TUI ui) {
@@ -287,6 +306,11 @@ public final class TUIBrowser extends TUIElement {
             rendererY = contentY;
             rendererWidth = contentWidth;
             rendererHeight = viewportHeight;
+
+            // Restaurar las imágenes al crear el renderizador.
+            for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
+                htmlRenderer.setImage(entry.getKey(), entry.getValue());
+            }
         }
 
         // Obtener la altura total calculada por el renderizador.
@@ -601,26 +625,38 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
-        if ("about:blank".equalsIgnoreCase(target)) {
-            address = "about:blank";
-            addressCursor = address.length();
-            document = null;
-            htmlRenderer = null;
-            scrollY = 0;
-            contentHeight = 0;
-            pageTitle = "T3Browser";
-            status = "Página en blanco";
-            return;
-        }
-
-        if (!target.matches("(?i)^https?://.*")) {
+        if (!target.matches("(?i)^https?://.*")
+                && !"about:blank".equalsIgnoreCase(target)) {
             target = "http://" + target;
         }
 
-        final String url = target;
+        if ("about:blank".equalsIgnoreCase(target)) {
+            synchronized (this) {
+                ++navigationId;
+                synchronized (requestedImages) {
+                    requestedImages.clear();
+                }
+                loadedImages.clear();
 
+                address = "about:blank";
+                addressCursor = address.length();
+                document = null;
+                htmlRenderer = null;
+                rendererX = Integer.MIN_VALUE;
+                rendererY = Integer.MIN_VALUE;
+                rendererWidth = -1;
+                rendererHeight = -1;
+                scrollY = 0;
+                contentHeight = 0;
+                pageTitle = "T3Browser";
+                status = "Página en blanco";
+            }
+            return;
+        }
+
+        final URI uri;
         try {
-            java.net.URI uri = java.net.URI.create(url);
+            uri = URI.create(target);
 
             if (uri.getHost() == null
                     || (!"http".equalsIgnoreCase(uri.getScheme())
@@ -633,29 +669,46 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
-        address = url;
-        addressCursor = address.length();
-        status = "Descargando página...";
-        pageTitle = "T3Browser";
+        final String url = uri.toString();
+        final long currentNavigation;
+
+        synchronized (this) {
+            currentNavigation = ++navigationId;
+
+            synchronized (requestedImages) {
+                requestedImages.clear();
+            }
+            loadedImages.clear();
+
+            address = url;
+            addressCursor = address.length();
+            status = "Descargando página...";
+            pageTitle = "T3Browser";
+        }
 
         Thread downloader = new Thread(() -> {
             try {
-                String html = t3isa.NETWORKING.THostNetwork.wget(url);
+                String html = THostNetwork.wget(url);
 
                 if (html == null || html.isBlank()) {
-                    throw new java.io.IOException("La página no contiene HTML");
+                    throw new IOException("La página no contiene HTML");
                 }
 
                 T3HtmlParser parser = new T3HtmlParser(html);
                 T3HtmlNode parsedDocument = parser.parse();
 
                 if (parsedDocument == null) {
-                    throw new java.io.IOException("No se pudo interpretar el HTML");
+                    throw new IOException("No se pudo interpretar el HTML");
                 }
 
                 synchronized (this) {
+                    if (navigationId != currentNavigation) {
+                        return;
+                    }
+
                     document = parsedDocument;
                     htmlRenderer = null;
+
                     rendererX = Integer.MIN_VALUE;
                     rendererY = Integer.MIN_VALUE;
                     rendererWidth = -1;
@@ -663,16 +716,91 @@ public final class TUIBrowser extends TUIElement {
 
                     scrollY = 0;
                     contentHeight = 0;
-                    status = "Página cargada";
                     pageTitle = uriTitle(url);
+                    status = "Página cargada";
                 }
+
+                loadImages(parsedDocument, uri, currentNavigation);
 
             } catch (Exception ex) {
                 synchronized (this) {
+                    if (navigationId != currentNavigation) {
+                        return;
+                    }
+
                     status = "Error al cargar: " + ex.getMessage();
                 }
             }
         }, "T3Browser-Wget");
+
+        downloader.setDaemon(true);
+        downloader.start();
+    }
+
+    private void loadImages(T3HtmlNode node, URI pageUri, long currentNavigation) {
+        if (node == null || pageUri == null) {
+            return;
+        }
+
+        if ("img".equalsIgnoreCase(node.getTagName())) {
+            String src = node.getAttributes().get("src");
+
+            if (src != null && !src.isBlank()) {
+                try {
+                    URI imageUri = pageUri.resolve(src.trim()).normalize();
+
+                    String scheme = imageUri.getScheme();
+
+                    // Solo descargar imágenes HTTP o HTTPS.
+                    if (imageUri.getHost() != null && ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
+                        requestImage(imageUri.toString(), currentNavigation);
+                    }
+                } catch (IllegalArgumentException ex) {
+                    System.err.println("URL de imagen inválida: " + src);
+                }
+            }
+        }
+
+        for (T3HtmlNode child : node.getChildren()) {
+            loadImages(child, pageUri, currentNavigation);
+        }
+    }
+
+    private void requestImage(String imageUrl, long currentNavigation) {
+        synchronized (requestedImages) {
+            if (!requestedImages.add(imageUrl)) {
+                return;
+            }
+        }
+
+        Thread downloader = new Thread(() -> {
+            try {
+                byte[] data = THostNetwork.wgetBytes(imageUrl);
+
+                if (data == null || data.length == 0) {
+                    throw new IOException("La imagen está vacía");
+                }
+
+                T3HtmlImage image = T3HtmlImageDecoder.decode(data, imageUrl);
+
+                synchronized (this) {
+                    if (navigationId != currentNavigation) {
+                        return;
+                    }
+
+                    loadedImages.put(imageUrl, image);
+
+                    if (htmlRenderer != null) {
+                        htmlRenderer.setImage(imageUrl, image);
+                    }
+
+                    status = "Página cargada";
+                }
+
+            } catch (Exception ex) {
+                System.err.println("No se pudo cargar la imagen " + imageUrl + ": " + ex.getMessage());
+            }
+        }, "T3Browser-Image");
 
         downloader.setDaemon(true);
         downloader.start();
