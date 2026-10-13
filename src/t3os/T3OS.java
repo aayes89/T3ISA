@@ -42,7 +42,7 @@ public final class T3OS {
 
     private final TMachine machine;
     private final TKernel kernel;
-    private final TGraphicsHostBackend graphicsHost;
+    //private final TGraphicsHostBackend graphicsHost;
     private final TBoot boot;
     private final TConsoleDevice console;
     private final TFileSystem fileSystem;
@@ -56,7 +56,7 @@ public final class T3OS {
         }
 
         this.machine = machine;
-        this.graphicsHost = graphicsHost;
+        //this.graphicsHost = graphicsHost;
         boot = new TBoot(machine);
         kernel = new TKernel(machine, 10);
         machine.setKernel(kernel);

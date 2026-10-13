@@ -227,8 +227,7 @@ public final class T3HtmlImagePNG {
         long rowBytesLong = ((long) width * channels * bitDepth + 7) / 8;
         long rawSizeLong = (rowBytesLong + 1) * height;
 
-        if (rawSizeLong > 128L * 1024 * 1024
-                || rowBytesLong > Integer.MAX_VALUE) {
+        if (rawSizeLong > 128L * 1024 * 1024 || rowBytesLong > Integer.MAX_VALUE) {
             throw new IOException("PNG descomprimido demasiado grande");
         }
 

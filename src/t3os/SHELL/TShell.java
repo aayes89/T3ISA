@@ -1301,7 +1301,7 @@ public final class TShell {
 //  Iniciar el UI de T3OS
     private void startGraphics() {
         TUI ui = new TUI(machine);
-        TUIDesktop desktop = new TUIDesktop(1024, 768, kernel);
+        TUIDesktop desktop = new TUIDesktop(1920, 1080, kernel);
         TGraphicsHostBackend gb = machine.getTGraphicsHostBackend();
 
         ui.add(desktop);

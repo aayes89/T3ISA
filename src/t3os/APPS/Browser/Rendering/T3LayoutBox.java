@@ -48,12 +48,14 @@ public class T3LayoutBox {
 
     public boolean isText;
     public String textContent;
+    public List<String> textLines; // Almacena las líneas calculadas
     public T3HtmlImage image;
 
     public T3LayoutBox(T3HtmlNode node, T3Style style) {
         this.node = node;
         this.style = style;
         this.children = new ArrayList<>();
+        this.textLines = new ArrayList<>();
         this.isText = node != null && node.isTextNode();
         this.textContent = node != null ? node.getText() : "";
     }
@@ -62,6 +64,14 @@ public class T3LayoutBox {
         if (child != null) {
             child.parent = this;
             this.children.add(child);
+        }
+    }
+
+    public void shift(int dx, int dy) {
+        this.x += dx;
+        this.y += dy;
+        for (T3LayoutBox child : children) {
+            child.shift(dx, dy);
         }
     }
 }

@@ -257,20 +257,20 @@ public final class TUIDesktop extends TUIElement {
 
     // Gradiente en azul
     public void gradiente() {
-        for (int y = 0; y < 728; y += 16) {
+        for (int y = 0; y < height; y += 16) {
             int b = 60 + (y / 3);
             if (b > 255) {
                 b = 255;
             }
             int col = ((y / 8) << 16) | ((y / 4) << 8) | b;
-            ui.fillRect(0, y, 1024, 16, col);
+            ui.fillRect(0, y, width, 16, col);
         }
     }
 
     // Conjunto Mandelbrot usando punto fijo
     public void mandelbrot() {
-        for (int py = 0; py < 728; py += 4) {
-            for (int px = 0; px < 1024; px += 4) {
+        for (int py = 0; py < height; py += 4) {
+            for (int px = 0; px < width; px += 4) {
                 int x0 = ((px - 600) * 4096) / 300;
                 int y0 = ((py - 364) * 4096) / 300;
                 int cx = 0, cy = 0, iter = 0;

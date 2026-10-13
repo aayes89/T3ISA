@@ -40,6 +40,7 @@ public class T3Painter {
     private final T3RenderContext context;
     private int scrollY;
 
+    //Constructor
     public T3Painter(TUI ui, T3RenderContext context) {
         this.ui = ui;
         this.context = context;
@@ -50,30 +51,33 @@ public class T3Painter {
         this.scrollY = Math.max(0, scrollY);
     }
 
+    // Dibujar la caja
     public void paint(T3LayoutBox box) {
         if (box == null) {
             return;
         }
 
-        // Aplicamos el scroll y calculamos posición absoluta en pantalla
         int screenX = box.x + context.getX();
         int screenY = box.y - scrollY + context.getY();
 
-        // Culling (No dibujar si está completamente fuera de la vista)
         if (screenY + box.height < context.getY() || screenY > context.getBottom()) {
             return;
         }
 
-        if (box.isText && box.textContent != null && !box.textContent.isEmpty()) {
+        // Dibujar múltiples líneas
+        if (box.isText && box.textLines != null && !box.textLines.isEmpty()) {
             int color = box.style.getColor() != null ? toRGB(box.style.getColor()) : context.getColor();
-            drawTextClipped(box.textContent, screenX, screenY, color);
+            int lineY = screenY;
+
+            for (String line : box.textLines) {
+                drawTextClipped(line, screenX, lineY, color);
+                lineY += 16; // Avanzar LINE_HEIGHT píxeles hacia abajo
+            }
         } else {
-            // Dibujar fondo
             if (box.style.getBackgroundColor() != null && box.width > 0 && box.height > 0) {
                 fillRectClipped(screenX, screenY, box.width, box.height, toRGB(box.style.getBackgroundColor()));
             }
 
-            // Dibujar bordes
             int borderWidth = box.style.getBorderWidth();
             if (borderWidth > 0 && box.width > 0 && box.height > 0) {
                 int borderColor = toRGB(box.style.getBorderColor());
@@ -86,16 +90,74 @@ public class T3Painter {
                 }
             }
 
-            // Dibujar imagen si existe
             if (box.image != null) {
-                ui.drawImagePixels(screenX, screenY, box.width, box.height, box.image.getPixels());
+                drawImageClipped(box, screenX, screenY);
             }
         }
 
-        // Pintar recursivamente los hijos
         for (T3LayoutBox child : box.children) {
             paint(child);
         }
+    }
+
+    // Auxiliares para dibujar
+    private void drawImageClipped(T3LayoutBox box, int screenX, int screenY) {
+        int imgW = box.image.getWidth();
+        int imgH = box.image.getHeight();
+        int reqW = box.width;
+        int reqH = box.height;
+
+        if (reqW <= 0 || reqH <= 0) {
+            return;
+        }
+
+        // Escalar la imagen al tamaño de la caja calculada por LayoutEngine
+        int[] pixels = box.image.getPixels();
+        if (reqW != imgW || reqH != imgH) {
+            pixels = scaleNearestNeighbor(pixels, imgW, imgH, reqW, reqH);
+        }
+
+        // Calcular los límites de recorte respecto al Viewport
+        int startX = Math.max(0, context.getX() - screenX);
+        int startY = Math.max(0, context.getY() - screenY);
+        int endX = Math.min(reqW, context.getRight() - screenX);
+        int endY = Math.min(reqH, context.getBottom() - screenY);
+
+        // Si la imagen está completamente fuera de los límites, abortar
+        if (startX >= endX || startY >= endY) {
+            return;
+        }
+
+        int clippedW = endX - startX;
+        int clippedH = endY - startY;
+
+        // Si no hay que recortar, dibujamos directo para máxima velocidad
+        if (clippedW == reqW && clippedH == reqH) {
+            ui.drawImagePixels(screenX, screenY, reqW, reqH, pixels);
+            return;
+        }
+
+        // Si hay que recortar (Scroll o ventana pequeña), extraemos solo los píxeles visibles
+        int[] clippedPixels = new int[clippedW * clippedH];
+        for (int y = 0; y < clippedH; y++) {
+            System.arraycopy(pixels, (startY + y) * reqW + startX, clippedPixels, y * clippedW, clippedW);
+        }
+
+        ui.drawImagePixels(screenX + startX, screenY + startY, clippedW, clippedH, clippedPixels);
+    }
+
+    private int[] scaleNearestNeighbor(int[] source, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight) {
+        int[] result = new int[targetWidth * targetHeight];
+        for (int y = 0; y < targetHeight; y++) {
+            int sourceY = (int) ((long) y * sourceHeight / targetHeight);
+            int rowOffsetTarget = y * targetWidth;
+            int rowOffsetSource = sourceY * sourceWidth;
+            for (int x = 0; x < targetWidth; x++) {
+                int sourceX = (int) ((long) x * sourceWidth / targetWidth);
+                result[rowOffsetTarget + x] = source[rowOffsetSource + sourceX];
+            }
+        }
+        return result;
     }
 
     private int toRGB(Color color) {

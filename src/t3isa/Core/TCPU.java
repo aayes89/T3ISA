@@ -125,7 +125,7 @@ public final class TCPU implements TMachine {
         pendingProcessAction = -1;
 
         deviceBus = new TDeviceBus(16);
-        graphicsDevice = new TGraphicsDevice(1024, 768, 60, 32);
+        graphicsDevice = new TGraphicsDevice(1920, 1080, 60, 32);
         mouseDevice = new TMouseDevice();
         keyboardDevice = new TKeyboardDevice();
 

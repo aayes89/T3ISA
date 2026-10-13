@@ -29,11 +29,13 @@ package t3os.APPS.Browser.Rendering;
  */
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import t3os.APPS.Browser.T3HtmlNode;
 import t3os.APPS.Browser.CSS.T3CSSRule;
 import t3os.APPS.Browser.CSS.T3CSSUtils;
-
 import t3os.APPS.Browser.CSS.T3Style;
-import t3os.APPS.Browser.T3HtmlNode;
+
+import t3os.APPS.Browser.Images.T3HtmlImage;
 
 public class T3LayoutEngine {
 
@@ -42,11 +44,13 @@ public class T3LayoutEngine {
 
     private final int viewportWidth;
     private final List<T3CSSRule> cssRules;
+    private final Map<String, T3HtmlImage> loadedImages;
     private int contentHeight = 0;
 
-    public T3LayoutEngine(int viewportWidth, List<T3CSSRule> cssRules) {
+    public T3LayoutEngine(int viewportWidth, List<T3CSSRule> cssRules, Map<String, T3HtmlImage> loadedImages) {
         this.viewportWidth = viewportWidth;
         this.cssRules = cssRules;
+        this.loadedImages = loadedImages;
     }
 
     public T3LayoutBox buildLayoutTree(T3HtmlNode root) {
@@ -59,12 +63,9 @@ public class T3LayoutEngine {
             return null;
         }
 
-        String tag = node.getTagName();
-        if (tag != null) {
-            tag = tag.toLowerCase(Locale.ROOT);
-            if (tag.equals("head") || tag.equals("script") || tag.equals("style") || tag.equals("meta") || tag.equals("link") || tag.equals("title")) {
-                return null;
-            }
+        String tag = node.getTagName() != null ? node.getTagName().toLowerCase(Locale.ROOT) : "";
+        if (tag.equals("head") || tag.equals("script") || tag.equals("style") || tag.equals("meta") || tag.equals("link") || tag.equals("title")) {
+            return null;
         }
 
         T3Style style = T3CSSUtils.computeT3Style(node, inheritedStyle != null ? inheritedStyle : new T3Style(), cssRules);
@@ -72,26 +73,74 @@ public class T3LayoutEngine {
         box.x = currentX;
         box.y = currentY;
 
+        // Manejo de Nodos de Texto
         if (box.isText) {
-            box.width = box.textContent != null ? box.textContent.length() * CHAR_WIDTH : 0;
-            if (box.width > availableWidth) {
-                box.width = availableWidth; // Límite básico para texto inline
+            String text = box.textContent.replaceAll("\\s+", " ").trim();
+            if (text.isEmpty()) {
+                box.width = 0;
+                box.height = 0;
+                return box;
             }
-            box.height = LINE_HEIGHT;
+
+            String[] words = text.split(" ");
+            StringBuilder currentLine = new StringBuilder();
+            int currentLineWidth = 0;
+            int maxCalculatedWidth = 0;
+
+            for (String word : words) {
+                int wordWidth = word.length() * CHAR_WIDTH;
+
+                // Salto de línea si la palabra excede el ancho disponible
+                if (currentLineWidth + wordWidth > availableWidth && currentLineWidth > 0) {
+                    box.textLines.add(currentLine.toString().trim());
+                    currentLine = new StringBuilder();
+                    maxCalculatedWidth = Math.max(maxCalculatedWidth, currentLineWidth);
+                    currentLineWidth = 0;
+                }
+
+                currentLine.append(word).append(" ");
+                currentLineWidth += wordWidth + CHAR_WIDTH; // Incluye el espacio
+            }
+
+            if (currentLine.length() > 0) {
+                box.textLines.add(currentLine.toString().trim());
+                maxCalculatedWidth = Math.max(maxCalculatedWidth, currentLineWidth - CHAR_WIDTH);
+            }
+
+            box.width = Math.min(maxCalculatedWidth, availableWidth);
+            box.height = box.textLines.size() * LINE_HEIGHT;
             contentHeight = Math.max(contentHeight, box.y + box.height);
+
+            return box;
+        }
+
+        // Manejo de Imágenes (¡Calcula tamaño real!)
+        if (tag.equals("img")) {
+            String src = node.getAttributes().get("src");
+            if (src != null) {
+                T3HtmlImage img = getLoadedImage(src);
+                box.image = img;
+                int intrinsicW = img != null ? img.getWidth() : 64;
+                int intrinsicH = img != null ? img.getHeight() : 48;
+
+                box.width = resolveWidth(node.getAttributes().get("width"), resolveWidth(style.getWidth(), intrinsicW));
+                box.height = resolveHeight(node.getAttributes().get("height"), resolveHeight(style.getHeight(), intrinsicH));
+                contentHeight = Math.max(contentHeight, box.y + box.height);
+            }
             return box;
         }
 
         boolean isBlock = isBlockElement(tag, style);
+        boolean isFlex = "flex".equals(style.getDisplay());
 
         int marginTop = Math.max(0, style.getMarginTop());
-        int marginRight = Math.max(0, style.getMarginRight());
         int marginBottom = Math.max(0, style.getMarginBottom());
         int marginLeft = Math.max(0, style.getMarginLeft());
+        int marginRight = Math.max(0, style.getMarginRight());
 
+        int paddingLeft = style.getPaddingLeft();
         int paddingTop = style.getPaddingTop();
         int paddingBottom = style.getPaddingBottom();
-        int paddingLeft = style.getPaddingLeft();
         int paddingRight = style.getPaddingRight();
 
         box.x += marginLeft;
@@ -100,7 +149,6 @@ public class T3LayoutEngine {
         int childX = box.x + paddingLeft;
         int childY = box.y + paddingTop;
         int childAvailableWidth = availableWidth - marginLeft - marginRight - paddingLeft - paddingRight;
-
         if (childAvailableWidth < 0) {
             childAvailableWidth = 0;
         }
@@ -108,23 +156,27 @@ public class T3LayoutEngine {
         int maxChildBottom = childY;
         int maxChildRight = childX;
 
+        // Procesar Hijos en flujo normal
         for (T3HtmlNode childNode : node.getChildren()) {
             T3LayoutBox childBox = buildBox(childNode, style, childX, childY, childAvailableWidth);
             if (childBox != null) {
                 box.addChild(childBox);
 
-                if (isBlockElement(childNode.getTagName(), childBox.style)) {
-                    childY += childBox.height + Math.max(0, childBox.style.getMarginBottom());
-                    childX = box.x + paddingLeft;
-                } else {
-                    childX += childBox.width;
-                    if (childX > box.x + paddingLeft + childAvailableWidth) {
-                        childY += LINE_HEIGHT;
+                // Si NO es flex, apilamos normal. (Si es flex, lo calculamos después).
+                if (!isFlex) {
+                    if (isBlockElement(childNode.getTagName(), childBox.style)) {
+                        childY += childBox.height + Math.max(0, childBox.style.getMarginBottom()) + Math.max(0, childBox.style.getMarginTop());
                         childX = box.x + paddingLeft;
+                    } else {
+                        childX += childBox.width + Math.max(0, childBox.style.getMarginRight());
+                        if (childX > box.x + paddingLeft + childAvailableWidth) {
+                            childY += LINE_HEIGHT;
+                            childX = box.x + paddingLeft;
+                        }
                     }
                 }
-                maxChildBottom = Math.max(maxChildBottom, childBox.y + childBox.height);
-                maxChildRight = Math.max(maxChildRight, childBox.x + childBox.width);
+                maxChildBottom = Math.max(maxChildBottom, childBox.y + childBox.height + Math.max(0, childBox.style.getMarginBottom()));
+                maxChildRight = Math.max(maxChildRight, childBox.x + childBox.width + Math.max(0, childBox.style.getMarginRight()));
             }
         }
 
@@ -132,8 +184,17 @@ public class T3LayoutEngine {
         box.width = resolveWidth(style.getWidth(), calculatedWidth);
         box.height = resolveHeight(style.getHeight(), maxChildBottom - box.y + paddingBottom);
 
-        contentHeight = Math.max(contentHeight, box.y + box.height + marginBottom);
+        // Evaluar Flexbox si corresponde
+        if (isFlex) {
+            T3FlexLayout.apply(box, box.width);
+            maxChildBottom = box.y;
+            for (T3LayoutBox c : box.children) {
+                maxChildBottom = Math.max(maxChildBottom, c.y + c.height + Math.max(0, c.style.getMarginBottom()));
+            }
+            box.height = resolveHeight(style.getHeight(), maxChildBottom - box.y + paddingBottom);
+        }
 
+        contentHeight = Math.max(contentHeight, box.y + box.height + marginBottom);
         return box;
     }
 
@@ -142,13 +203,13 @@ public class T3LayoutEngine {
             return false;
         }
         String display = style.getDisplay();
-
         if ("inline".equals(display) || "inline-block".equals(display)) {
             return false;
         }
         if ("flex".equals(display)) {
-            return true; // Preparado para T3FlexLayout en el futuro
+            return true;
         }
+
         switch (tag) {
             case "document":
             case "html":
@@ -183,6 +244,18 @@ public class T3LayoutEngine {
         }
     }
 
+    private T3HtmlImage getLoadedImage(String src) {
+        T3HtmlImage img = loadedImages.get(src);
+        if (img == null) {
+            for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
+                if (entry.getKey().endsWith(src)) {
+                    return entry.getValue();
+                }
+            }
+        }
+        return img;
+    }
+
     private int resolveWidth(String value, int fallback) {
         if (value == null || "auto".equals(value)) {
             return fallback;
@@ -204,7 +277,7 @@ public class T3LayoutEngine {
         }
         try {
             if (value.endsWith("%")) {
-                return fallback; // Evita dependencias cíclicas de altura
+                return fallback;
             }
             return Math.max(0, parsePixels(value, fallback));
         } catch (NumberFormatException ex) {

@@ -30,17 +30,23 @@ package t3os.APPS.Browser;
 import java.awt.event.KeyEvent;
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import t3isa.DEVICE.TKeyboardDevice;
 import t3isa.NETWORKING.THostNetwork;
+import t3os.APPS.Browser.CSS.T3CSSRule;
 import t3os.APPS.Browser.Images.T3HtmlImage;
 import t3os.APPS.Browser.Images.T3HtmlImageBMP;
 import t3os.APPS.Browser.Images.T3HtmlImageDecoder;
 import t3os.APPS.Browser.Images.T3HtmlImageGIF;
 import t3os.APPS.Browser.Images.T3HtmlImagePNG;
+import t3os.APPS.Browser.Rendering.T3LayoutBox;
+import t3os.APPS.Browser.Rendering.T3LayoutEngine;
+import t3os.APPS.Browser.Rendering.T3Painter;
 import t3os.UI.TUI;
 import t3os.UI.TUIElement;
 
@@ -112,7 +118,6 @@ public final class TUIBrowser extends TUIElement {
     private int addressCursor;
 
     private T3HtmlNode document;
-    private T3HtmlRenderer htmlRenderer;
     private final Set<String> requestedImages = new HashSet<>();
     private final Map<String, T3HtmlImage> loadedImages = new ConcurrentHashMap<>();
     private volatile long navigationId = 0;
@@ -174,7 +179,6 @@ public final class TUIBrowser extends TUIElement {
         addressCursor = address.length();
         this.document = new T3HtmlParser(html).parse();
         this.status = "Página de inicio";
-        this.htmlRenderer = null;
     }
 
     @Override
@@ -291,42 +295,27 @@ public final class TUIBrowser extends TUIElement {
             drawScrollbar(ui, contentX + contentWidth, contentY, SCROLLBAR_WIDTH, viewportHeight);
             return;
         }
-        if (htmlRenderer == null
-                || rendererX != contentX
-                || rendererY != contentY
-                || rendererWidth != contentWidth
-                || rendererHeight != viewportHeight) {
 
-            T3HtmlRenderer renderer = new T3HtmlRenderer(ui, contentX, contentY, contentWidth, viewportHeight);
+        //  Crear contexto para el pintor
+        T3RenderContext context = new T3RenderContext(contentX, contentY, contentWidth, viewportHeight);
 
-            renderer.setBaseUrl(address);
+        List<T3CSSRule> cssRules = new ArrayList<>();
+        // Extraer CSS
+        collectCSSRules(document, cssRules);  
 
-            synchronized (loadedImages) {
-                for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
-                    renderer.setImage(entry.getKey(), entry.getValue());
-                }
-            }
-
-            htmlRenderer = renderer;
-
-            rendererX = contentX;
-            rendererY = contentY;
-            rendererWidth = contentWidth;
-            rendererHeight = viewportHeight;
-        }
-
-        T3HtmlRenderer renderer = htmlRenderer;
-        if (renderer == null) {
-            return;
-        }
-
-        renderer.setScrollY(scrollY);
-        renderer.render(document);
-
-        contentHeight = Math.max(viewportHeight, renderer.getContentHeight());
-
+        // Paso loadedImages directamente al Layout Engine
+        T3LayoutEngine engine = new T3LayoutEngine(contentWidth, cssRules, loadedImages);
+        T3LayoutBox renderTree = engine.buildLayoutTree(document);
+        
+        // Actualizar el Scroll y la altura total
+        contentHeight = Math.max(viewportHeight, engine.getContentHeight());
         int maxScroll = Math.max(0, contentHeight - viewportHeight);
         scrollY = Math.max(0, Math.min(scrollY, maxScroll));
+
+        // Fase de Paint (Dibujar los píxeles reales en UI)
+        T3Painter painter = new T3Painter(ui, context);
+        painter.setScrollY(scrollY);
+        painter.paint(renderTree);
 
         drawScrollbar(ui, contentX + contentWidth, contentY, SCROLLBAR_WIDTH, viewportHeight);
     }
@@ -677,12 +666,6 @@ public final class TUIBrowser extends TUIElement {
                 addressCursor = address.length();
 
                 document = new T3HtmlParser(html).parse();
-                htmlRenderer = null;
-
-                rendererX = Integer.MIN_VALUE;
-                rendererY = Integer.MIN_VALUE;
-                rendererWidth = -1;
-                rendererHeight = -1;
 
                 scrollY = 0;
                 contentHeight = 0;
@@ -709,12 +692,6 @@ public final class TUIBrowser extends TUIElement {
 
                 // No parsear el HTML de inicio.
                 document = null;
-                htmlRenderer = null;
-
-                rendererX = Integer.MIN_VALUE;
-                rendererY = Integer.MIN_VALUE;
-                rendererWidth = -1;
-                rendererHeight = -1;
 
                 scrollY = 0;
                 contentHeight = 0;
@@ -764,15 +741,9 @@ public final class TUIBrowser extends TUIElement {
             pageTitle = "T3Browser";
 
             document = null;
-            htmlRenderer = null;
 
             address = url;
             addressCursor = address.length();
-
-            rendererX = Integer.MIN_VALUE;
-            rendererY = Integer.MIN_VALUE;
-            rendererWidth = -1;
-            rendererHeight = -1;
 
             scrollY = 0;
             contentHeight = 0;
@@ -805,12 +776,6 @@ public final class TUIBrowser extends TUIElement {
                     }
 
                     document = parsedDocument;
-                    htmlRenderer = null;
-
-                    rendererX = Integer.MIN_VALUE;
-                    rendererY = Integer.MIN_VALUE;
-                    rendererWidth = -1;
-                    rendererHeight = -1;
 
                     scrollY = 0;
                     contentHeight = 0;
@@ -991,6 +956,35 @@ public final class TUIBrowser extends TUIElement {
         System.out.println("Refrescando");
     }
 
+    // Auxiliar para vincular las imágenes descargadas al Render Tree
+    private void injectImages(T3LayoutBox box) {
+        if (box == null || box.node == null) {
+            return;
+        }
+
+        if ("img".equalsIgnoreCase(box.node.getTagName())) {
+            String src = box.node.getAttributes().get("src");
+            if (src != null) {
+                // Resuelve la ruta contra loadedImages (idealmente normalizando URLs)
+                T3HtmlImage img = loadedImages.get(src);
+                if (img == null) {
+                    // Intento extra por si la URL absoluta difiere ligeramente
+                    for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
+                        if (entry.getKey().endsWith(src)) {
+                            img = entry.getValue();
+                            break;
+                        }
+                    }
+                }
+                box.image = img;
+            }
+        }
+
+        for (T3LayoutBox child : box.children) {
+            injectImages(child);
+        }
+    }
+
     // Auxiliar para dibujar el scrollbar
     private void drawScrollbar(TUI ui, int sx, int sy, int sw, int sh) {
         ui.fillRect(sx, sy, sw, sh, COLOR_SCROLL_TRACK);
@@ -1017,6 +1011,32 @@ public final class TUIBrowser extends TUIElement {
         ui.drawRect(sx + 2, thumbY, sw - 4, thumbHeight, COLOR_SCROLL_BORDER);
     }
 
+    // Auxiliar para obtener las reglas CSS
+    private void collectCSSRules(T3HtmlNode node, java.util.List<t3os.APPS.Browser.CSS.T3CSSRule> rules) {
+        if (node == null) {
+            return;
+        }
+        if ("style".equalsIgnoreCase(node.getTagName())) {
+            StringBuilder css = new StringBuilder();
+            String nodeText = node.getText();
+            if (nodeText != null && !nodeText.isEmpty()) {
+                css.append(nodeText);
+            } else {
+                for (T3HtmlNode child : node.getChildren()) {
+                    if (child.isTextNode() && child.getText() != null) {
+                        css.append(child.getText());
+                    }
+                }
+            }
+            if (!css.isEmpty()) {
+                rules.addAll(t3os.APPS.Browser.CSS.T3CSSUtils.parseT3Stylesheet(css.toString()));
+            }
+        }
+        for (T3HtmlNode child : node.getChildren()) {
+            collectCSSRules(child, rules);
+        }
+    }
+
     public boolean hasAddressFocus() {
         return addressFocused;
     }
@@ -1036,9 +1056,7 @@ public final class TUIBrowser extends TUIElement {
 
         this.address = address;
         this.addressCursor = address.length();
-
-        if (this.htmlRenderer != null) {
-            this.htmlRenderer.setBaseUrl(address);
-        }
+        // Se elimina la asignación de setBaseUrl ya que ahora se gestionará desde el motor de red y layout
     }
+
 }
