@@ -146,6 +146,20 @@ public final class THostNetwork {
         }
     }
 
+    public static String wget(String url) throws IOException, InterruptedException {
+        byte[] data = wgetBytes(url);
+
+        // Intentar decodificar como UTF-8
+        String content = new String(data, java.nio.charset.StandardCharsets.UTF_8);
+
+        // Si UTF-8 falla y genera el carácter de reemplazo (), decodificamos como ISO-8859-1
+        if (content.contains("\uFFFD")) {
+            content = new String(data, java.nio.charset.StandardCharsets.ISO_8859_1);
+        }
+
+        return content;
+    }
+
     public static byte[] wgetBytes(String url) throws IOException, InterruptedException {
 
         HttpClient client = HttpClient.newBuilder()
@@ -170,13 +184,4 @@ public final class THostNetwork {
         return response.body();
     }
 
-    public static String wget(String url)
-            throws IOException, InterruptedException {
-
-        byte[] data = wgetBytes(url);
-
-        // Decodificación inicial UTF-8 para HTML.
-        // Más adelante se puede detectar el charset declarado por la página.
-        return new String(data, java.nio.charset.StandardCharsets.UTF_8);
-    }
 }
