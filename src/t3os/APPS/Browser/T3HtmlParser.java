@@ -62,14 +62,15 @@ public class T3HtmlParser {
 
     public T3HtmlNode parse() {
         T3HtmlNode root = new T3HtmlNode("document");
+
         try {
             while (pos < contentLength) {
-                skipWhitespace();
                 T3HtmlNode child = parseNode();
                 if (child != null) {
                     root.addChild(child);
                 }
             }
+
             return root;
         } catch (Exception e) {
             throw new ParseException("Failed to parse HTML at position " + pos + ": " + e.getMessage(), e);
@@ -390,30 +391,37 @@ public class T3HtmlParser {
 
     private String readAttributeValue() {
         skipWhitespace();
+
         if (pos >= contentLength) {
             return "";
         }
 
         char quote = content.charAt(pos);
-        if (quote != '"' && quote != '\'') {
+
+        if (quote == '"' || quote == '\'') {
+            pos++;
             int start = pos;
-            while (pos < contentLength && !Character.isWhitespace(content.charAt(pos)) && content.charAt(pos) != '>' && content.charAt(pos) != '/') {
+
+            while (pos < contentLength && content.charAt(pos) != quote) {
                 pos++;
             }
-            return content.substring(start, pos).trim();
+
+            String value = content.substring(start, pos);
+
+            if (pos < contentLength) {
+                pos++;
+            }
+
+            return decodeHtmlEntities(value);
         }
 
-        pos++;
         int start = pos;
-        while (pos < contentLength && content.charAt(pos) != quote) {
+
+        while (pos < contentLength && !Character.isWhitespace(content.charAt(pos)) && content.charAt(pos) != '>') {
             pos++;
         }
-        if (pos >= contentLength) {
-            throw new ParseException("Unclosed attribute quote at position " + start);
-        }
-        String value = content.substring(start, pos);
-        pos++;
-        return value;
+
+        return decodeHtmlEntities(content.substring(start, pos));
     }
 
     private String readRawContentUntil(String endTag) {
@@ -424,13 +432,8 @@ public class T3HtmlParser {
         return content.substring(start, pos);
     }
 
-    private void skipUntil(char target) {
-        while (pos < contentLength && content.charAt(pos) != target) {
-            pos++;
-        }
-        if (pos < contentLength) {
-            pos++;
-        }
+    private boolean isSelfClosing(String tag) {
+        return tag != null && SELF_CLOSING_TAGS.contains(tag.toLowerCase(java.util.Locale.ROOT));
     }
 
     private String readText() {
@@ -462,16 +465,8 @@ public class T3HtmlParser {
         }
     }
 
-    private boolean isSelfClosing(String tag) {
-        return SELF_CLOSING_TAGS.contains(tag.toLowerCase());
-    }
-
     private boolean validCodePoint(int codePoint) {
         return Character.isValidCodePoint(codePoint) && !(codePoint >= 0xD800 && codePoint <= 0xDFFF) && codePoint != 0;
-    }
-
-    private boolean isWhitespacePreserving(T3HtmlNode parent) {
-        return parent != null && WHITESPACE_PRESERVING_TAGS.contains(parent.getTagName().toLowerCase(java.util.Locale.ROOT));
     }
 
     public static class ParseException extends RuntimeException {
