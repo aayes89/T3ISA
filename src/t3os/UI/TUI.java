@@ -335,14 +335,9 @@ public class TUI {
 
     // Auxiliar para dibujar una imagen directamente en el framebuffer
     public void drawImagePixels(int x, int y, int width, int height, int[] pixels) {
-        if (pixels == null || width <= 0 || height <= 0) {
+        if (pixels == null || width <= 0 || height <= 0 || (long) width * height > pixels.length) {
             return;
         }
-
-        if ((long) width * height > pixels.length) {
-            return;
-        }
-
         machine.graphics(9, x, y, width, height, 0, 0, pixels);
     }
 
