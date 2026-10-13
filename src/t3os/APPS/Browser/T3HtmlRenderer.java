@@ -30,8 +30,10 @@ package t3os.APPS.Browser;
  */
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import t3os.APPS.Browser.CSS.T3CSSRule;
 import t3os.APPS.Browser.CSS.T3CSSUtils;
@@ -52,6 +54,7 @@ public final class T3HtmlRenderer {
     private final TUI ui;
     private final T3RenderContext context;
     private final List<T3CSSRule> cssRules = new ArrayList<>();
+    private final Map<String, T3HtmlImage> images = new HashMap<>();
     private int scrollY;
     private int contentHeight;
     private boolean measuring;
@@ -262,7 +265,8 @@ public final class T3HtmlRenderer {
         } else if (tag.equals("ul") || tag.equals("ol")) {
             renderList(node, tag.equals("ol"), style);
         } else if (tag.equals("img")) {
-            renderImagePlaceholder(node);
+            //renderImagePlaceholder(node);
+            renderImage(node);
         } else {
             for (T3HtmlNode child : node.getChildren()) {
                 renderNode(child, !block, style);
@@ -660,6 +664,41 @@ public final class T3HtmlRenderer {
         }
     }
 
+    // Dibujar imagen
+    private void renderImage(T3HtmlNode node) {
+        int imageX = context.getCursorX();
+        int imageY = context.getCursorY();
+
+        String src = node.getAttributes().get("src");
+        String alt = node.getAttributes().get("alt");
+
+        int requestedWidth = parsePixels(node.getAttributes().get("width"), 64);
+        int requestedHeight = parsePixels(node.getAttributes().get("height"), 48);
+
+        requestedWidth = Math.max(16, Math.min(requestedWidth, context.getWidth()));
+        requestedHeight = Math.max(16, Math.min(requestedHeight, context.getHeight()));
+
+        T3HtmlImage image = src == null ? null : images.get(src);
+
+        if (!measuring && image != null) {
+            int drawWidth = requestedWidth;
+            int drawHeight = requestedHeight;
+
+            ui.drawImagePixels(imageX, imageY, drawWidth, drawHeight, image.getPixels());
+        } else {
+            drawRectClipped(imageX, imageY, requestedWidth, requestedHeight, 0x808080);
+            if (!measuring && alt != null && !alt.isEmpty()) {
+                drawTextClipped(alt, imageX + 2, imageY + 2, context.getColor());
+            }
+        }
+
+        context.setCursorX(imageX + requestedWidth + CHAR_WIDTH);
+
+        if (context.getCursorX() + CHAR_WIDTH > context.getRight()) {
+            newLine();
+        }
+    }
+
     // Getter y Setters
     public int getContentHeight() {
         return contentHeight;
@@ -667,5 +706,17 @@ public final class T3HtmlRenderer {
 
     public void setScrollY(int value) {
         scrollY = Math.max(0, value);
+    }
+
+    public void setImage(String src, T3HtmlImage image) {
+        if (src == null || src.isBlank()) {
+            return;
+        }
+
+        if (image == null) {
+            images.remove(src);
+        } else {
+            images.put(src, image);
+        }
     }
 }
