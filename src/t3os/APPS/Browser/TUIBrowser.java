@@ -118,7 +118,7 @@ public final class TUIBrowser extends TUIElement {
     private volatile long navigationId = 0;
     private Button pressedButton = Button.NONE;
 
-    String html0 = """
+    String html = """
                 <html>
                   <head>
                       <style>
@@ -184,10 +184,7 @@ public final class TUIBrowser extends TUIElement {
         drawTitleBar(ui);
         drawToolbar(ui);
         drawContent(ui);
-        drawStatusBar(ui);
-        //testBMP("", ui);
-        //testPNG("", ui);
-        //testGIF("", ui);
+        drawStatusBar(ui);        
     }
 
     private void drawWindow(TUI ui) {
@@ -278,7 +275,7 @@ public final class TUIBrowser extends TUIElement {
 
         // Cargar el HTML de prueba una sola vez.
         if (document == null) {
-            T3HtmlParser parser = new T3HtmlParser(html0);
+            T3HtmlParser parser = new T3HtmlParser(html);
             document = parser.parse();
 
             pageTitle = "DNS-Web Browser";
