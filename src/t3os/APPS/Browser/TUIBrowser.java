@@ -281,40 +281,49 @@ public final class TUIBrowser extends TUIElement {
         ui.fillRect(contentX, contentY, contentWidth, viewportHeight, COLOR_BACKGROUND);
 
         if (document == null) {
-            String message = "about:blank".equalsIgnoreCase(address) ? "Página en blanco" : "Descargando página...";
-
-            ui.drawText(message, contentX + 8, contentY + 20, COLOR_TEXT);
             contentHeight = viewportHeight;
             scrollY = 0;
+
+            if (!"about:blank".equalsIgnoreCase(address)) {
+                ui.drawText("Descargando página...", contentX + 8, contentY + 20, COLOR_TEXT);
+            }
 
             drawScrollbar(ui, contentX + contentWidth, contentY, SCROLLBAR_WIDTH, viewportHeight);
             return;
         }
-
         if (htmlRenderer == null
                 || rendererX != contentX
                 || rendererY != contentY
                 || rendererWidth != contentWidth
                 || rendererHeight != viewportHeight) {
 
-            htmlRenderer = new T3HtmlRenderer(ui, contentX, contentY, contentWidth, viewportHeight);
+            T3HtmlRenderer renderer = new T3HtmlRenderer(ui, contentX, contentY, contentWidth, viewportHeight);
 
-            htmlRenderer.setBaseUrl(address);
+            renderer.setBaseUrl(address);
+
+            synchronized (loadedImages) {
+                for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
+                    renderer.setImage(entry.getKey(), entry.getValue());
+                }
+            }
+
+            htmlRenderer = renderer;
 
             rendererX = contentX;
             rendererY = contentY;
             rendererWidth = contentWidth;
             rendererHeight = viewportHeight;
-
-            for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
-                htmlRenderer.setImage(entry.getKey(), entry.getValue());
-            }
         }
 
-        htmlRenderer.setScrollY(scrollY);
-        htmlRenderer.render(document);
+        T3HtmlRenderer renderer = htmlRenderer;
+        if (renderer == null) {
+            return;
+        }
 
-        contentHeight = Math.max(viewportHeight, htmlRenderer.getContentHeight());
+        renderer.setScrollY(scrollY);
+        renderer.render(document);
+
+        contentHeight = Math.max(viewportHeight, renderer.getContentHeight());
 
         int maxScroll = Math.max(0, contentHeight - viewportHeight);
         scrollY = Math.max(0, Math.min(scrollY, maxScroll));
@@ -652,17 +661,38 @@ public final class TUIBrowser extends TUIElement {
     private void navigate() {
         String target = address.trim();
 
-        if (target.isEmpty()) {
-            status = "Introduce una dirección";
+        // Página de inicio o dirección vacía.
+        if (target.isEmpty() || "about:home".equalsIgnoreCase(target)) {
+            synchronized (this) {
+                ++navigationId;
+
+                synchronized (requestedImages) {
+                    requestedImages.clear();
+                }
+                synchronized (loadedImages) {
+                    loadedImages.clear();
+                }
+
+                address = "about:home";
+                addressCursor = address.length();
+
+                document = new T3HtmlParser(html).parse();
+                htmlRenderer = null;
+
+                rendererX = Integer.MIN_VALUE;
+                rendererY = Integer.MIN_VALUE;
+                rendererWidth = -1;
+                rendererHeight = -1;
+
+                scrollY = 0;
+                contentHeight = 0;
+                pageTitle = "T3Browser";
+                status = "Página de inicio";
+            }
             return;
         }
 
-        if (!target.matches("(?i)^https?://.*")
-                && !"about:blank".equalsIgnoreCase(target)) {
-            target = "http://" + target;
-        }
-
-        // Página en blanco explícita.
+        // Página completamente en blanco.
         if ("about:blank".equalsIgnoreCase(target)) {
             synchronized (this) {
                 ++navigationId;
@@ -670,7 +700,6 @@ public final class TUIBrowser extends TUIElement {
                 synchronized (requestedImages) {
                     requestedImages.clear();
                 }
-
                 synchronized (loadedImages) {
                     loadedImages.clear();
                 }
@@ -678,9 +707,9 @@ public final class TUIBrowser extends TUIElement {
                 address = "about:blank";
                 addressCursor = address.length();
 
-                document = new T3HtmlParser(html).parse();
+                // No parsear el HTML de inicio.
+                document = null;
                 htmlRenderer = null;
-                status = "Página de inicio";
 
                 rendererX = Integer.MIN_VALUE;
                 rendererY = Integer.MIN_VALUE;
@@ -695,6 +724,11 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
+        // Página remota HTTP/HTTPS.
+        if (!target.matches("(?i)^https?://.*")) {
+            target = "http://" + target;
+        }
+
         final URI uri;
 
         try {
@@ -702,7 +736,9 @@ public final class TUIBrowser extends TUIElement {
 
             String scheme = uri.getScheme();
 
-            if (uri.getHost() == null || scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+            if (uri.getHost() == null || scheme == null
+                    || (!scheme.equalsIgnoreCase("http")
+                    && !scheme.equalsIgnoreCase("https"))) {
                 status = "URL no válida";
                 return;
             }
@@ -720,7 +756,6 @@ public final class TUIBrowser extends TUIElement {
             synchronized (requestedImages) {
                 requestedImages.clear();
             }
-
             synchronized (loadedImages) {
                 loadedImages.clear();
             }
@@ -728,10 +763,12 @@ public final class TUIBrowser extends TUIElement {
             status = "Descargando página...";
             pageTitle = "T3Browser";
 
-            // Invalidar el renderer anterior sin perder la nueva navegación.
+            document = null;
             htmlRenderer = null;
+
             address = url;
             addressCursor = address.length();
+
             rendererX = Integer.MIN_VALUE;
             rendererY = Integer.MIN_VALUE;
             rendererWidth = -1;
@@ -743,22 +780,22 @@ public final class TUIBrowser extends TUIElement {
 
         Thread downloader = new Thread(() -> {
             try {
-                String html = THostNetwork.wget(url);
+                String response = THostNetwork.wget(url);
 
-                if (html == null || html.isBlank()) {
+                if (response == null || response.isBlank()) {
                     throw new IOException("Respuesta HTTP vacía");
                 }
 
                 T3HtmlNode parsedDocument;
 
                 try {
-                    parsedDocument = new T3HtmlParser(html).parse();
+                    parsedDocument = new T3HtmlParser(response).parse();
                 } catch (RuntimeException ex) {
                     throw new IOException("Error al interpretar HTML: " + ex.getMessage(), ex);
                 }
 
-                if (parsedDocument == null || parsedDocument.getChildren().isEmpty()) {
-                    throw new IOException("El documento HTML no contiene nodos");
+                if (parsedDocument == null) {
+                    throw new IOException("No se pudo interpretar el documento HTML");
                 }
 
                 synchronized (this) {
@@ -777,24 +814,21 @@ public final class TUIBrowser extends TUIElement {
 
                     scrollY = 0;
                     contentHeight = 0;
+
                     pageTitle = uriTitle(url);
                     status = "Página cargada";
                 }
 
-                // Las imágenes se cargan después de aceptar el documento.
                 loadImages(parsedDocument, uri, currentNavigation);
 
             } catch (Exception ex) {
-                ex.printStackTrace();
-
                 synchronized (this) {
                     if (navigationId != currentNavigation) {
                         return;
                     }
 
                     String message = ex.getMessage();
-                    status = "Error al cargar: "
-                            + (message == null ? ex.getClass().getSimpleName() : message);
+                    status = "Error al cargar: " + (message == null ? ex.getClass().getSimpleName() : message);
                 }
             }
         }, "T3Browser-Wget");

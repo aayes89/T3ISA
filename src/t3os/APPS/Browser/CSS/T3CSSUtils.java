@@ -499,9 +499,16 @@ public class T3CSSUtils {
                 style.setBorderWidth(parseDimension(value));
                 break;
 
-            case "border-color":
-                style.setBorderColor(parseColor(value));
+            case "border-color": {
+                String[] colors = value.trim().split("\\s+");
+
+                Color borderColor = parseColor(colors[0]);
+
+                if (borderColor != null) {
+                    style.setBorderColor(borderColor);
+                }
                 break;
+            }
 
             case "border-radius":
                 style.setBorderRadius(parseDimension(value));
