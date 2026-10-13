@@ -354,6 +354,21 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
+        // Redimensionar desde la esquina inferior derecha.
+        if (localX >= width - RESIZE_SIZE && localY >= height - RESIZE_SIZE) {
+            resizing = true;
+            resizeStartX = mx;
+            resizeStartY = my;
+            resizeStartWidth = width;
+            resizeStartHeight = height;
+
+            dragging = false;
+            draggingScrollbar = false;
+            addressFocused = false;
+            return;
+        }
+
+        // Barra de título: cerrar o mover la ventana.
         if (localY < TITLE_HEIGHT) {
             addressFocused = false;
 
@@ -368,9 +383,11 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
+        // Barra de herramientas.
         int toolbarY = TITLE_HEIGHT;
 
         if (localY >= toolbarY && localY < toolbarY + TOOLBAR_HEIGHT) {
+
             int by = toolbarY + 4;
             int bh = TOOLBAR_HEIGHT - 8;
 
@@ -424,6 +441,8 @@ public final class TUIBrowser extends TUIElement {
             addressFocused = false;
             return;
         }
+
+        // Barra de desplazamiento vertical.
         int contentTop = TITLE_HEIGHT + TOOLBAR_HEIGHT + 1;
         int contentBottom = height - STATUS_HEIGHT - 2;
         int scrollbarX = width - 2 - SCROLLBAR_WIDTH;
@@ -431,7 +450,14 @@ public final class TUIBrowser extends TUIElement {
         if (localY >= contentTop && localY < contentBottom && localX >= scrollbarX && localX < width - 2) {
 
             int trackHeight = contentBottom - contentTop;
-            int thumbHeight = contentHeight <= trackHeight ? trackHeight : Math.max(SCROLL_MIN_THUMB, trackHeight * trackHeight / contentHeight);
+
+            if (trackHeight <= 0) {
+                addressFocused = false;
+                return;
+            }
+
+            int thumbHeight = contentHeight <= trackHeight
+                    ? trackHeight : Math.max(SCROLL_MIN_THUMB, (int) ((long) trackHeight * trackHeight / Math.max(1, contentHeight)));
 
             thumbHeight = Math.min(trackHeight, thumbHeight);
 
@@ -439,6 +465,7 @@ public final class TUIBrowser extends TUIElement {
             int thumbRange = trackHeight - thumbHeight;
 
             int thumbY = contentTop;
+
             if (maxScroll > 0) {
                 thumbY += (int) ((long) scrollY * thumbRange / maxScroll);
             }
@@ -448,6 +475,7 @@ public final class TUIBrowser extends TUIElement {
                 scrollbarDragOffset = localY - thumbY;
             } else {
                 int targetThumbY = localY - thumbHeight / 2;
+
                 targetThumbY = Math.max(contentTop, Math.min(targetThumbY, contentBottom - thumbHeight));
 
                 scrollY = thumbRange > 0 ? (int) ((long) (targetThumbY - contentTop) * maxScroll / thumbRange) : 0;
@@ -462,6 +490,15 @@ public final class TUIBrowser extends TUIElement {
 
     @Override
     public void mouseMove(int mx, int my) {
+
+        // Redimensionar la ventana.
+        if (resizing) {
+            width = Math.max(MIN_WIDTH, resizeStartWidth + mx - resizeStartX);
+            height = Math.max(MIN_HEIGHT, resizeStartHeight + my - resizeStartY);
+            return;
+        }
+
+        // Arrastrar el control de desplazamiento.
         if (draggingScrollbar) {
             int contentTop = TITLE_HEIGHT + TOOLBAR_HEIGHT + 1;
             int contentBottom = height - STATUS_HEIGHT - 2;
@@ -471,7 +508,8 @@ public final class TUIBrowser extends TUIElement {
                 return;
             }
 
-            int thumbHeight = contentHeight <= trackHeight ? trackHeight : Math.max(SCROLL_MIN_THUMB, (int) ((long) trackHeight * trackHeight / Math.max(1, contentHeight)));
+            int thumbHeight = contentHeight <= trackHeight
+                    ? trackHeight : Math.max(SCROLL_MIN_THUMB, (int) ((long) trackHeight * trackHeight / Math.max(1, contentHeight)));
 
             thumbHeight = Math.min(trackHeight, thumbHeight);
 
@@ -484,13 +522,14 @@ public final class TUIBrowser extends TUIElement {
             }
 
             int targetThumbY = my - y - scrollbarDragOffset;
+
             targetThumbY = Math.max(contentTop, Math.min(targetThumbY, contentBottom - thumbHeight));
 
             scrollY = (int) ((long) (targetThumbY - contentTop) * maxScroll / thumbRange);
-
             return;
         }
 
+        // Mover la ventana.
         if (dragging) {
             setPosition(mx - dragOffsetX, my - dragOffsetY);
         }
@@ -502,6 +541,7 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
+        resizing = false;
         dragging = false;
         draggingScrollbar = false;
 
