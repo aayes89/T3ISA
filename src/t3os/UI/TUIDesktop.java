@@ -373,6 +373,21 @@ public final class TUIDesktop extends TUIElement {
         System.exit(0);
     }
 
+    // Manejo de eventos de teclado
+    public void keyPressed(t3isa.DEVICE.TKeyboardDevice.Key key) {
+        if (key == null) {
+            return;
+        }
+
+        if (browser != null && browser.isVisible()) {
+            browser.keyPressed(key);
+        }
+
+        if (editor != null && editor.isVisible()) {
+            editor.keyPressed(key);
+        }
+    }
+
     // === GETTER y SETTERS ===
     public TUIPopupMenu getDesktopMenu() {
         return desktopMenu;

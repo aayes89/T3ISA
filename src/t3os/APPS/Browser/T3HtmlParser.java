@@ -154,9 +154,150 @@ public class T3HtmlParser {
         if (text.isEmpty()) {
             return null;
         }
+
         T3HtmlNode textNode = new T3HtmlNode("#text");
-        textNode.setText(isWhitespacePreserving(textNode.getParent()) ? text : text.trim());
+
+        // No usar getParent() aquí: el nodo aún no pertenece al árbol.
+        // Conservar el contenido para no perder espacios entre elementos.
+        textNode.setText(decodeHtmlEntities(text));
+
         return textNode;
+    }
+
+    private String decodeHtmlEntities(String text) {
+        if (text == null || text.indexOf('&') < 0) {
+            return text;
+        }
+
+        StringBuilder result = new StringBuilder(text.length());
+
+        for (int i = 0; i < text.length();) {
+            char current = text.charAt(i);
+
+            if (current != '&') {
+                result.append(current);
+                i++;
+                continue;
+            }
+
+            int semicolon = text.indexOf(';', i + 1);
+
+            // Evitar buscar indefinidamente o consumir texto que no sea entidad.
+            if (semicolon < 0 || semicolon - i > 32) {
+                result.append(current);
+                i++;
+                continue;
+            }
+
+            String entity = text.substring(i + 1, semicolon);
+            String decoded = decodeHtmlEntity(entity);
+
+            if (decoded == null) {
+                result.append(current);
+                i++;
+            } else {
+                result.append(decoded);
+                i = semicolon + 1;
+            }
+        }
+
+        return result.toString();
+    }
+
+    private String decodeHtmlEntity(String entity) {
+        switch (entity) {
+            case "amp":
+                return "&";
+            case "lt":
+                return "<";
+            case "gt":
+                return ">";
+            case "quot":
+                return "\"";
+            case "apos":
+                return "'";
+            case "nbsp":
+                return "\u00A0";
+
+            case "copy":
+                return "\u00A9";
+            case "reg":
+                return "\u00AE";
+            case "trade":
+                return "\u2122";
+
+            case "aacute":
+                return "\u00E1";
+            case "Aacute":
+                return "\u00C1";
+            case "eacute":
+                return "\u00E9";
+            case "Eacute":
+                return "\u00C9";
+            case "iacute":
+                return "\u00ED";
+            case "Iacute":
+                return "\u00CD";
+            case "oacute":
+                return "\u00F3";
+            case "Oacute":
+                return "\u00D3";
+            case "uacute":
+                return "\u00FA";
+            case "Uacute":
+                return "\u00DA";
+
+            case "ntilde":
+                return "\u00F1";
+            case "Ntilde":
+                return "\u00D1";
+            case "uuml":
+                return "\u00FC";
+            case "Uuml":
+                return "\u00DC";
+
+            case "iexcl":
+                return "\u00A1";
+            case "iquest":
+                return "\u00BF";
+            case "mdash":
+                return "\u2014";
+            case "ndash":
+                return "\u2013";
+            case "hellip":
+                return "\u2026";
+            case "lsquo":
+                return "\u2018";
+            case "rsquo":
+                return "\u2019";
+            case "ldquo":
+                return "\u201C";
+            case "rdquo":
+                return "\u201D";
+
+            default:
+                break;
+        }
+
+        try {
+            if (entity.startsWith("#x") || entity.startsWith("#X")) {
+                int codePoint = Integer.parseInt(entity.substring(2), 16);
+                return validCodePoint(codePoint)
+                        ? new String(Character.toChars(codePoint))
+                        : null;
+            }
+
+            if (entity.startsWith("#")) {
+                int codePoint = Integer.parseInt(entity.substring(1));
+                return validCodePoint(codePoint)
+                        ? new String(Character.toChars(codePoint))
+                        : null;
+            }
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+
+        return null;
     }
 
     private T3HtmlNode parseComment() {
@@ -325,8 +466,12 @@ public class T3HtmlParser {
         return SELF_CLOSING_TAGS.contains(tag.toLowerCase());
     }
 
+    private boolean validCodePoint(int codePoint) {
+        return Character.isValidCodePoint(codePoint) && !(codePoint >= 0xD800 && codePoint <= 0xDFFF) && codePoint != 0;
+    }
+
     private boolean isWhitespacePreserving(T3HtmlNode parent) {
-        return parent != null && WHITESPACE_PRESERVING_TAGS.contains(parent.getTagName().toLowerCase());
+        return parent != null && WHITESPACE_PRESERVING_TAGS.contains(parent.getTagName().toLowerCase(java.util.Locale.ROOT));
     }
 
     public static class ParseException extends RuntimeException {

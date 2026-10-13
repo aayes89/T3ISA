@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import t3isa.DEVICE.TKeyboardDevice;
 import t3isa.HARDWARE.TMachine;
+import t3os.APPS.Browser.TUIBrowser;
 
 public class TUI {
 
@@ -89,6 +90,16 @@ public class TUI {
                     }
 
                     dialog.keyPressed(key);
+                    break;
+                }
+
+                // Integración con Browser
+                if (element instanceof TUIBrowser browser) {
+                    if (!browser.hasAddressFocus()) {
+                        continue;
+                    }
+
+                    browser.keyPressed(key);
                     break;
                 }
 

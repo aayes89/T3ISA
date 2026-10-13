@@ -271,7 +271,7 @@ public final class TUIBrowser extends TUIElement {
 
     @Override
     public void mouseDown(int button, int mx, int my) {
-        if (button != 1) {
+        if (!visible || !enabled || button != 1) {
             return;
         }
 
@@ -280,7 +280,14 @@ public final class TUIBrowser extends TUIElement {
 
         pressedButton = Button.NONE;
 
+        if (localY < 0 || localY >= height || localX < 0 || localX >= width) {
+            addressFocused = false;
+            return;
+        }
+
         if (localY < TITLE_HEIGHT) {
+            addressFocused = false;
+
             if (localX >= width - CLOSE_WIDTH) {
                 pressedButton = Button.CLOSE;
                 return;
@@ -293,60 +300,65 @@ public final class TUIBrowser extends TUIElement {
         }
 
         int toolbarY = TITLE_HEIGHT;
-        if (localY < toolbarY || localY >= toolbarY + TOOLBAR_HEIGHT) {
+
+        if (localY >= toolbarY
+                && localY < toolbarY + TOOLBAR_HEIGHT) {
+
+            int by = toolbarY + 4;
+            int bh = TOOLBAR_HEIGHT - 8;
+
+            if (localY < by || localY >= by + bh) {
+                addressFocused = false;
+                return;
+            }
+
+            int bx = 5;
+
+            if (localX >= bx && localX < bx + BUTTON_WIDTH) {
+                addressFocused = false;
+                pressedButton = Button.BACK;
+                return;
+            }
+
+            bx += BUTTON_WIDTH + 3;
+
+            if (localX >= bx && localX < bx + BUTTON_WIDTH) {
+                addressFocused = false;
+                pressedButton = Button.FORWARD;
+                return;
+            }
+
+            bx += BUTTON_WIDTH + 3;
+
+            if (localX >= bx && localX < bx + BUTTON_WIDTH) {
+                addressFocused = false;
+                pressedButton = Button.RELOAD;
+                return;
+            }
+
+            bx += BUTTON_WIDTH + 6;
+
+            int goX = width - GO_WIDTH - 5;
+
+            if (localX >= goX && localX < goX + GO_WIDTH) {
+                addressFocused = false;
+                pressedButton = Button.GO;
+                return;
+            }
+
+            if (localX >= bx && localX < goX) {
+                addressFocused = true;
+
+                int charPosition = (localX - bx - 5) / 8;
+                addressCursor = Math.max(0, Math.min(charPosition, address.length()));
+                return;
+            }
+
             addressFocused = false;
             return;
         }
 
-        int by = toolbarY + 4;
-        int bh = TOOLBAR_HEIGHT - 8;
-
-        if (localY < by || localY >= by + bh) {
-            addressFocused = false;
-            return;
-        }
-
-        int bx = 5;
-
-        if (localX >= bx && localX < bx + BUTTON_WIDTH) {
-            pressedButton = Button.BACK;
-            addressFocused = false;
-            return;
-        }
-
-        bx += BUTTON_WIDTH + 3;
-
-        if (localX >= bx && localX < bx + BUTTON_WIDTH) {
-            pressedButton = Button.FORWARD;
-            addressFocused = false;
-            return;
-        }
-
-        bx += BUTTON_WIDTH + 3;
-
-        if (localX >= bx && localX < bx + BUTTON_WIDTH) {
-            pressedButton = Button.RELOAD;
-            addressFocused = false;
-            return;
-        }
-
-        int goX = width - GO_WIDTH - 5;
-
-        if (localX >= goX && localX < goX + GO_WIDTH) {
-            pressedButton = Button.GO;
-            addressFocused = false;
-            return;
-        }
-
-        int fieldX = bx;// + BUTTON_WIDTH + 6;
-        if (localX >= fieldX && localX < goX) {
-            addressFocused = true;
-
-            int charPosition = (localX - fieldX - 5) / 8;
-            addressCursor = Math.max(0, Math.min(charPosition, address.length()));
-        } else {
-            addressFocused = false;
-        }
+        addressFocused = false;
     }
 
     @Override
@@ -398,7 +410,7 @@ public final class TUIBrowser extends TUIElement {
     }
 
     public void keyPressed(TKeyboardDevice.Key key) {
-        if (!addressFocused || key == null) {
+        if (key == null || !visible || !enabled || !addressFocused) {
             return;
         }
 
@@ -417,7 +429,7 @@ public final class TUIBrowser extends TUIElement {
         }
 
         if (code == KeyEvent.VK_BACK_SPACE || ch == '\b') {
-            if (addressCursor > 0 && !address.isEmpty()) {
+            if (addressCursor > 0) {
                 address = address.substring(0, addressCursor - 1) + address.substring(addressCursor);
                 addressCursor--;
             }
@@ -432,16 +444,12 @@ public final class TUIBrowser extends TUIElement {
         }
 
         if (code == KeyEvent.VK_LEFT) {
-            if (addressCursor > 0) {
-                addressCursor--;
-            }
+            addressCursor = Math.max(0, addressCursor - 1);
             return;
         }
 
         if (code == KeyEvent.VK_RIGHT) {
-            if (addressCursor < address.length()) {
-                addressCursor++;
-            }
+            addressCursor = Math.min(address.length(), addressCursor + 1);
             return;
         }
 
@@ -457,7 +465,6 @@ public final class TUIBrowser extends TUIElement {
 
         if (!Character.isISOControl(ch)) {
             address = address.substring(0, addressCursor) + ch + address.substring(addressCursor);
-
             addressCursor++;
         }
     }
