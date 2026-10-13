@@ -417,56 +417,71 @@ public final class TUIBrowser extends TUIElement {
         int code = key.getCode();
         char ch = key.getCharacter();
 
-        if (code == KeyEvent.VK_ENTER || ch == '\n' || ch == '\r') {
-            addressFocused = false;
-            navigate();
+        switch (code) {
+            case KeyEvent.VK_ENTER:
+                addressFocused = false;
+                navigate();
+                return;
+
+            case KeyEvent.VK_ESCAPE:
+                addressFocused = false;
+                return;
+
+            case KeyEvent.VK_BACK_SPACE:
+                if (addressCursor > 0) {
+                    address = address.substring(0, addressCursor - 1) + address.substring(addressCursor);
+                    addressCursor--;
+                }
+                return;
+
+            case KeyEvent.VK_DELETE:
+                if (addressCursor < address.length()) {
+                    address = address.substring(0, addressCursor)
+                            + address.substring(addressCursor + 1);
+                }
+                return;
+
+            case KeyEvent.VK_LEFT:
+                addressCursor = Math.max(0, addressCursor - 1);
+                return;
+
+            case KeyEvent.VK_RIGHT:
+                addressCursor = Math.min(address.length(), addressCursor + 1);
+                return;
+
+            case KeyEvent.VK_HOME:
+                addressCursor = 0;
+                return;
+
+            case KeyEvent.VK_END:
+                addressCursor = address.length();
+                return;
+
+            case KeyEvent.VK_SHIFT:
+            case KeyEvent.VK_CONTROL:
+            case KeyEvent.VK_ALT:
+            case KeyEvent.VK_ALT_GRAPH:
+            case KeyEvent.VK_META:
+            case KeyEvent.VK_CAPS_LOCK:
+            case KeyEvent.VK_TAB:
+            case KeyEvent.VK_UP:
+            case KeyEvent.VK_DOWN:
+            case KeyEvent.VK_PAGE_UP:
+            case KeyEvent.VK_PAGE_DOWN:
+            case KeyEvent.VK_INSERT:
+                return;
+
+            default:
+                break;
+        }
+
+        // No insertar caracteres de control ni espacios espurios.
+        if (Character.isISOControl(ch) || Character.isWhitespace(ch)) {
             return;
         }
 
-        if (code == KeyEvent.VK_ESCAPE) {
-            addressFocused = false;
-            return;
-        }
-
-        if (code == KeyEvent.VK_BACK_SPACE || ch == '\b') {
-            if (addressCursor > 0) {
-                address = address.substring(0, addressCursor - 1) + address.substring(addressCursor);
-                addressCursor--;
-            }
-            return;
-        }
-
-        if (code == KeyEvent.VK_DELETE) {
-            if (addressCursor < address.length()) {
-                address = address.substring(0, addressCursor) + address.substring(addressCursor + 1);
-            }
-            return;
-        }
-
-        if (code == KeyEvent.VK_LEFT) {
-            addressCursor = Math.max(0, addressCursor - 1);
-            return;
-        }
-
-        if (code == KeyEvent.VK_RIGHT) {
-            addressCursor = Math.min(address.length(), addressCursor + 1);
-            return;
-        }
-
-        if (code == KeyEvent.VK_HOME) {
-            addressCursor = 0;
-            return;
-        }
-
-        if (code == KeyEvent.VK_END) {
-            addressCursor = address.length();
-            return;
-        }
-
-        if (!Character.isISOControl(ch)) {
-            address = address.substring(0, addressCursor) + ch + address.substring(addressCursor);
-            addressCursor++;
-        }
+        address = address.substring(0, addressCursor) + ch + address.substring(addressCursor);
+        addressCursor++;
     }
 
     private void navigate() {
