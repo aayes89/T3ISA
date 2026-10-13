@@ -23,10 +23,6 @@
  */
 package t3os.APPS.Browser;
 
-/**
- *
- * @author Slam
- */
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
@@ -113,7 +109,6 @@ public class T3HtmlParser {
 
         String tagName = readTagName().toLowerCase(java.util.Locale.ROOT);
         if (tagName.isEmpty()) {
-            // Evitar bucles infinitos ante un '<' que no inicia una etiqueta.
             pos = startPos + 1;
             T3HtmlNode textNode = new T3HtmlNode("#text");
             textNode.setText("<");
@@ -134,7 +129,18 @@ public class T3HtmlParser {
             skipWhitespace();
         }
 
-        skip('>');
+        // Prevenir colisión de etiquetas anidadas sin cierre (ej: <a <b)
+        while (pos < contentLength && content.charAt(pos) != '>' && content.charAt(pos) != '<') {
+            pos++;
+        }
+
+        if (pos < contentLength && content.charAt(pos) == '>') {
+            pos++;
+        } else {
+            // Si aparece '<' antes de cerrar la etiqueta actual, 
+            // fuerzo como autocierre para evitar StackOverflowError por recursión.
+            selfClosing = true;
+        }
 
         if (selfClosing) {
             return node;
@@ -149,6 +155,8 @@ public class T3HtmlParser {
         }
 
         while (pos < contentLength) {
+            int loopStartPos = pos; // prevenir bucles infinitos
+
             if (content.regionMatches(true, pos, "</", 0, 2)) {
                 int closeStart = pos;
                 pos += 2;
@@ -159,7 +167,6 @@ public class T3HtmlParser {
                     return node;
                 }
 
-                // Un cierre de otro elemento no debe consumir el resto del documento.
                 if (AUTO_CLOSE_TAGS.contains(tagName)) {
                     pos = closeStart;
                     return node;
@@ -176,9 +183,13 @@ public class T3HtmlParser {
             if (child != null) {
                 node.addChild(child);
             }
+
+            // Forzar el avance si el parser interno falló en avanzar
+            if (pos == loopStartPos) {
+                pos++;
+            }
         }
 
-        // HTML tolerante: acepta elementos que no tienen etiqueta de cierre.
         return node;
     }
 
@@ -241,9 +252,6 @@ public class T3HtmlParser {
         }
 
         T3HtmlNode textNode = new T3HtmlNode("#text");
-
-        // No usar getParent() aquí: el nodo aún no pertenece al árbol.
-        // Conservar el contenido para no perder espacios entre elementos.
         textNode.setText(decodeHtmlEntities(text));
 
         return textNode;
@@ -267,7 +275,6 @@ public class T3HtmlParser {
 
             int semicolon = text.indexOf(';', i + 1);
 
-            // Evitar buscar indefinidamente o consumir texto que no sea entidad.
             if (semicolon < 0 || semicolon - i > 32) {
                 result.append(current);
                 i++;
@@ -303,14 +310,12 @@ public class T3HtmlParser {
                 return "'";
             case "nbsp":
                 return "\u00A0";
-
             case "copy":
                 return "\u00A9";
             case "reg":
                 return "\u00AE";
             case "trade":
                 return "\u2122";
-
             case "aacute":
                 return "\u00E1";
             case "Aacute":
@@ -331,7 +336,6 @@ public class T3HtmlParser {
                 return "\u00FA";
             case "Uacute":
                 return "\u00DA";
-
             case "ntilde":
                 return "\u00F1";
             case "Ntilde":
@@ -340,7 +344,6 @@ public class T3HtmlParser {
                 return "\u00FC";
             case "Uuml":
                 return "\u00DC";
-
             case "iexcl":
                 return "\u00A1";
             case "iquest":
@@ -359,7 +362,6 @@ public class T3HtmlParser {
                 return "\u201C";
             case "rdquo":
                 return "\u201D";
-
             default:
                 break;
         }
@@ -367,16 +369,12 @@ public class T3HtmlParser {
         try {
             if (entity.startsWith("#x") || entity.startsWith("#X")) {
                 int codePoint = Integer.parseInt(entity.substring(2), 16);
-                return validCodePoint(codePoint)
-                        ? new String(Character.toChars(codePoint))
-                        : null;
+                return validCodePoint(codePoint) ? new String(Character.toChars(codePoint)) : null;
             }
 
             if (entity.startsWith("#")) {
                 int codePoint = Integer.parseInt(entity.substring(1));
-                return validCodePoint(codePoint)
-                        ? new String(Character.toChars(codePoint))
-                        : null;
+                return validCodePoint(codePoint) ? new String(Character.toChars(codePoint)) : null;
             }
         } catch (NumberFormatException ex) {
             return null;
@@ -436,10 +434,7 @@ public class T3HtmlParser {
     private String readTagName() {
         skipWhitespace();
         int start = pos;
-        while (pos < contentLength
-                && (Character.isLetterOrDigit(content.charAt(pos))
-                || content.charAt(pos) == '-'
-                || content.charAt(pos) == ':')) {
+        while (pos < contentLength && (Character.isLetterOrDigit(content.charAt(pos)) || content.charAt(pos) == '-' || content.charAt(pos) == ':')) {
             pos++;
         }
         return content.substring(start, pos).trim();
@@ -449,7 +444,8 @@ public class T3HtmlParser {
         while (pos < contentLength && content.charAt(pos) != '>' && content.charAt(pos) != '/') {
             skipWhitespace();
 
-            if (pos >= contentLength || content.charAt(pos) == '>' || content.charAt(pos) == '/') {
+            // Añado interrupción por '<' para evitar parsear basura.
+            if (pos >= contentLength || content.charAt(pos) == '>' || content.charAt(pos) == '/' || content.charAt(pos) == '<') {
                 break;
             }
 

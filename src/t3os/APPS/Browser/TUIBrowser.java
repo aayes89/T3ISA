@@ -120,6 +120,7 @@ public final class TUIBrowser extends TUIElement {
     private T3HtmlNode document;
     private final Set<String> requestedImages = new HashSet<>();
     private final Map<String, T3HtmlImage> loadedImages = new ConcurrentHashMap<>();
+    private T3LayoutBox currentRenderTree;
     private volatile long navigationId = 0;
     private Button pressedButton = Button.NONE;
 
@@ -301,12 +302,11 @@ public final class TUIBrowser extends TUIElement {
 
         List<T3CSSRule> cssRules = new ArrayList<>();
         // Extraer CSS
-        collectCSSRules(document, cssRules);  
+        collectCSSRules(document, cssRules);
 
         // Paso loadedImages directamente al Layout Engine
         T3LayoutEngine engine = new T3LayoutEngine(contentWidth, cssRules, loadedImages);
-        T3LayoutBox renderTree = engine.buildLayoutTree(document);
-        
+        currentRenderTree = engine.buildLayoutTree(document);
         // Actualizar el Scroll y la altura total
         contentHeight = Math.max(viewportHeight, engine.getContentHeight());
         int maxScroll = Math.max(0, contentHeight - viewportHeight);
@@ -315,7 +315,7 @@ public final class TUIBrowser extends TUIElement {
         // Fase de Paint (Dibujar los píxeles reales en UI)
         T3Painter painter = new T3Painter(ui, context);
         painter.setScrollY(scrollY);
-        painter.paint(renderTree);
+        painter.paint(currentRenderTree);
 
         drawScrollbar(ui, contentX + contentWidth, contentY, SCROLLBAR_WIDTH, viewportHeight);
     }
@@ -422,7 +422,6 @@ public final class TUIBrowser extends TUIElement {
 
             if (localX >= bx && localX < goX) {
                 addressFocused = true;
-
                 int charPosition = (localX - bx - 5) / 8;
                 addressCursor = Math.max(0, Math.min(charPosition, address.length()));
                 return;
@@ -432,49 +431,81 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
-        // Barra de desplazamiento vertical.
+        // Zona central del contenido Web y Scrollbar 
         int contentTop = TITLE_HEIGHT + TOOLBAR_HEIGHT + 1;
         int contentBottom = height - STATUS_HEIGHT - 2;
+        int contentX = 2;
         int scrollbarX = width - 2 - SCROLLBAR_WIDTH;
 
-        if (localY >= contentTop && localY < contentBottom && localX >= scrollbarX && localX < width - 2) {
+        // Comprobar si el clic ocurrió en la franja vertical de la página
+        if (localY >= contentTop && localY < contentBottom) {
 
-            int trackHeight = contentBottom - contentTop;
+            // Clic en el área de la página web (Hit Testing)
+            if (localX >= contentX && localX < scrollbarX) {
+                addressFocused = false; // Quitar el foco de la barra de URL
 
-            if (trackHeight <= 0) {
-                addressFocused = false;
+                if (currentRenderTree != null) {
+                    int docX = localX - contentX;
+                    int docY = localY - contentTop + scrollY;
+
+                    t3os.APPS.Browser.Rendering.T3LayoutBox clickedBox = findBoxAt(currentRenderTree, docX, docY);
+
+                    if (clickedBox != null && clickedBox.node != null) {
+                        String href = getHrefFromNode(clickedBox.node);
+
+                        if (href != null && !href.isBlank()) {
+                            try {
+                                URI currentUri = URI.create(address);
+                                URI targetUri = currentUri.resolve(href.trim()).normalize();
+
+                                setAddress(targetUri.toString());
+                                navigate();
+
+                            } catch (IllegalArgumentException ex) {
+                                System.err.println("URL de enlace inválida: " + href);
+                            }
+                        }
+                    }
+                }
                 return;
             }
 
-            int thumbHeight = contentHeight <= trackHeight
-                    ? trackHeight : Math.max(SCROLL_MIN_THUMB, (int) ((long) trackHeight * trackHeight / Math.max(1, contentHeight)));
+            // Clic en la barra de desplazamiento
+            if (localX >= scrollbarX && localX < width - 2) {
+                addressFocused = false; // Quitar el foco de la barra de URL
 
-            thumbHeight = Math.min(trackHeight, thumbHeight);
+                int trackHeight = contentBottom - contentTop;
+                if (trackHeight <= 0) {
+                    return;
+                }
 
-            int maxScroll = Math.max(0, contentHeight - trackHeight);
-            int thumbRange = trackHeight - thumbHeight;
+                int thumbHeight = contentHeight <= trackHeight
+                        ? trackHeight : Math.max(SCROLL_MIN_THUMB, (int) ((long) trackHeight * trackHeight / Math.max(1, contentHeight)));
 
-            int thumbY = contentTop;
+                thumbHeight = Math.min(trackHeight, thumbHeight);
 
-            if (maxScroll > 0) {
-                thumbY += (int) ((long) scrollY * thumbRange / maxScroll);
+                int maxScroll = Math.max(0, contentHeight - trackHeight);
+                int thumbRange = trackHeight - thumbHeight;
+
+                int thumbY = contentTop;
+
+                if (maxScroll > 0) {
+                    thumbY += (int) ((long) scrollY * thumbRange / maxScroll);
+                }
+
+                if (localY >= thumbY && localY < thumbY + thumbHeight) {
+                    draggingScrollbar = true;
+                    scrollbarDragOffset = localY - thumbY;
+                } else {
+                    int targetThumbY = localY - thumbHeight / 2;
+                    targetThumbY = Math.max(contentTop, Math.min(targetThumbY, contentBottom - thumbHeight));
+                    scrollY = thumbRange > 0 ? (int) ((long) (targetThumbY - contentTop) * maxScroll / thumbRange) : 0;
+                }
+                return;
             }
-
-            if (localY >= thumbY && localY < thumbY + thumbHeight) {
-                draggingScrollbar = true;
-                scrollbarDragOffset = localY - thumbY;
-            } else {
-                int targetThumbY = localY - thumbHeight / 2;
-
-                targetThumbY = Math.max(contentTop, Math.min(targetThumbY, contentBottom - thumbHeight));
-
-                scrollY = thumbRange > 0 ? (int) ((long) (targetThumbY - contentTop) * maxScroll / thumbRange) : 0;
-            }
-
-            addressFocused = false;
-            return;
         }
 
+        // Si se hace clic en cualquier otro borde muerto de la ventana
         addressFocused = false;
     }
 
@@ -956,33 +987,35 @@ public final class TUIBrowser extends TUIElement {
         System.out.println("Refrescando");
     }
 
-    // Auxiliar para vincular las imágenes descargadas al Render Tree
-    private void injectImages(T3LayoutBox box) {
-        if (box == null || box.node == null) {
-            return;
+    // Auxiliar para captura de eventos de colisión
+    private T3LayoutBox findBoxAt(T3LayoutBox box, int x, int y) {
+        if (box == null) {
+            return null;
         }
 
-        if ("img".equalsIgnoreCase(box.node.getTagName())) {
-            String src = box.node.getAttributes().get("src");
-            if (src != null) {
-                // Resuelve la ruta contra loadedImages (idealmente normalizando URLs)
-                T3HtmlImage img = loadedImages.get(src);
-                if (img == null) {
-                    // Intento extra por si la URL absoluta difiere ligeramente
-                    for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
-                        if (entry.getKey().endsWith(src)) {
-                            img = entry.getValue();
-                            break;
-                        }
-                    }
+        // Verificar si las coordenadas están dentro de esta caja
+        if (x >= box.x && x < box.x + box.width && y >= box.y && y < box.y + box.height) {
+            // Buscar primero en los hijos (el elemento más profundo que solape)
+            for (int i = box.children.size() - 1; i >= 0; i--) {
+                T3LayoutBox hitChild = findBoxAt(box.children.get(i), x, y);
+                if (hitChild != null) {
+                    return hitChild;
                 }
-                box.image = img;
             }
+            return box;
         }
+        return null;
+    }
 
-        for (T3LayoutBox child : box.children) {
-            injectImages(child);
+    private String getHrefFromNode(T3HtmlNode node) {
+        T3HtmlNode current = node;
+        while (current != null) {
+            if ("a".equalsIgnoreCase(current.getTagName())) {
+                return current.getAttributes().get("href");
+            }
+            current = current.getParent();
         }
+        return null;
     }
 
     // Auxiliar para dibujar el scrollbar
