@@ -565,6 +565,18 @@ public class T3CSSUtils {
         // !important no forma parte del valor del color.
         value = value.replaceFirst("\\s*!\\s*important\\s*$", "").trim();
 
+        /* ignorar por ahora cosas como:
+            var(--background-color-interactive);
+            var(--color-progressive);
+            var(--color-subtle);
+            var(--border-color-base);
+            var(--color-emphasized);
+        
+         */
+        if (value.startsWith("var(--")) {
+            return new Color(255, 255, 255); // blanco
+        }
+
         if ("transparent".equals(value)) {
             return new Color(0, 0, 0, 0);
         }
@@ -626,6 +638,7 @@ public class T3CSSUtils {
             if (value.matches("[0-9a-f]{6}")) {
                 return new Color(Integer.parseInt(value, 16));
             }
+
             return switch (value) {
                 case "red" ->
                     Color.RED;
@@ -637,6 +650,26 @@ public class T3CSSUtils {
                     Color.BLACK;
                 case "white" ->
                     Color.WHITE;
+                case "grey" ->
+                    Color.GRAY;
+                case "fuchsia" ->
+                    new Color(255, 0, 128);
+                case "lime" ->
+                    new Color(137, 243, 54);
+                case "purple" ->
+                    new Color(48, 25, 52);
+                case "silver" ->
+                    new Color(192, 192, 192);
+                case "orange" ->
+                    Color.ORANGE;
+                case "cyan" ->
+                    Color.CYAN;
+                case "pink" ->
+                    Color.PINK;
+                case "yellow" ->
+                    Color.YELLOW;
+                case "dark_gray" ->
+                    Color.DARK_GRAY;
                 case "f8f9fa" ->
                     new Color(248, 249, 250);
                 case "6c757d" ->

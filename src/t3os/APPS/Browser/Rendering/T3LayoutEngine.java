@@ -225,7 +225,6 @@ public class T3LayoutEngine {
         box.width = resolveWidth(style.getWidth(), calculatedWidth) + paddingLeft + paddingRight;
         box.height = resolveHeight(style.getHeight(), maxChildBottom - box.y) + paddingBottom;
 
-        // La evaluación de Tablas e Inputs va fuera del ciclo for
         if ("table".equals(tag)) {
             T3TableLayout.apply(box, box.width);
             maxChildBottom = box.y;
@@ -235,34 +234,40 @@ public class T3LayoutEngine {
             box.height = resolveHeight(style.getHeight(), maxChildBottom - box.y) + paddingBottom;
         }
 
-        // Manejo de Inputs(Ocultos, Cajas de texto y Botones)
+        // Dimensionamiento intrínseco robusto y forzado para Inputs
         if ("input".equals(tag)) {
             String type = node.getAttributes().getOrDefault("type", "").toLowerCase();
 
-            // Ignorar completamente los inputs ocultos
             if ("hidden".equals(type)) {
                 return null;
             }
 
-            // Ajustar tamaños según el tipo
+            int intrinsicW = 150;
+            int intrinsicH = 24;
+
             if ("submit".equals(type) || "button".equals(type)) {
                 String val = node.getAttributes().getOrDefault("value", "Botón");
-                if (box.width == 0) {
-                    box.width = Math.max(100, (val.length() * CHAR_WIDTH) + 24); // Ajustar al texto
-                }
-                if (box.height == 0) {
-                    box.height = 24;
-                }
-                box.style.setBackgroundColor(new java.awt.Color(240, 240, 240)); // Gris claro para botones
+                intrinsicW = Math.max(100, (val.length() * CHAR_WIDTH) + 24);
+                box.style.setBackgroundColor(new java.awt.Color(240, 240, 240));
             } else {
-                // Caja de texto normal (search, text, password)
-                if (box.width == 0) {
-                    box.width = 250; // Un poco más ancha para búsquedas
-                }
-                if (box.height == 0) {
-                    box.height = 24;
+                String sizeAttr = node.getAttributes().get("size");
+                if (sizeAttr != null) {
+                    try {
+                        intrinsicW = Integer.parseInt(sizeAttr) * CHAR_WIDTH;
+                    } catch (NumberFormatException e) {
+                    }
+                } else {
+                    intrinsicW = 300; // Cajas de búsqueda más anchas por defecto
                 }
                 box.style.setBackgroundColor(java.awt.Color.WHITE);
+            }
+
+            // Forzar el tamaño si el CSS lo omite o lo marca como auto
+            if (style.getWidth() == null || "auto".equals(style.getWidth())) {
+                box.width = intrinsicW + style.getPaddingLeft() + style.getPaddingRight();
+            }
+            if (style.getHeight() == null || "auto".equals(style.getHeight())) {
+                box.height = intrinsicH + style.getPaddingTop() + style.getPaddingBottom();
             }
 
             box.style.setBorderWidth(1);

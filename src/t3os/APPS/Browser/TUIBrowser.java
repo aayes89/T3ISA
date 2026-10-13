@@ -252,10 +252,23 @@ public final class TUIBrowser extends TUIElement {
         int textX = fieldX + 5;
         int textY = by + 8;
 
-        ui.drawText(address, textX, textY, COLOR_TEXT);
+        // CORRECCIÓN: Lógica para recortar y desplazar la URL si es más grande que la ventana
+        int maxChars = Math.max(1, (fieldWidth - 10) / 8);
+        int startIdx = 0;
+
+        if (address.length() > maxChars) {
+            if (addressCursor > maxChars) {
+                startIdx = addressCursor - maxChars;
+            } else {
+                startIdx = 0;
+            }
+        }
+
+        String displayAddress = address.substring(startIdx, Math.min(address.length(), startIdx + maxChars));
+        ui.drawText(displayAddress, textX, textY, COLOR_TEXT);
 
         if (addressFocused) {
-            int visibleCursor = Math.min(addressCursor, address.length());
+            int visibleCursor = addressCursor - startIdx;
             int cursorX = textX + visibleCursor * 8;
 
             int rightLimit = fieldX + fieldWidth - 3;

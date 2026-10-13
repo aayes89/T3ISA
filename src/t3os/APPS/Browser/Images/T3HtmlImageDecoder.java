@@ -45,6 +45,10 @@ public final class T3HtmlImageDecoder {
         String extension = getExtension(source);
 
         // Primero se intenta identificar el formato por su firma.
+        if (isSVG(data)) {
+            return T3HtmlImageSVG.decode(data);
+        }
+
         if (isPNG(data)) {
             return T3HtmlImagePNG.decode(data);
         }
@@ -63,6 +67,8 @@ public final class T3HtmlImageDecoder {
 
         // Como alternativa, se utiliza la extensión de la URL.
         switch (extension) {
+            case "svg": // NUEVO: Detectar por extensión
+                return T3HtmlImageSVG.decode(data);
             case "jpg":
             case "jpeg":
                 return T3HtmlImageJPEG.decode(data);
@@ -109,6 +115,12 @@ public final class T3HtmlImageDecoder {
         }
 
         return path.substring(dot + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean isSVG(byte[] d) {
+        // Leer los primeros 100 bytes buscando firmas XML o SVG
+        String header = new String(d, 0, Math.min(d.length, 100)).trim().toLowerCase(Locale.ROOT);
+        return header.startsWith("<?xml") || header.startsWith("<svg") || header.startsWith("<!doctype svg");
     }
 
     private static boolean isPNG(byte[] d) {
