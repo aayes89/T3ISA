@@ -33,6 +33,7 @@ import t3isa.DEVICE.TKeyboardDevice;
 import t3isa.NETWORKING.THostNetwork;
 import t3os.APPS.Browser.Images.T3HtmlImage;
 import t3os.APPS.Browser.Images.T3HtmlImageBMP;
+import t3os.APPS.Browser.Images.T3HtmlImageGIF;
 import t3os.APPS.Browser.Images.T3HtmlImagePNG;
 import t3os.UI.TUI;
 import t3os.UI.TUIElement;
@@ -166,7 +167,8 @@ public final class TUIBrowser extends TUIElement {
         drawContent(ui);
         drawStatusBar(ui);
         //testBMP("", ui);
-        testPNG("", ui);
+        //testPNG("", ui);
+        testGIF("", ui);
     }
 
     private void drawWindow(TUI ui) {
@@ -730,6 +732,23 @@ public final class TUIBrowser extends TUIElement {
             ui.drawImagePixels(x, y, image.getWidth(), image.getHeight(), image.getPixels());
         } catch (Exception ex) {
             System.err.println("Error PNG: " + ex.getMessage());
+        }
+    }
+
+    public void testGIF(String url, TUI ui) {
+        try {
+            //byte[] data = THostNetwork.wgetBytes(url);
+            byte[] gifBytes = new byte[]{
+                71, 73, 70, 56, 57, 97, 1, 0, 1, 0, -128, 0, 0, -1, 0, 0,
+                0, 0, 0, 44, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 2, 68,
+                1, 0, 59
+            };
+
+            T3HtmlImage image = T3HtmlImageGIF.decode(gifBytes);
+
+            ui.drawImagePixels(x, y, image.getWidth(), image.getHeight(), image.getPixels());
+        } catch (Exception ex) {
+            System.err.println("Error GIF: " + ex.getMessage());
         }
     }
 
