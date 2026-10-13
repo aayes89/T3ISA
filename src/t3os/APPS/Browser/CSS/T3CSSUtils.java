@@ -341,6 +341,8 @@ public class T3CSSUtils {
                     new Color(220, 53, 69);
                 case "0d6efd" ->
                     new Color(13, 110, 253);
+                case "inherit" ->
+                    new Color(0, 0, 0);
                 default -> {
                     LOGGER.warning("Color no reconocido: " + value + "; usando null");
                     yield null;
