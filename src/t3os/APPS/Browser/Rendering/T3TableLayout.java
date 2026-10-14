@@ -38,7 +38,6 @@ public class T3TableLayout {
             return;
         }
 
-        // Extraer todas las filas (<tr>), incluso si están dentro de un <tbody>
         List<T3LayoutBox> rows = new ArrayList<>();
         for (T3LayoutBox child : tableBox.children) {
             String tag = child.node.getTagName();
@@ -57,7 +56,6 @@ public class T3TableLayout {
             return;
         }
 
-        // Determinar el número máximo de columnas
         int maxCols = 0;
         for (T3LayoutBox row : rows) {
             maxCols = Math.max(maxCols, row.children.size());
@@ -66,35 +64,32 @@ public class T3TableLayout {
             return;
         }
 
-        // Calcular el ancho de cada columna (distribución equitativa por ahora)
-        int usableWidth = availableWidth - tableBox.style.getPaddingLeft() - tableBox.style.getPaddingRight();
-        int colWidth = Math.max(10, usableWidth / maxCols);
+        // Prevención de anchos negativos o mínimos absolutos irrompibles para Wikipedia
+        int usableWidth = Math.max(maxCols * 10, availableWidth - tableBox.style.getPaddingLeft() - tableBox.style.getPaddingRight());
+        int colWidth = usableWidth / maxCols;
 
         int currentY = tableBox.y + tableBox.style.getPaddingTop();
 
-        // Alinear cada celda en la cuadrícula
         for (T3LayoutBox row : rows) {
             int currentX = tableBox.x + tableBox.style.getPaddingLeft();
             int maxRowHeight = 0;
 
             for (T3LayoutBox cell : row.children) {
-                // Desplazar la celda a su posición en la grilla
                 int dx = currentX - cell.x;
                 int dy = currentY - cell.y;
                 cell.shift(dx, dy);
 
-                // Forzar el ancho visual de la columna
-                cell.width = colWidth;
+                // Respetar anchos precalculados mayores al ancho de columna
+                cell.width = Math.max(colWidth, cell.width);
                 maxRowHeight = Math.max(maxRowHeight, cell.height);
 
-                currentX += colWidth;
+                currentX += cell.width;
             }
 
             currentY += maxRowHeight;
-            row.height = maxRowHeight; // Ajustar la altura de la fila
+            row.height = maxRowHeight;
         }
 
-        // Ajustar la altura total de la tabla
         tableBox.height = currentY - tableBox.y + tableBox.style.getPaddingBottom();
     }
 }
