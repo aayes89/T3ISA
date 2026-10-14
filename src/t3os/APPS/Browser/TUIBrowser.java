@@ -1012,28 +1012,37 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
+        // Buscar imágenes tanto en etiquetas <img> como en atributos 'background' (para Space Jam)
+        String src = null;
         if ("img".equalsIgnoreCase(node.getTagName())) {
-            String src = node.getAttributes().get("src");
+            src = node.getAttributes().get("src");
+        } else if (node.getAttributes().containsKey("background")) {
+            src = node.getAttributes().get("background");
+        }
 
-            if (src != null && !src.isBlank()) {
-                try {
-                    String baseStr = pageUri.toString();
-                    // Si la ruta base no termina en barra y no es solo el dominio, añádesela
-                    if (!baseStr.endsWith("/") && baseStr.lastIndexOf('/') > 8) {
-                        baseStr += "/";
-                    }
-                    URI baseDirUri = URI.create(baseStr);
-                    URI imageUri = baseDirUri.resolve(src.trim()).normalize();
-
-                    String scheme = imageUri.getScheme();
-
-                    // Solo descargar imágenes HTTP o HTTPS.
-                    if (imageUri.getHost() != null && ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
-                        requestImage(imageUri.toString(), currentNavigation);
-                    }
-                } catch (IllegalArgumentException ex) {
-                    System.err.println("URL de imagen inválida: " + src);
+        if (src != null && !src.isBlank()) {
+            try {
+                String baseStr = pageUri.toString();
+                if (!baseStr.endsWith("/") && baseStr.lastIndexOf('/') > 8) {
+                    baseStr += "/";
                 }
+
+                // Soporte para URLs relativas al protocolo (ej. "//google.com/img.png")
+                String cleanSrc = src.trim();
+                if (cleanSrc.startsWith("//")) {
+                    cleanSrc = pageUri.getScheme() + ":" + cleanSrc;
+                }
+
+                URI baseDirUri = URI.create(baseStr);
+                URI imageUri = baseDirUri.resolve(cleanSrc).normalize();
+
+                String scheme = imageUri.getScheme();
+
+                if (imageUri.getHost() != null && ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
+                    requestImage(imageUri.toString(), currentNavigation);
+                }
+            } catch (IllegalArgumentException ex) {
+                System.err.println("URL de imagen inválida: " + src);
             }
         }
 
