@@ -56,6 +56,12 @@ public class T3Style {
     private String width = null; // Soporta px, %, auto
     private String height = null; // Soporta px, %, auto
     private String overflow = "visible";
+    private String top = "auto";
+    private String right = "auto";
+    private String bottom = "auto";
+    private String left = "auto";
+    private int zIndex = 0;
+    private String floatElement = "none"; // Evitamos usar la palabra reservada 'float'
 
     public static final Map<String, Map<String, String>> BOOTSTRAP_STYLES;
     private String position = "static";
@@ -387,5 +393,54 @@ public class T3Style {
     public void setOverflow(String overflow) {
         this.overflow = overflow != null && List.of("visible", "hidden", "scroll").contains(overflow.toLowerCase())
                 ? overflow.toLowerCase() : "visible";
+    }
+
+    public String getTop() {
+        return top;
+    }
+
+    public void setTop(String top) {
+        this.top = normalizeDimension(top);
+    }
+
+    public String getRight() {
+        return right;
+    }
+
+    public void setRight(String right) {
+        this.right = normalizeDimension(right);
+    }
+
+    public String getBottom() {
+        return bottom;
+    }
+
+    public void setBottom(String bottom) {
+        this.bottom = normalizeDimension(bottom);
+    }
+
+    public String getLeft() {
+        return left;
+    }
+
+    public void setLeft(String left) {
+        this.left = normalizeDimension(left);
+    }
+
+    public int getZIndex() {
+        return zIndex;
+    }
+
+    public void setZIndex(int zIndex) {
+        this.zIndex = zIndex;
+    }
+
+    public String getFloatElement() {
+        return floatElement;
+    }
+
+    public void setFloatElement(String floatElement) {
+        this.floatElement = floatElement != null && List.of("left", "right", "none").contains(floatElement.toLowerCase())
+                ? floatElement.toLowerCase() : "none";
     }
 }
