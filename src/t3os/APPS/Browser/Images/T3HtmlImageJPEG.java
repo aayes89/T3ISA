@@ -698,9 +698,9 @@ public final class T3HtmlImageJPEG {
                 int tables = u8();
                 Component c = null;
 
-                for (Component candidate : components) {
-                    if (candidate.id == id) {
-                        c = candidate;
+                for (int j = 0; j < componentCount; j++) {
+                    if (components[j].id == id) {
+                        c = components[j];
                         break;
                     }
                 }
@@ -732,8 +732,9 @@ public final class T3HtmlImageJPEG {
             int restartCount = 0;
             int expectedRestart = 0;
 
-            for (Component c : components) {
-                c.predictor = 0;
+            // Limitar el bucle a componentCount para no leer índices null
+            for (int i = 0; i < componentCount; i++) {
+                components[i].predictor = 0;
             }
 
             for (int my = 0; my < mcuRows; my++) {
@@ -743,12 +744,14 @@ public final class T3HtmlImageJPEG {
                         expectedRestart = (expectedRestart + 1) & 7;
                         restartCount = 0;
 
-                        for (Component c : components) {
-                            c.predictor = 0;
+                        // Limitar el bucle aquí también
+                        for (int i = 0; i < componentCount; i++) {
+                            components[i].predictor = 0;
                         }
                     }
 
-                    for (Component c : components) {
+                    for (int i = 0; i < componentCount; i++) {
+                        Component c = components[i];
                         for (int vy = 0; vy < c.v; vy++) {
                             for (int hx = 0; hx < c.h; hx++) {
                                 decodeBlock(bits, c, mx * c.h + hx, my * c.v + vy);

@@ -663,21 +663,35 @@ public final class TUIBrowser extends TUIElement {
         int code = key.getCode();
         char ch = key.getCharacter();
 
-        // Interceptar el input web ANTES del switch y del return
+        // Manejo seguro de atributos para evitar UnsupportedOperationException
         if (focusedInputNode != null) {
             String currentVal = focusedInputNode.getAttributes().getOrDefault("value", "");
+            String newVal = currentVal;
 
             if (code == KeyEvent.VK_BACK_SPACE && currentVal.length() > 0) {
-                focusedInputNode.getAttributes().put("value", currentVal.substring(0, currentVal.length() - 1));
+                newVal = currentVal.substring(0, currentVal.length() - 1);
             } else if (code == KeyEvent.VK_ENTER) {
                 submitForm(focusedInputNode);
+                return;
             } else if (!Character.isISOControl(ch)) {
-                focusedInputNode.getAttributes().put("value", currentVal + ch);
+                newVal = currentVal + ch;
             }
-            return; // Detener ejecución para no escribir en la barra de URL
+
+            if (!newVal.equals(currentVal)) {
+                try {
+                    focusedInputNode.getAttributes().put("value", newVal);
+                } catch (UnsupportedOperationException e) {
+                    try {
+                        // Acceso de emergencia al campo público/package-private si el getter está bloqueado
+                        focusedInputNode.attributes.put("value", newVal);
+                    } catch (Exception ex) {
+                        System.err.println("CRÍTICO: Modifica T3HtmlNode para que 'attributes' sea un HashMap estándar.");
+                    }
+                }
+            }
+            return;
         }
 
-        // Navegación rápida por teclado (Scroll) sin necesidad de tener el foco en la barra de URL
         if (!addressFocused) {
             int viewportHeight = height - TITLE_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT - 3;
             int maxScroll = Math.max(0, contentHeight - viewportHeight);
