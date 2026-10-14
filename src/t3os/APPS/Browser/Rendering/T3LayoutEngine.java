@@ -119,6 +119,7 @@ public class T3LayoutEngine {
             return box;
         }
 
+        // Dimensionamiento intrínseco robusto y forzado para Inputs
         if ("input".equals(tag)) {
             String type = node.getAttributes().getOrDefault("type", "").toLowerCase();
 
@@ -141,19 +142,18 @@ public class T3LayoutEngine {
                     } catch (NumberFormatException e) {
                     }
                 } else {
-                    intrinsicW = 300;
+                    intrinsicW = 200; // Un tamaño mínimo razonable para la caja de texto
                 }
                 box.style.setBackgroundColor(java.awt.Color.WHITE);
             }
 
-            if (style.getWidth() == null || "auto".equals(style.getWidth())) {
-                box.width = intrinsicW + style.getPaddingLeft() + style.getPaddingRight();
-            }
-            if (style.getHeight() == null || "auto".equals(style.getHeight())) {
-                box.height = intrinsicH + style.getPaddingTop() + style.getPaddingBottom();
-            }
+            // Forzar los valores ABSOLUTOS
+            box.width = intrinsicW + style.getPaddingLeft() + style.getPaddingRight();
+            box.height = intrinsicH + style.getPaddingTop() + style.getPaddingBottom();
 
             box.style.setBorderWidth(1);
+            box.isText = false; // Asegurar que no actúe como una caja de texto fluido (word-wrap)
+
             contentHeight = Math.max(contentHeight, box.y + box.height);
             return box;
         }
