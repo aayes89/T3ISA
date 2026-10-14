@@ -159,7 +159,8 @@ public final class T3HtmlImageJPEG {
                 code = (code + count) << 1;
             }
 
-            if (index != vals.length || code > 65536) {
+            // Relajar las restricciones para cargar JPEG de los 90s (TheOldNet)
+            if (index > vals.length || code > 131072) { // Relajado para no tirar excepción
                 throw new IOException("Tabla Huffman JPEG inválida");
             }
         }
