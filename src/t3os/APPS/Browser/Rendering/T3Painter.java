@@ -77,6 +77,11 @@ public class T3Painter {
                 fillRectClipped(screenX, screenY, box.width, box.height, toRGB(box.style.getBackgroundColor()));
             }
 
+            // Dibujar imagen de fondo repetida (Tiled) si el tag no es <img> 
+            if (box.image != null && box.node != null && !"img".equals(box.node.getTagName())) {
+                drawBackgroundTiled(box, screenX, screenY);
+            }
+
             int borderWidth = box.style.getBorderWidth();
             if (borderWidth > 0 && box.width > 0 && box.height > 0) {
                 int borderColor = toRGB(box.style.getBorderColor());
@@ -89,7 +94,6 @@ public class T3Painter {
                 }
             }
 
-            // Comprobación de seguridad para evitar NullPointerExceptions
             if (box.node != null && "input".equals(box.node.getTagName())) {
                 String val = box.node.getAttributes().getOrDefault("value", "");
                 String type = box.node.getAttributes().getOrDefault("type", "text");
@@ -103,7 +107,8 @@ public class T3Painter {
                 }
             }
 
-            if (box.image != null) {
+            // Si es estrictamente un tag <img>, se dibuja normal (escalado)
+            if (box.image != null && box.node != null && "img".equals(box.node.getTagName())) {
                 drawImageClipped(box, screenX, screenY);
             }
         }
@@ -111,6 +116,45 @@ public class T3Painter {
         for (T3LayoutBox child : box.children) {
             paint(child);
         }
+    }
+
+    // Auxiliar para pintar fondos (html antiguos como los de Space Jam)
+    private void drawBackgroundTiled(T3LayoutBox box, int screenX, int screenY) {
+        int imgW = box.image.getWidth();
+        int imgH = box.image.getHeight();
+        int reqW = box.width;
+        int reqH = box.height;
+
+        if (reqW <= 0 || reqH <= 0 || imgW <= 0 || imgH <= 0) {
+            return;
+        }
+
+        int[] pixels = box.image.getPixels();
+
+        int startX = Math.max(0, context.getX() - screenX);
+        int startY = Math.max(0, context.getY() - screenY);
+        int endX = Math.min(reqW, context.getRight() - screenX);
+        int endY = Math.min(reqH, context.getBottom() - screenY);
+
+        if (startX >= endX || startY >= endY) {
+            return;
+        }
+
+        int clippedW = endX - startX;
+        int clippedH = endY - startY;
+
+        int[] tiledPixels = new int[clippedW * clippedH];
+
+        // Rellenar como mosaico
+        for (int y = 0; y < clippedH; y++) {
+            int srcY = (startY + y) % imgH;
+            for (int x = 0; x < clippedW; x++) {
+                int srcX = (startX + x) % imgW;
+                tiledPixels[y * clippedW + x] = pixels[srcY * imgW + srcX];
+            }
+        }
+
+        ui.drawImagePixels(screenX + startX, screenY + startY, clippedW, clippedH, tiledPixels);
     }
 
     // Auxiliares para dibujar

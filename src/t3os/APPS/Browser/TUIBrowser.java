@@ -314,27 +314,30 @@ public final class TUIBrowser extends TUIElement {
             return;
         }
 
-        //  Crear contexto para el pintor
         T3RenderContext context = new T3RenderContext(contentX, contentY, contentWidth, viewportHeight);
 
         List<T3CSSRule> cssRules = new ArrayList<>();
-        // Extraer CSS
         collectCSSRules(document, cssRules);
 
-        // Paso loadedImages directamente al Layout Engine
         URI baseUri = null;
         try {
-            baseUri = URI.create(address);
+            String baseStr = address;
+            // Agrego slash final a la url base si es necesario
+            // Evita que URI.resolve() borre directorios como /1996
+            if (!baseStr.endsWith("/") && baseStr.lastIndexOf('/') > 8) {
+                baseStr += "/";
+            }
+            baseUri = URI.create(baseStr);
         } catch (Exception ignored) {
         }
+
         T3LayoutEngine engine = new T3LayoutEngine(contentWidth, contentHeight, cssRules, loadedImages, baseUri);
         currentRenderTree = engine.buildLayoutTree(document);
-        // Actualizar el Scroll y la altura total
+
         contentHeight = Math.max(viewportHeight, engine.getContentHeight());
         int maxScroll = Math.max(0, contentHeight - viewportHeight);
         scrollY = Math.max(0, Math.min(scrollY, maxScroll));
 
-        // Fase de Paint (Dibujar los píxeles reales en UI)
         T3Painter painter = new T3Painter(ui, context);
         painter.setScrollY(scrollY);
         painter.paint(currentRenderTree);
@@ -1060,6 +1063,9 @@ public final class TUIBrowser extends TUIElement {
 
         Thread downloader = new Thread(() -> {
             try {
+                // Pequeño sleep para no saturar al servidor y evitar el error 429
+                Thread.sleep(50 + (int) (Math.random() * 100));
+
                 byte[] data = THostNetwork.wgetBytes(imageUrl);
 
                 if (data == null || data.length == 0) {

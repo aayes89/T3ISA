@@ -119,24 +119,66 @@ public class T3LayoutEngine {
             return box;
         }
 
+        if ("input".equals(tag)) {
+            String type = node.getAttributes().getOrDefault("type", "").toLowerCase();
+
+            if ("hidden".equals(type)) {
+                return null;
+            }
+
+            int intrinsicW = 150;
+            int intrinsicH = 24;
+
+            if ("submit".equals(type) || "button".equals(type)) {
+                String val = node.getAttributes().getOrDefault("value", "Botón");
+                intrinsicW = Math.max(100, (val.length() * CHAR_WIDTH) + 24);
+                box.style.setBackgroundColor(new java.awt.Color(240, 240, 240));
+            } else {
+                String sizeAttr = node.getAttributes().get("size");
+                if (sizeAttr != null) {
+                    try {
+                        intrinsicW = Integer.parseInt(sizeAttr) * CHAR_WIDTH;
+                    } catch (NumberFormatException e) {
+                    }
+                } else {
+                    intrinsicW = 300;
+                }
+                box.style.setBackgroundColor(java.awt.Color.WHITE);
+            }
+
+            if (style.getWidth() == null || "auto".equals(style.getWidth())) {
+                box.width = intrinsicW + style.getPaddingLeft() + style.getPaddingRight();
+            }
+            if (style.getHeight() == null || "auto".equals(style.getHeight())) {
+                box.height = intrinsicH + style.getPaddingTop() + style.getPaddingBottom();
+            }
+
+            box.style.setBorderWidth(1);
+            contentHeight = Math.max(contentHeight, box.y + box.height);
+            return box;
+        }
+
+        // Uso getLoadedImage para la imagen de fondo de forma segura
+        String bgSrc = node.getAttributes().get("background");
+        if (bgSrc != null) {
+            T3HtmlImage bgImg = getLoadedImage(bgSrc);
+            if (bgImg != null) {
+                box.image = bgImg;
+            }
+        }
+
+        // Uso getLoadedImage para las etiquetas IMG
         if (tag.equals("img")) {
             String src = node.getAttributes().get("src");
-            if (src != null && baseUrl != null) {
-                try {
-                    String absoluteUrl = baseUrl.resolve(src.trim()).normalize().toString();
-                    T3HtmlImage img = loadedImages.get(absoluteUrl);
-                    box.image = img;
-                    int intrinsicW = img != null ? img.getWidth() : 64;
-                    int intrinsicH = img != null ? img.getHeight() : 48;
+            T3HtmlImage img = getLoadedImage(src);
+            box.image = img;
 
-                    box.width = resolveWidth(node.getAttributes().get("width"), resolveWidth(style.getWidth(), intrinsicW));
-                    box.height = resolveHeight(node.getAttributes().get("height"), resolveHeight(style.getHeight(), intrinsicH));
-                    contentHeight = Math.max(contentHeight, box.y + box.height);
-                } catch (IllegalArgumentException e) {
-                    box.width = 64;
-                    box.height = 48;
-                }
-            }
+            int intrinsicW = img != null ? img.getWidth() : 64;
+            int intrinsicH = img != null ? img.getHeight() : 48;
+
+            box.width = resolveWidth(node.getAttributes().get("width"), resolveWidth(style.getWidth(), intrinsicW));
+            box.height = resolveHeight(node.getAttributes().get("height"), resolveHeight(style.getHeight(), intrinsicH));
+            contentHeight = Math.max(contentHeight, box.y + box.height);
             return box;
         }
 
@@ -234,45 +276,6 @@ public class T3LayoutEngine {
             box.height = resolveHeight(style.getHeight(), maxChildBottom - box.y) + paddingBottom;
         }
 
-        // Dimensionamiento intrínseco robusto y forzado para Inputs
-        if ("input".equals(tag)) {
-            String type = node.getAttributes().getOrDefault("type", "").toLowerCase();
-
-            if ("hidden".equals(type)) {
-                return null;
-            }
-
-            int intrinsicW = 150;
-            int intrinsicH = 24;
-
-            if ("submit".equals(type) || "button".equals(type)) {
-                String val = node.getAttributes().getOrDefault("value", "Botón");
-                intrinsicW = Math.max(100, (val.length() * CHAR_WIDTH) + 24);
-                box.style.setBackgroundColor(new java.awt.Color(240, 240, 240));
-            } else {
-                String sizeAttr = node.getAttributes().get("size");
-                if (sizeAttr != null) {
-                    try {
-                        intrinsicW = Integer.parseInt(sizeAttr) * CHAR_WIDTH;
-                    } catch (NumberFormatException e) {
-                    }
-                } else {
-                    intrinsicW = 300; // Cajas de búsqueda más anchas por defecto
-                }
-                box.style.setBackgroundColor(java.awt.Color.WHITE);
-            }
-
-            // Forzar el tamaño si el CSS lo omite o lo marca como auto
-            if (style.getWidth() == null || "auto".equals(style.getWidth())) {
-                box.width = intrinsicW + style.getPaddingLeft() + style.getPaddingRight();
-            }
-            if (style.getHeight() == null || "auto".equals(style.getHeight())) {
-                box.height = intrinsicH + style.getPaddingTop() + style.getPaddingBottom();
-            }
-
-            box.style.setBorderWidth(1);
-        }
-
         if (isFlex) {
             T3FlexLayout.apply(box, box.width);
             maxChildBottom = box.y;
@@ -288,6 +291,36 @@ public class T3LayoutEngine {
 
         contentHeight = Math.max(contentHeight, box.y + box.height + marginBottom);
         return box;
+    }
+
+    // Resolvedor robusto de caché de imágenes
+    private T3HtmlImage getLoadedImage(String src) {
+        if (src == null || src.trim().isEmpty()) {
+            return null;
+        }
+        String cleanSrc = src.trim();
+
+        if (baseUrl != null) {
+            try {
+                // Soportar URLs relativas al protocolo (ej. "//upload.wikimedia.org")
+                if (cleanSrc.startsWith("//")) {
+                    cleanSrc = baseUrl.getScheme() + ":" + cleanSrc;
+                }
+                String absoluteUrl = baseUrl.resolve(cleanSrc).normalize().toString();
+                if (loadedImages.containsKey(absoluteUrl)) {
+                    return loadedImages.get(absoluteUrl);
+                }
+            } catch (IllegalArgumentException e) {
+            }
+        }
+
+        // Si falla la resolución estricta, busca si alguna imagen cargada coincide al final
+        for (Map.Entry<String, T3HtmlImage> entry : loadedImages.entrySet()) {
+            if (entry.getKey().endsWith(cleanSrc)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     // Soporte para atributos de HTML de 1996 (para mi ejemplo de spacejam.com/1996)
