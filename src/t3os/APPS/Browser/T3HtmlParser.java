@@ -49,6 +49,7 @@ public class T3HtmlParser {
     ));
 
     private int pos;
+    private int depth = 0;
     private final String content;
     private final int contentLength;
 
@@ -130,7 +131,7 @@ public class T3HtmlParser {
             skipWhitespace();
         }
 
-        // Prevenir colisión de etiquetas anidadas sin cierre (ej: <a <b)
+        // Prevenir colisión de etiquetas anidadas sin cierre
         while (pos < contentLength && content.charAt(pos) != '>' && content.charAt(pos) != '<') {
             pos++;
         }
@@ -138,8 +139,6 @@ public class T3HtmlParser {
         if (pos < contentLength && content.charAt(pos) == '>') {
             pos++;
         } else {
-            // Si aparece '<' antes de cerrar la etiqueta actual, 
-            // fuerzo como autocierre para evitar StackOverflowError por recursión.
             selfClosing = true;
         }
 
@@ -155,8 +154,15 @@ public class T3HtmlParser {
             return node;
         }
 
+        // Límite de profundidad máxima para evitar StackOverflow en el parser (Wikipedia)
+        if (depth > 200) {
+            return node;
+        }
+
+        depth++;
+
         while (pos < contentLength) {
-            int loopStartPos = pos; // prevenir bucles infinitos
+            int loopStartPos = pos;
 
             if (content.regionMatches(true, pos, "</", 0, 2)) {
                 int closeStart = pos;
@@ -165,11 +171,13 @@ public class T3HtmlParser {
                 skipTag();
 
                 if (closeName.equals(tagName)) {
+                    depth--;
                     return node;
                 }
 
                 if (AUTO_CLOSE_TAGS.contains(tagName)) {
                     pos = closeStart;
+                    depth--;
                     return node;
                 }
 
@@ -177,6 +185,7 @@ public class T3HtmlParser {
             }
 
             if (content.charAt(pos) == '<' && AUTO_CLOSE_TAGS.contains(tagName) && startsAutoCloseTag(tagName, pos)) {
+                depth--;
                 return node;
             }
 
@@ -185,12 +194,12 @@ public class T3HtmlParser {
                 node.addChild(child);
             }
 
-            // Forzar el avance si el parser interno falló en avanzar
             if (pos == loopStartPos) {
                 pos++;
             }
         }
 
+        depth--;
         return node;
     }
 

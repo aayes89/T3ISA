@@ -651,6 +651,7 @@ public final class TUIBrowser extends TUIElement {
         }
     }
 
+    // Eventos de teclado 
     public void keyPressed(TKeyboardDevice.Key key) {
         if (key == null || !visible || !enabled) {
             return;
@@ -673,8 +674,31 @@ public final class TUIBrowser extends TUIElement {
             return; // Detener ejecución para no escribir en la barra de URL
         }
 
-        // Si no estamos en un input web ni en la barra de direcciones, ignorar
+        // Navegación rápida por teclado (Scroll) sin necesidad de tener el foco en la barra de URL
         if (!addressFocused) {
+            int viewportHeight = height - TITLE_HEIGHT - TOOLBAR_HEIGHT - STATUS_HEIGHT - 3;
+            int maxScroll = Math.max(0, contentHeight - viewportHeight);
+
+            switch (code) {
+                case KeyEvent.VK_UP:
+                    scrollY = Math.max(0, scrollY - 40);
+                    return;
+                case KeyEvent.VK_DOWN:
+                    scrollY = Math.min(maxScroll, scrollY + 40);
+                    return;
+                case KeyEvent.VK_PAGE_UP:
+                    scrollY = Math.max(0, scrollY - viewportHeight);
+                    return;
+                case KeyEvent.VK_PAGE_DOWN:
+                    scrollY = Math.min(maxScroll, scrollY + viewportHeight);
+                    return;
+                case KeyEvent.VK_HOME:
+                    scrollY = 0;
+                    return;
+                case KeyEvent.VK_END:
+                    scrollY = maxScroll;
+                    return;
+            }
             return;
         }
 
@@ -724,10 +748,6 @@ public final class TUIBrowser extends TUIElement {
             case KeyEvent.VK_META:
             case KeyEvent.VK_CAPS_LOCK:
             case KeyEvent.VK_TAB:
-            case KeyEvent.VK_UP:
-            case KeyEvent.VK_DOWN:
-            case KeyEvent.VK_PAGE_UP:
-            case KeyEvent.VK_PAGE_DOWN:
             case KeyEvent.VK_INSERT:
                 return;
 
